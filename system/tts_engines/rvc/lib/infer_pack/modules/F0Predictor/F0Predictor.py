@@ -1,4 +1,4 @@
-class F0Predictor(object):
+class F0Predictor:
     def compute_f0(self, wav, p_len):
         pass
 

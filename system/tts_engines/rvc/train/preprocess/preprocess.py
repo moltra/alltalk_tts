@@ -1,11 +1,11 @@
-from multiprocessing import cpu_count
 import os
 import sys
+from multiprocessing import cpu_count
 
-from scipy import signal
-from scipy.io import wavfile
 import librosa
 import numpy as np
+from scipy import signal
+from scipy.io import wavfile
 
 now_directory = os.getcwd()
 sys.path.append(now_directory)
@@ -51,17 +51,13 @@ class PreProcess:
         if tmp_max > 2.5:
             print(f"{idx0}-{idx1}-{tmp_max}-filtered")
             return
-        tmp_audio = (tmp_audio / tmp_max * (self.max_amplitude * self.alpha)) + (
-            1 - self.alpha
-        ) * tmp_audio
+        tmp_audio = (tmp_audio / tmp_max * (self.max_amplitude * self.alpha)) + (1 - self.alpha) * tmp_audio
         wavfile.write(
             f"{self.gt_wavs_dir}/{idx0}_{idx1}.wav",
             self.sr,
             tmp_audio.astype(np.float32),
         )
-        tmp_audio = librosa.resample(
-            tmp_audio, orig_sr=self.sr, target_sr=16000
-        )  # , res_type="soxr_vhq"
+        tmp_audio = librosa.resample(tmp_audio, orig_sr=self.sr, target_sr=16000)  # , res_type="soxr_vhq"
         wavfile.write(
             f"{self.wavs16k_dir}/{idx0}_{idx1}.wav",
             16000,
@@ -80,9 +76,7 @@ class PreProcess:
                     start = int(self.sr * (self.per - self.overlap) * i)
                     i += 1
                     if len(audio_segment[start:]) > self.tail * self.sr:
-                        tmp_audio = audio_segment[
-                            start : start + int(self.per * self.sr)
-                        ]
+                        tmp_audio = audio_segment[start : start + int(self.per * self.sr)]
                         self.normalize_and_write(tmp_audio, idx0, idx1)
                         idx1 += 1
                     else:
@@ -99,10 +93,7 @@ class PreProcess:
 
     def process_audio_multiprocessing_input_directory(self, input_root, num_processes):
         try:
-            infos = [
-                (f"{input_root}/{name}", idx)
-                for idx, name in enumerate(sorted(list(os.listdir(input_root))))
-            ]
+            infos = [(f"{input_root}/{name}", idx) for idx, name in enumerate(sorted(list(os.listdir(input_root))))]
             processes = []
             for i in range(num_processes):
                 p = multiprocessing.Process(
@@ -125,6 +116,4 @@ def preprocess_training_set(input_root, sr, num_processes, exp_dir, per):
 
 
 if __name__ == "__main__":
-    preprocess_training_set(
-        input_root, sampling_rate, num_processes, experiment_directory, percentage
-    )
+    preprocess_training_set(input_root, sampling_rate, num_processes, experiment_directory, percentage)

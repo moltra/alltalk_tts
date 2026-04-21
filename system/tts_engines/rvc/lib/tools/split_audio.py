@@ -1,8 +1,9 @@
-from pydub.silence import detect_nonsilent
-from pydub import AudioSegment
-import numpy as np
-import re
 import os
+import re
+
+import numpy as np
+from pydub import AudioSegment
+from pydub.silence import detect_nonsilent
 
 from ...lib.utils import format_title
 
@@ -17,9 +18,7 @@ def process_audio(file_path):
         min_silence_len = 750  # ms, adjust as needed
 
         # detect nonsilent parts
-        nonsilent_parts = detect_nonsilent(
-            song, min_silence_len=min_silence_len, silence_thresh=silence_thresh
-        )
+        nonsilent_parts = detect_nonsilent(song, min_silence_len=min_silence_len, silence_thresh=silence_thresh)
 
         # Create a new directory to store chunks
         file_dir = os.path.dirname(file_path)
@@ -64,7 +63,7 @@ def merge_audio(timestamps_file):
         timestamps_dir = os.path.dirname(timestamps_file)
 
         # Open the timestamps file
-        with open(timestamps_file, "r", encoding="utf-8") as f:
+        with open(timestamps_file, encoding="utf-8") as f:
             lines = f.readlines()
 
         # Initialize empty list to hold audio segments

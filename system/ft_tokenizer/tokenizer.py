@@ -14,7 +14,6 @@ from spacy.lang.es import Spanish
 from spacy.lang.ja import Japanese
 from spacy.lang.zh import Chinese
 from tokenizers import Tokenizer
-
 from TTS.tts.layers.xtts.zh_num2words import TextNorm as zh_num2words
 
 
@@ -237,9 +236,9 @@ _abbreviations = {
             ("博士", "はかせ"),  # Doctor or PhD
             ("株", "株式会社"),  # Corporation
             ("有", "有限会社"),  # Limited company
-            ("大学", "だいがく"),   # University
-            ("先生", "せんせい"),   # Teacher/Professor/Master
-            ("君", "くん")   # Used at the end of boys' names to express familiarity or affection.
+            ("大学", "だいがく"),  # University
+            ("先生", "せんせい"),  # Teacher/Professor/Master
+            ("君", "くん"),  # Used at the end of boys' names to express familiarity or affection.
         ]
     ],
 }
@@ -448,7 +447,7 @@ _symbols_multilingual = {
             ("$", " ドル "),
             ("£", " ポンド "),
             ("°", " 度"),
-            ]
+        ]
     ],
 }
 
@@ -475,7 +474,7 @@ _ordinal_re = {
     "tr": re.compile(r"([0-9]+)(\.|inci|nci|uncu|üncü|\.)"),
     "hu": re.compile(r"([0-9]+)(\.|adik|edik|odik|edik|ödik|ödike|ik)"),
     "ko": re.compile(r"([0-9]+)(번째|번|차|째)"),
-    "ja": re.compile(r"([0-9]+)(番|回|つ|目|等|位)")
+    "ja": re.compile(r"([0-9]+)(番|回|つ|目|等|位)"),
 }
 _number_re = re.compile(r"[0-9]+")
 _currency_re = {
@@ -509,7 +508,7 @@ def _expand_decimal_point(m, lang="en"):
 
 
 def _expand_currency(m, lang="en", currency="USD"):
-    amount = float((re.sub(r"[^\d.]", "", m.group(0).replace(",", "."))))
+    amount = float(re.sub(r"[^\d.]", "", m.group(0).replace(",", ".")))
     full_amount = num2words(amount, to="currency", currency=currency, lang=lang if lang != "cs" else "cz")
 
     and_equivalents = {

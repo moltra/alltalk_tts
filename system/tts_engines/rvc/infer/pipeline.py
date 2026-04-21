@@ -1,22 +1,22 @@
-import numpy as np
-import torch
-import sys
+import gc
 import os
-import pdb
-import parselmouth
+import re
+import sys
+from functools import lru_cache
+from pathlib import Path
 from time import time as ttime
+
+import faiss
+import librosa
+import numpy as np
+import parselmouth
+import pyworld
+import scipy.signal as signal
+import torch
 import torch.nn.functional as F
 import torchcrepe
 from torch import Tensor
-import scipy.signal as signal
-import pyworld, os, faiss, librosa, torchcrepe
-from scipy import signal
-from functools import lru_cache
-import random
-import gc
-import re
-import traceback
-from pathlib import Path
+
 # Get the current working directory
 script_dir = Path(__file__).resolve().parent
 now_dir = script_dir.parents[3]
@@ -49,32 +49,17 @@ def change_rms(data1, sr1, data2, sr2, rate):
     rms2 = librosa.feature.rms(y=data2, frame_length=sr2 // 2 * 2, hop_length=sr2 // 2)
 
     rms1 = torch.from_numpy(rms1)
-    rms1 = F.interpolate(
-        rms1.unsqueeze(0), size=data2.shape[0], mode="linear"
-    ).squeeze()
+    rms1 = F.interpolate(rms1.unsqueeze(0), size=data2.shape[0], mode="linear").squeeze()
 
     rms2 = torch.from_numpy(rms2)
-    rms2 = F.interpolate(
-        rms2.unsqueeze(0), size=data2.shape[0], mode="linear"
-    ).squeeze()
+    rms2 = F.interpolate(rms2.unsqueeze(0), size=data2.shape[0], mode="linear").squeeze()
     rms2 = torch.max(rms2, torch.zeros_like(rms2) + 1e-6)
 
-    data2 *= (
-        torch.pow(rms1, torch.tensor(1 - rate))
-        * torch.pow(rms2, torch.tensor(rate - 1))
-    ).numpy()
+    data2 *= (torch.pow(rms1, torch.tensor(1 - rate)) * torch.pow(rms2, torch.tensor(rate - 1))).numpy()
     return data2
 
-from sklearn.metrics import (
-    silhouette_score,
-    calinski_harabasz_score,
-    davies_bouldin_score,
-    fowlkes_mallows_score,
-    adjusted_rand_score,
-    adjusted_mutual_info_score
-)
 
-class VC(object):
+class VC:
     def __init__(self, tgt_sr, config, version, if_f0, net_g, data=None, d=None, train_data=None, debug_rvc=False):
         branding = "AllTalk "
         self.x_pad, self.x_query, self.x_center, self.x_max, self.is_half = (
@@ -128,7 +113,9 @@ class VC(object):
                 print(f"[{branding}Debug] FAISS IndexIVFFlat initialized: {self.index}")
 
             if debug_rvc:
-                print(f"[{branding}Debug] Training FAISS index with {len(train_data)} training points and {new_nlist} centroids")
+                print(
+                    f"[{branding}Debug] Training FAISS index with {len(train_data)} training points and {new_nlist} centroids"
+                )
             self.index.train(train_data)
             if debug_rvc:
                 print(f"[{branding}Debug] FAISS index trained")
@@ -145,7 +132,6 @@ class VC(object):
             if debug_rvc:
                 print(f"[{branding}Debug] FAISS index not initialized due to missing data.")
 
-
     def generate_interpolated_frequencies(self):
         note_dict = []
         for i in range(len(self.ref_freqs) - 1):
@@ -155,7 +141,6 @@ class VC(object):
             note_dict.extend(interpolated_freqs)
         note_dict.append(self.ref_freqs[-1])
         return note_dict
-
 
     def autotune_f0(self, f0):
         # Autotunes the given fundamental frequency (f0) to the nearest musical note.
@@ -167,14 +152,14 @@ class VC(object):
         return autotuned_f0
 
     def get_optimal_torch_device(self, index: int = 0) -> torch.device:
-        #print("GETTING OPTIMAL DEVICE")
+        # print("GETTING OPTIMAL DEVICE")
         if torch.cuda.is_available():
-            #print("GETTING OPTIMAL DEVICE CUDA")
+            # print("GETTING OPTIMAL DEVICE CUDA")
             return torch.device(f"cuda:{index % torch.cuda.device_count()}")
         elif torch.backends.mps.is_available():
-            #print("GETTING OPTIMAL DEVICE MPS")
+            # print("GETTING OPTIMAL DEVICE MPS")
             return torch.device("mps")
-        #print("GETTING OPTIMAL DEVICE CPU")
+        # print("GETTING OPTIMAL DEVICE CPU")
         return torch.device("cpu")
 
     def get_f0_crepe_computation(
@@ -214,7 +199,7 @@ class VC(object):
             source,
         )
         f0 = np.nan_to_num(target)
-        #print("LEAVING get_f0_crepe_computation")
+        # print("LEAVING get_f0_crepe_computation")
         return f0
 
     def get_f0_official_crepe_computation(
@@ -241,7 +226,7 @@ class VC(object):
         f0 = torchcrepe.filter.mean(f0, 3)
         f0[pd < 0.1] = 0
         f0 = f0[0].cpu().numpy()
-        #print("LEAVING get_f0_official_crepe_computation")
+        # print("LEAVING get_f0_official_crepe_computation")
         return f0
 
     def get_f0_hybrid_computation(
@@ -253,26 +238,23 @@ class VC(object):
         p_len,
         hop_length,
     ):
-        methods_str = re.search("hybrid\[(.+)\]", methods_str)
+        methods_str = re.search(r"hybrid\[(.+)\]", methods_str)
         if methods_str:
             methods = [method.strip() for method in methods_str.group(1).split("+")]
         f0_computation_stack = []
-        #print(f"Calculating f0 pitch estimations for methods {str(methods)}")
+        # print(f"Calculating f0 pitch estimations for methods {str(methods)}")
         x = x.astype(np.float32)
         x /= np.quantile(np.abs(x), 0.999)
         for method in methods:
             f0 = None
             if method == "crepe":
-                f0 = self.get_f0_crepe_computation(
-                    x, f0_min, f0_max, p_len, int(hop_length)
-                )
+                f0 = self.get_f0_crepe_computation(x, f0_min, f0_max, p_len, int(hop_length))
             elif method == "rmvpe":
                 if hasattr(self, "model_rmvpe") == False:
                     from ..lib.rmvpe import RMVPE
+
                     model_path = os.path.join(now_dir, "models", "rvc_base", "rmvpe.pt")
-                    self.model_rmvpe = RMVPE(
-                        model_path, is_half=self.is_half, device=self.device
-                    )
+                    self.model_rmvpe = RMVPE(model_path, is_half=self.is_half, device=self.device)
                 f0 = self.model_rmvpe.infer_from_audio(x, thred=0.03)
                 f0 = f0[1:]
             elif method == "fcpe":
@@ -291,14 +273,14 @@ class VC(object):
                 gc.collect()
             f0_computation_stack.append(f0)
 
-        #print(f"Calculating hybrid median f0 from the stack of {str(methods)}")
+        # print(f"Calculating hybrid median f0 from the stack of {str(methods)}")
         f0_computation_stack = [fc for fc in f0_computation_stack if fc is not None]
         f0_median_hybrid = None
         if len(f0_computation_stack) == 1:
             f0_median_hybrid = f0_computation_stack[0]
         else:
             f0_median_hybrid = np.nanmedian(f0_computation_stack, axis=0)
-        #print("LEAVING get_f0_hybrid_computation")
+        # print("LEAVING get_f0_hybrid_computation")
         return f0_median_hybrid
 
     def get_f0(
@@ -332,9 +314,7 @@ class VC(object):
             )
             pad_size = (p_len - len(f0) + 1) // 2
             if pad_size > 0 or p_len - len(f0) - pad_size > 0:
-                f0 = np.pad(
-                    f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant"
-                )
+                f0 = np.pad(f0, [[pad_size, p_len - len(f0) - pad_size]], mode="constant")
         elif f0_method == "harvest":
             input_audio_path2wav[input_audio_path] = x.astype(np.double)
             f0 = cache_harvest_f0(input_audio_path, self.sr, f0_max, f0_min, 10)
@@ -351,20 +331,15 @@ class VC(object):
             f0 = pyworld.stonemask(x.astype(np.double), f0, t, self.sr)
             f0 = signal.medfilt(f0, 3)
         elif f0_method == "crepe":
-            f0 = self.get_f0_crepe_computation(
-                x, f0_min, f0_max, p_len, int(hop_length)
-            )
+            f0 = self.get_f0_crepe_computation(x, f0_min, f0_max, p_len, int(hop_length))
         elif f0_method == "crepe-tiny":
-            f0 = self.get_f0_crepe_computation(
-                x, f0_min, f0_max, p_len, int(hop_length), "tiny"
-            )
+            f0 = self.get_f0_crepe_computation(x, f0_min, f0_max, p_len, int(hop_length), "tiny")
         elif f0_method == "rmvpe":
             if hasattr(self, "model_rmvpe") == False:
                 from ..lib.rmvpe import RMVPE
+
                 model_path = os.path.join(now_dir, "models", "rvc_base", "rmvpe.pt")
-                self.model_rmvpe = RMVPE(
-                    model_path, is_half=self.is_half, device=self.device
-                )
+                self.model_rmvpe = RMVPE(model_path, is_half=self.is_half, device=self.device)
             f0 = self.model_rmvpe.infer_from_audio(x, thred=0.03)
         elif f0_method == "fcpe":
             model_path = os.path.join(now_dir, "models", "rvc_base", "fcpe.pt")
@@ -397,25 +372,17 @@ class VC(object):
         f0 *= pow(2, f0_up_key / 12)
         tf0 = self.sr // self.window
         if inp_f0 is not None:
-            delta_t = np.round(
-                (inp_f0[:, 0].max() - inp_f0[:, 0].min()) * tf0 + 1
-            ).astype("int16")
-            replace_f0 = np.interp(
-                list(range(delta_t)), inp_f0[:, 0] * 100, inp_f0[:, 1]
-            )
+            delta_t = np.round((inp_f0[:, 0].max() - inp_f0[:, 0].min()) * tf0 + 1).astype("int16")
+            replace_f0 = np.interp(list(range(delta_t)), inp_f0[:, 0] * 100, inp_f0[:, 1])
             shape = f0[self.x_pad * tf0 : self.x_pad * tf0 + len(replace_f0)].shape[0]
-            f0[self.x_pad * tf0 : self.x_pad * tf0 + len(replace_f0)] = replace_f0[
-                :shape
-            ]
+            f0[self.x_pad * tf0 : self.x_pad * tf0 + len(replace_f0)] = replace_f0[:shape]
         f0bak = f0.copy()
         f0_mel = 1127 * np.log(1 + f0 / 700)
-        f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (
-            f0_mel_max - f0_mel_min
-        ) + 1
+        f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - f0_mel_min) * 254 / (f0_mel_max - f0_mel_min) + 1
         f0_mel[f0_mel <= 1] = 1
         f0_mel[f0_mel > 255] = 255
         f0_coarse = np.rint(f0_mel).astype(int)
-        #print("LEAVING get_f0")
+        # print("LEAVING get_f0")
         return f0_coarse, f0bak
 
     def vc(
@@ -430,146 +397,132 @@ class VC(object):
         index_rate,
         protect,
     ):
-        #print("ENTERING pipeline vc")
-        #print(f"audio0 shape: {audio0.shape}")
+        # print("ENTERING pipeline vc")
+        # print(f"audio0 shape: {audio0.shape}")
         feats = torch.from_numpy(audio0)
-        #print(f"feats initial dtype: {feats.dtype}")
+        # print(f"feats initial dtype: {feats.dtype}")
         if self.is_half:
             feats = feats.half()
-            #print("Converting feats to half precision")
+            # print("Converting feats to half precision")
         else:
             feats = feats.float()
-            #print("Converting feats to float precision")
-        #print(f"feats dtype after conversion: {feats.dtype}")
+            # print("Converting feats to float precision")
+        # print(f"feats dtype after conversion: {feats.dtype}")
         if feats.dim() == 2:
-            #print("feats has 2 dimensions, taking mean along last dimension")
+            # print("feats has 2 dimensions, taking mean along last dimension")
             feats = feats.mean(-1)
         assert feats.dim() == 1, feats.dim()
-        #print(f"feats shape after mean: {feats.shape}")
+        # print(f"feats shape after mean: {feats.shape}")
         feats = feats.view(1, -1)
-        #print(f"feats shape after view: {feats.shape}")
+        # print(f"feats shape after view: {feats.shape}")
         padding_mask = torch.BoolTensor(feats.shape).to(self.device).fill_(False)
-        #print(f"padding_mask shape: {padding_mask.shape}")
-        #print(f"padding_mask device: {padding_mask.device}")
+        # print(f"padding_mask shape: {padding_mask.shape}")
+        # print(f"padding_mask device: {padding_mask.device}")
 
         inputs = {
             "source": feats.to(self.device),
             "padding_mask": padding_mask,
             "output_layer": 9 if self.__version == "v1" else 12,
         }
-        #print(f"inputs source shape: {inputs['source'].shape}")
-        #print(f"inputs source device: {inputs['source'].device}")
-        #print(f"output_layer: {inputs['output_layer']}")
+        # print(f"inputs source shape: {inputs['source'].shape}")
+        # print(f"inputs source device: {inputs['source'].device}")
+        # print(f"output_layer: {inputs['output_layer']}")
         t0 = ttime()
-        #print("Pipeline vc STEP 1:")
+        # print("Pipeline vc STEP 1:")
         with torch.no_grad():
             logits = model.extract_features(**inputs)
-            #print(f"logits type: {type(logits)}")
-            #print(f"logits length: {len(logits)}")
-            #print(f"logits[0] shape: {logits[0].shape}")
+            # print(f"logits type: {type(logits)}")
+            # print(f"logits length: {len(logits)}")
+            # print(f"logits[0] shape: {logits[0].shape}")
             feats = model.final_proj(logits[0]) if self.__version == "v1" else logits[0]
-            #print(f"feats shape after final_proj or logits[0]: {feats.shape}")
-        #print("Pipeline vc STEP 1a:")
+            # print(f"feats shape after final_proj or logits[0]: {feats.shape}")
+        # print("Pipeline vc STEP 1a:")
         if protect < 0.5 and pitch is not None and pitchf is not None:
-            #print("Cloning feats to feats0")
+            # print("Cloning feats to feats0")
             feats0 = feats.clone()
-            #print(f"feats0 shape: {feats0.shape}")
-        #print("Pipeline vc STEP 1b:")
-        if (
-            isinstance(index, type(None)) == False
-            and isinstance(big_npy, type(None)) == False
-            and index_rate != 0
-        ):
-            #print("Pipeline vc STEP 1c:")
-            #print(f"feats shape: {feats.shape}")
-            npy = feats[0, :feats.shape[1], :].cpu().numpy()
-            #print(f"npy shape: {npy.shape}")
-            #print("Pipeline vc STEP 1c1:")
+            # print(f"feats0 shape: {feats0.shape}")
+        # print("Pipeline vc STEP 1b:")
+        if index is None == False and big_npy is None == False and index_rate != 0:
+            # print("Pipeline vc STEP 1c:")
+            # print(f"feats shape: {feats.shape}")
+            npy = feats[0, : feats.shape[1], :].cpu().numpy()
+            # print(f"npy shape: {npy.shape}")
+            # print("Pipeline vc STEP 1c1:")
             if self.is_half:
-                #print("Pipeline vc STEP 1c2:")
+                # print("Pipeline vc STEP 1c2:")
                 npy = npy.astype("float32")
-                #print(f"Converted npy to float32. npy dtype: {npy.dtype}")
-            #print("Pipeline vc STEP 1c3:")
-            #print(f"npy size: {npy.size}")
-            
+                # print(f"Converted npy to float32. npy dtype: {npy.dtype}")
+            # print("Pipeline vc STEP 1c3:")
+            # print(f"npy size: {npy.size}")
+
             score, ix = self.index.search(npy, k=4)
-            
-            #print(f"score shape: {score.shape}")
-            #print(f"ix shape: {ix.shape}")
-            #print("Pipeline vc STEP 1c4:")
+
+            # print(f"score shape: {score.shape}")
+            # print(f"ix shape: {ix.shape}")
+            # print("Pipeline vc STEP 1c4:")
             weight = np.square(1 / score)
-            #print(f"weight shape: {weight.shape}")
-            #print("Pipeline vc STEP 1c5:")
+            # print(f"weight shape: {weight.shape}")
+            # print("Pipeline vc STEP 1c5:")
             weight /= weight.sum(axis=1, keepdims=True)
-            #print(f"weight shape after normalization: {weight.shape}")
-            #print("Pipeline vc STEP 1d:")
+            # print(f"weight shape after normalization: {weight.shape}")
+            # print("Pipeline vc STEP 1d:")
             npy = np.sum(big_npy[ix] * np.expand_dims(weight, axis=2), axis=1)
-            #print(f"npy shape after weighted sum: {npy.shape}")
-            #print("Pipeline vc STEP 1e:")
+            # print(f"npy shape after weighted sum: {npy.shape}")
+            # print("Pipeline vc STEP 1e:")
             if self.is_half:
                 npy = npy.astype("float16")
-                #print(f"Converted npy to float16. npy dtype: {npy.dtype}")
-                #print("Pipeline vc STEP 1f:")
-            feats = (
-                torch.from_numpy(npy).unsqueeze(0).to(self.device) * index_rate
-                + (1 - index_rate) * feats
-            )
-            #print(f"feats shape after updating with npy: {feats.shape}")
-        #print("Pipeline vc STEP 2:")
+                # print(f"Converted npy to float16. npy dtype: {npy.dtype}")
+                # print("Pipeline vc STEP 1f:")
+            feats = torch.from_numpy(npy).unsqueeze(0).to(self.device) * index_rate + (1 - index_rate) * feats
+            # print(f"feats shape after updating with npy: {feats.shape}")
+        # print("Pipeline vc STEP 2:")
         feats = F.interpolate(feats.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
-        #print(f"feats shape after interpolation: {feats.shape}")
+        # print(f"feats shape after interpolation: {feats.shape}")
         if protect < 0.5 and pitch is not None and pitchf is not None:
             feats0 = F.interpolate(feats0.permute(0, 2, 1), scale_factor=2).permute(0, 2, 1)
-            #print(f"feats0 shape after interpolation: {feats0.shape}")
+            # print(f"feats0 shape after interpolation: {feats0.shape}")
         t1 = ttime()
         p_len = audio0.shape[0] // self.window
-        #print(f"Initial p_len: {p_len}")
+        # print(f"Initial p_len: {p_len}")
         if feats.shape[1] < p_len:
             p_len = feats.shape[1]
-            #print(f"Updated p_len to match feats shape: {p_len}")
+            # print(f"Updated p_len to match feats shape: {p_len}")
             if pitch is not None and pitchf is not None:
                 pitch = pitch[:, :p_len]
                 pitchf = pitchf[:, :p_len]
-                #print(f"Updated pitch shape: {pitch.shape}")
-                #print(f"Updated pitchf shape: {pitchf.shape}")
-        #print("Pipeline vc STEP 3:")
+                # print(f"Updated pitch shape: {pitch.shape}")
+                # print(f"Updated pitchf shape: {pitchf.shape}")
+        # print("Pipeline vc STEP 3:")
         if protect < 0.5 and pitch is not None and pitchf is not None:
             pitchff = pitchf.clone()
-            #print(f"pitchff shape: {pitchff.shape}")
+            # print(f"pitchff shape: {pitchff.shape}")
             pitchff[pitchf > 0] = 1
             pitchff[pitchf < 1] = protect
             pitchff = pitchff.unsqueeze(-1)
-            #print(f"pitchff shape after unsqueeze: {pitchff.shape}")
+            # print(f"pitchff shape after unsqueeze: {pitchff.shape}")
             feats = feats * pitchff + feats0 * (1 - pitchff)
-            #print(f"feats shape after updating with pitchff: {feats.shape}")
+            # print(f"feats shape after updating with pitchff: {feats.shape}")
             feats = feats.to(feats0.dtype)
-            #print(f"feats dtype after conversion: {feats.dtype}")
+            # print(f"feats dtype after conversion: {feats.dtype}")
         p_len = torch.tensor([p_len], device=self.device).long()
-        #print(f"p_len tensor: {p_len}")
-        #print(f"p_len device: {p_len.device}")
-        #print("Pipeline vc p_len is:", p_len)
+        # print(f"p_len tensor: {p_len}")
+        # print(f"p_len device: {p_len.device}")
+        # print("Pipeline vc p_len is:", p_len)
         with torch.no_grad():
             if pitch is not None and pitchf is not None:
-                audio1 = (
-                    (self.__net_g.infer(feats, p_len, pitch, pitchf, sid)[0][0, 0])
-                    .data.cpu()
-                    .float()
-                    .numpy()
-                )
+                audio1 = (self.__net_g.infer(feats, p_len, pitch, pitchf, sid)[0][0, 0]).data.cpu().float().numpy()
             else:
-                audio1 = (
-                    (self.__net_g.infer(feats, p_len, sid)[0][0, 0]).data.cpu().float().numpy()
-                )
-        #print(f"audio1 shape: {audio1.shape}")
+                audio1 = (self.__net_g.infer(feats, p_len, sid)[0][0, 0]).data.cpu().float().numpy()
+        # print(f"audio1 shape: {audio1.shape}")
         del feats, p_len, padding_mask
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         t2 = ttime()
-        #print(f"Pipeline vc time breakdown:")
-        #print(f"  Step 1: {t1 - t0:.3f}s")
-        #print(f"  Step 2: {t2 - t1:.3f}s")
-        #print(f"  Total: {t2 - t0:.3f}s")
-        #print("Leaving pipeline vc")
+        # print(f"Pipeline vc time breakdown:")
+        # print(f"  Step 1: {t1 - t0:.3f}s")
+        # print(f"  Step 2: {t2 - t1:.3f}s")
+        # print(f"  Total: {t2 - t0:.3f}s")
+        # print("Leaving pipeline vc")
         return audio1
 
     def pipeline(
@@ -625,7 +578,7 @@ class VC(object):
         inp_f0 = None
         if hasattr(f0_file, "name") == True:
             try:
-                with open(f0_file.name, "r") as f:
+                with open(f0_file.name) as f:
                     lines = f.read().strip("\n").split("\n")
                 inp_f0 = []
                 for line in lines:
@@ -717,9 +670,7 @@ class VC(object):
         if rms_mix_rate != 1:
             audio_opt = change_rms(audio, 16000, audio_opt, tgt_sr, rms_mix_rate)
         if resample_sr >= 16000 and tgt_sr != resample_sr:
-            audio_opt = librosa.resample(
-                audio_opt, orig_sr=tgt_sr, target_sr=resample_sr
-            )
+            audio_opt = librosa.resample(audio_opt, orig_sr=tgt_sr, target_sr=resample_sr)
         audio_max = np.abs(audio_opt).max() / 0.99
         max_int16 = 32768
         if audio_max > 1:

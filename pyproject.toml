@@ -138,6 +138,9 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 warn_no_return = true
 strict_equality = true
+exclude = [
+    "system/TGWUI_Extension/script.py",
+]
 
 [[tool.mypy.overrides]]
 module = "tests.*"

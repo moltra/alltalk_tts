@@ -1,5 +1,5 @@
-import os
 import json
+import os
 import pathlib
 from random import shuffle
 
@@ -29,11 +29,7 @@ def generate_config(rvc_version, sampling_rate, model_path):
 
 def generate_filelist(f0_method, model_path, rvc_version, sampling_rate):
     gt_wavs_dir = f"{model_path}/0_gt_wavs"
-    feature_dir = (
-        f"{model_path}/3_feature256"
-        if rvc_version == "v1"
-        else f"{model_path}/3_feature768"
-    )
+    feature_dir = f"{model_path}/3_feature256" if rvc_version == "v1" else f"{model_path}/3_feature768"
     if f0_method:
         f0_dir = f"{model_path}/2a_f0"
         f0nsf_dir = f"{model_path}/2b-f0nsf"

@@ -1,20 +1,18 @@
-from __future__ import print_function
-
 import json
 import os
 import os.path as osp
 import re
-import warnings
-from six.moves import urllib_parse
 import shutil
 import sys
 import tempfile
 import textwrap
 import time
+import warnings
 
 import requests
 import six
 import tqdm
+from six.moves import urllib_parse
 
 
 def indent(text, prefix):
@@ -73,9 +71,7 @@ def parse_url(url, warning=True):
         warnings.warn(
             "You specified a Google Drive link that is not the correct link "
             "to download a file. You might want to try `--fuzzy` option "
-            "or the following url: {url}".format(
-                url="https://drive.google.com/uc?id={}".format(file_id)
-            )
+            "or the following url: {url}".format(url=f"https://drive.google.com/uc?id={file_id}")
         )
 
     return file_id, is_download_link
@@ -96,16 +92,9 @@ def get_url_from_gdrive_confirmation(contents):
     m = re.search(r'href="/open\?id=([^"]+)"', contents)
     if m:
         url = m.groups()[0]
-        uuid = re.search(
-            r'<input\s+type="hidden"\s+name="uuid"\s+value="([^"]+)"', contents
-        )
+        uuid = re.search(r'<input\s+type="hidden"\s+name="uuid"\s+value="([^"]+)"', contents)
         uuid = uuid.groups()[0]
-        url = (
-            "https://drive.usercontent.google.com/download?id="
-            + url
-            + "&confirm=t&uuid="
-            + uuid
-        )
+        url = "https://drive.usercontent.google.com/download?id=" + url + "&confirm=t&uuid=" + uuid
         return url
 
     m = re.search(r'"downloadUrl":"([^"]+)', contents)
@@ -130,9 +119,7 @@ def get_url_from_gdrive_confirmation(contents):
 def _get_session(proxy, use_cookies, return_cookies_file=False):
     sess = requests.session()
 
-    sess.headers.update(
-        {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6)"}
-    )
+    sess.headers.update({"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_6)"})
 
     if proxy is not None:
         sess.proxies = {"http": proxy, "https": proxy}
@@ -206,19 +193,17 @@ def download(
     if not (id is None) ^ (url is None):
         raise ValueError("Either url or id has to be specified")
     if id is not None:
-        url = "https://drive.google.com/uc?id={id}".format(id=id)
+        url = f"https://drive.google.com/uc?id={id}"
 
     url_origin = url
 
-    sess, cookies_file = _get_session(
-        proxy=proxy, use_cookies=use_cookies, return_cookies_file=True
-    )
+    sess, cookies_file = _get_session(proxy=proxy, use_cookies=use_cookies, return_cookies_file=True)
 
     gdrive_file_id, is_gdrive_download_link = parse_url(url, warning=not fuzzy)
 
     if fuzzy and gdrive_file_id:
         # overwrite the url with fuzzy match of a file id
-        url = "https://drive.google.com/uc?id={id}".format(id=gdrive_file_id)
+        url = f"https://drive.google.com/uc?id={gdrive_file_id}"
         url_origin = url
         is_gdrive_download_link = True
 
@@ -227,36 +212,27 @@ def download(
 
         if url == url_origin and res.status_code == 500:
             # The file could be Google Docs or Spreadsheets.
-            url = "https://drive.google.com/open?id={id}".format(id=gdrive_file_id)
+            url = f"https://drive.google.com/open?id={gdrive_file_id}"
             continue
 
         if res.headers["Content-Type"].startswith("text/html"):
             m = re.search("<title>(.+)</title>", res.text)
             if m and m.groups()[0].endswith(" - Google Docs"):
-                url = (
-                    "https://docs.google.com/document/d/{id}/export"
-                    "?format={format}".format(
-                        id=gdrive_file_id,
-                        format="docx" if format is None else format,
-                    )
+                url = "https://docs.google.com/document/d/{id}/export" "?format={format}".format(
+                    id=gdrive_file_id,
+                    format="docx" if format is None else format,
                 )
                 continue
             elif m and m.groups()[0].endswith(" - Google Sheets"):
-                url = (
-                    "https://docs.google.com/spreadsheets/d/{id}/export"
-                    "?format={format}".format(
-                        id=gdrive_file_id,
-                        format="xlsx" if format is None else format,
-                    )
+                url = "https://docs.google.com/spreadsheets/d/{id}/export" "?format={format}".format(
+                    id=gdrive_file_id,
+                    format="xlsx" if format is None else format,
                 )
                 continue
             elif m and m.groups()[0].endswith(" - Google Slides"):
-                url = (
-                    "https://docs.google.com/presentation/d/{id}/export"
-                    "?format={format}".format(
-                        id=gdrive_file_id,
-                        format="pptx" if format is None else format,
-                    )
+                url = "https://docs.google.com/presentation/d/{id}/export" "?format={format}".format(
+                    id=gdrive_file_id,
+                    format="pptx" if format is None else format,
                 )
                 continue
         elif (
@@ -264,12 +240,9 @@ def download(
             and res.headers["Content-Disposition"].endswith("pptx")
             and format not in {None, "pptx"}
         ):
-            url = (
-                "https://docs.google.com/presentation/d/{id}/export"
-                "?format={format}".format(
-                    id=gdrive_file_id,
-                    format="pptx" if format is None else format,
-                )
+            url = "https://docs.google.com/presentation/d/{id}/export" "?format={format}".format(
+                id=gdrive_file_id,
+                format="pptx" if format is None else format,
             )
             continue
 
@@ -278,11 +251,7 @@ def download(
                 os.makedirs(osp.dirname(cookies_file))
             # Save cookies
             with open(cookies_file, "w") as f:
-                cookies = [
-                    (k, v)
-                    for k, v in sess.cookies.items()
-                    if not k.startswith("download_warning_")
-                ]
+                cookies = [(k, v) for k, v in sess.cookies.items() if not k.startswith("download_warning_")]
                 json.dump(cookies, f, indent=2)
 
         if "Content-Disposition" in res.headers:
@@ -307,9 +276,7 @@ def download(
             raise FileURLRetrievalError(message)
 
     if gdrive_file_id and is_gdrive_download_link:
-        content_disposition = six.moves.urllib_parse.unquote(
-            res.headers["Content-Disposition"]
-        )
+        content_disposition = six.moves.urllib_parse.unquote(res.headers["Content-Disposition"])
 
         m = re.search(r"filename\*=UTF-8''(.*)", content_disposition)
         if not m:
@@ -364,7 +331,7 @@ def download(
         f = output
 
     if tmp_file is not None and f.tell() != 0:
-        headers = {"Range": "bytes={}-".format(f.tell())}
+        headers = {"Range": f"bytes={f.tell()}-"}
         res = sess.get(url, headers=headers, stream=True, verify=verify)
 
     if not quiet:

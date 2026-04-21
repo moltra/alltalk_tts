@@ -1,5 +1,6 @@
-import sys
 import asyncio
+import sys
+
 import edge_tts
 
 

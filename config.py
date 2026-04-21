@@ -1,27 +1,27 @@
 import os
-import time
 import shutil
+import time
+from abc import ABC, abstractmethod
+from collections.abc import Callable, MutableSequence
 from pathlib import Path
 
 from filelock import FileLock
-from abc import ABC, abstractmethod
-from typing import Callable, MutableSequence
+from pydantic import AliasChoices, AliasGenerator, BaseModel, ConfigDict, Field
 
-from pydantic import BaseModel, ConfigDict, AliasGenerator, AliasChoices, Field
 
 class AlltalkConfigTheme(BaseModel):
     # Map 'class' to 'clazz' and vice versa
     model_config = ConfigDict(
         alias_generator=AliasGenerator(
-            validation_alias=lambda field_name:
-                {
-                    "clazz": AliasChoices("clazz", "class"),
-                }.get(field_name, None),
+            validation_alias=lambda field_name: {
+                "clazz": AliasChoices("clazz", "class"),
+            }.get(field_name),
             serialization_alias=lambda field_name: "class" if field_name == "clazz" else field_name,
         )
     )
     file: str | None = None
     clazz: str = "gradio/base"
+
 
 class AlltalkConfigRvcSettings(BaseModel):
     rvc_enabled: bool = False
@@ -39,6 +39,7 @@ class AlltalkConfigRvcSettings(BaseModel):
     embedder_model: str = "hubert"
     training_data_size: int = 45000
     model_cache_size: int = 1
+
 
 class AlltalkConfigTgwUi(BaseModel):
     tgwui_activate_tts: bool = True
@@ -60,6 +61,7 @@ class AlltalkConfigTgwUi(BaseModel):
     tgwui_rvc_narr_voice: str = "Disabled"
     tgwui_rvc_narr_pitch: int = 0
 
+
 class AlltalkConfigApiDef(BaseModel):
     api_port_number: int = 7851
     api_allowed_filter: str = "[^a-zA-Z0-9\\s.,;:!?\\-\\'\"$\\u0400-\\u04FF\\u00C0-\\u017F\\u0150\\u0151\\u0170\\u0171\\u011E\\u011F\\u0130\\u0131\\u0900-\\u097F\\u2018\\u2019\\u201C\\u201D\\u3001\\u3002\\u3040-\\u309F\\u30A0-\\u30FF\\u4E00-\\u9FFF\\u3400-\\u4DBF\\uF900-\\uFAFF\\u0600-\\u06FF\\u0750-\\u077F\\uFB50-\\uFDFF\\uFE70-\\uFEFF\\uAC00-\\uD7A3\\u1100-\\u11FF\\u3130-\\u318F\\uFF01\\uFF0c\\uFF1A\\uFF1B\\uFF1F]"
@@ -76,6 +78,7 @@ class AlltalkConfigApiDef(BaseModel):
     api_autoplay: bool = False
     api_autoplay_volume: float = 0.5
 
+
 class AlltalkConfigDebug(BaseModel):
     debug_transcode: bool = False
     debug_tts: bool = False
@@ -91,6 +94,7 @@ class AlltalkConfigDebug(BaseModel):
     debug_transcribe: bool = False
     debug_proxy: bool = False
 
+
 class AlltalkConfigGradioPages(BaseModel):
     Generate_Help_page: bool = True
     Voice2RVC_page: bool = True
@@ -99,15 +103,18 @@ class AlltalkConfigGradioPages(BaseModel):
     alltalk_documentation_page: bool = True
     api_documentation_page: bool = True
 
+
 class AlltalkAvailableEngine(BaseModel):
     name: str = ""
     selected_model: str = ""
+
 
 class AlltalkConfigProxyEndpoint(BaseModel):
     enabled: bool = False
     external_port: int = 0
     external_ip: str = "0.0.0.0"
     cert_name: str = ""
+
 
 class AlltalkConfigProxySettings(BaseModel):
     proxy_enabled: bool = False
@@ -118,11 +125,18 @@ class AlltalkConfigProxySettings(BaseModel):
     logging_enabled: bool = True
     log_level: str = "INFO"
 
+
 class AlltalkConfigCorsSettings(BaseModel):
-    allowed_origins: list[str] = ["http://localhost:7852", "http://localhost:3000", "http://127.0.0.1:7852", "http://127.0.0.1:3000"]
+    allowed_origins: list[str] = [
+        "http://localhost:7852",
+        "http://localhost:3000",
+        "http://127.0.0.1:7852",
+        "http://127.0.0.1:3000",
+    ]
     allow_credentials: bool = True
     allow_methods: list[str] = ["*"]
     allow_headers: list[str] = ["*"]
+
 
 class AbstractJsonConfig(ABC):
     def __init__(self, config_path: Path | str, file_check_interval: int):
@@ -151,30 +165,32 @@ class AbstractJsonConfig(ABC):
 
     def _load_config(self):
         self.__last_read_time = self.get_config_path().stat().st_mtime
+
         def __load():
-            with open(self.get_config_path(), "r") as configfile:
+            with open(self.get_config_path()) as configfile:
                 json_string = configfile.read()
             # The delegate is the actual config loaded:
             self.__delegate = self._handle_loaded_config(json_string)
+
         self.__with_lock_and_backup(self.get_config_path(), False, __load)
 
     def _save_file(self, path: Path | None | str, default=None, indent=4):
         file_path = (Path(path) if type(path) is str else path) if path is not None else self.get_config_path()
 
         def __save():
-            with open(file_path, 'w') as file:
+            with open(file_path, "w") as file:
                 file.write(self.__delegate.model_dump_json(indent=indent, by_alias=True))
 
         self.__with_lock_and_backup(file_path, True, __save)
 
     def __with_lock_and_backup(self, path: Path, backup: bool, callable: Callable[[], None]):
-        lock_path = path.with_suffix('.lock')
+        lock_path = path.with_suffix(".lock")
         backup_path = None
         try:
             with FileLock(lock_path):
                 # Create backup:
                 if path.exists() and backup:
-                    backup_path = path.with_suffix('.backup')
+                    backup_path = path.with_suffix(".backup")
                     shutil.copy(path, backup_path)
 
                 try:
@@ -200,10 +216,12 @@ class AbstractJsonConfig(ABC):
 
     # Delegation to the loaded config data
     @property
-    def _xtra(self): return [o for o in dir(self.__delegate) if not o.startswith('_')]
+    def _xtra(self):
+        return [o for o in dir(self.__delegate) if not o.startswith("_")]
 
     def __getattr__(self, key):
-        if key in self._xtra: return getattr(self.__delegate, key)
+        if key in self._xtra:
+            return getattr(self.__delegate, key)
         raise AttributeError(key)
 
     def __getattribute__(self, key):
@@ -228,19 +246,23 @@ class AbstractJsonConfig(ABC):
             super().__setattr__(key, value)
 
     def __dir__(self):
-        def custom_dir(c, add): return dir(type(c)) + list(c.__dict__.keys()) + add
+        def custom_dir(c, add):
+            return dir(type(c)) + list(c.__dict__.keys()) + add
+
         return custom_dir(self, self._xtra)
+
 
 class AlltalkNewEnginesConfigFields:
     engines_available: MutableSequence[AlltalkAvailableEngine] = Field(default_factory=list)
 
-class AlltalkNewEnginesConfigModel(BaseModel, AlltalkNewEnginesConfigFields):
 
+class AlltalkNewEnginesConfigModel(BaseModel, AlltalkNewEnginesConfigFields):
     def get_engine_names_available(self):
         return [engine.name for engine in self.engines_available]
 
     def get_engines_matching(self, condition: Callable[[AlltalkAvailableEngine], bool]):
         return [x for x in self.engines_available if condition(x)]
+
 
 class AlltalkNewEnginesConfig(AbstractJsonConfig, AlltalkNewEnginesConfigFields):
     __instance = None
@@ -260,13 +282,14 @@ class AlltalkNewEnginesConfig(AbstractJsonConfig, AlltalkNewEnginesConfigFields)
     def _handle_loaded_config(self, json_string: str):
         return AlltalkNewEnginesConfigModel.model_validate_json(json_string)
 
+
 class AlltalkTTSEnginesConfigFields:
     engines_available: MutableSequence[AlltalkAvailableEngine] = Field(default_factory=list)
     engine_loaded: str = ""
     selected_model: str = ""
 
-class AlltalkTTSEnginesConfigModel(BaseModel, AlltalkTTSEnginesConfigFields):
 
+class AlltalkTTSEnginesConfigModel(BaseModel, AlltalkTTSEnginesConfigFields):
     def get_engine_names_available(self):
         return [engine.name for engine in self.engines_available]
 
@@ -283,6 +306,7 @@ class AlltalkTTSEnginesConfigModel(BaseModel, AlltalkTTSEnginesConfigFields):
                 return self
         return self
 
+
 class AlltalkTTSEnginesConfig(AbstractJsonConfig, AlltalkTTSEnginesConfigFields):
     __instance = None
     __this_dir = Path(__file__).parent.resolve()
@@ -292,7 +316,7 @@ class AlltalkTTSEnginesConfig(AbstractJsonConfig, AlltalkTTSEnginesConfigFields)
         self._load_config()
 
     @staticmethod
-    def get_instance(force_reload = False):
+    def get_instance(force_reload=False):
         if AlltalkTTSEnginesConfig.__instance is None:
             force_reload = False
             AlltalkTTSEnginesConfig.__instance = AlltalkTTSEnginesConfig()
@@ -321,6 +345,7 @@ class AlltalkTTSEnginesConfig(AbstractJsonConfig, AlltalkTTSEnginesConfigFields)
     def save(self, path: Path | str | None = None):
         self._save_file(path)
 
+
 class AlltalkConfigFields:
     branding: str = "AllTalk "
     delete_output_wavs: str = "Disabled"
@@ -340,11 +365,13 @@ class AlltalkConfigFields:
     proxy_settings: AlltalkConfigProxySettings = AlltalkConfigProxySettings()
     cors_settings: AlltalkConfigCorsSettings = AlltalkConfigCorsSettings()
 
+
 class AlltalkConfigModel(BaseModel, AlltalkConfigFields):
     __this_dir = Path(__file__).parent.resolve()
 
     def get_output_directory(self):
         return self.__this_dir / self.output_folder
+
 
 class AlltalkConfig(AbstractJsonConfig, AlltalkConfigFields):
     __instance = None
@@ -359,7 +386,7 @@ class AlltalkConfig(AbstractJsonConfig, AlltalkConfigFields):
         return AlltalkConfig.__this_dir / "confignew.json"
 
     @staticmethod
-    def get_instance(force_reload = False):
+    def get_instance(force_reload=False):
         if AlltalkConfig.__instance is None:
             force_reload = False
             AlltalkConfig.__instance = AlltalkConfig()
@@ -378,6 +405,7 @@ class AlltalkConfig(AbstractJsonConfig, AlltalkConfigFields):
         model.get_output_directory().mkdir(parents=True, exist_ok=True)
         return model
 
+
 class AlltalkMultiEngineManagerConfigFields:
     base_port: int = 7001
     api_server_port: int = 7851
@@ -388,16 +416,18 @@ class AlltalkMultiEngineManagerConfigFields:
     initial_wait: float = 2
     backoff_factor: float = 1.2
     debug_mode: bool = False
-    max_queue_time: int = 60,  # Maximum time a request can wait in the queue (in seconds)
-    queue_check_interval: float = 0.1,  # Time between checks for available instances (in seconds)
-    tts_request_timeout: int = 30,  # Timeout for individual TTS requests (in seconds)
-    text_length_factor: float = 0.2,  # Increase timeout by 20% per 100 characters
-    concurrent_request_factor: float = 0.5,  # Increase timeout by 50% per concurrent request
-    diminishing_factor: float = 0.5,  # Reduce additional time for long-running requests by 50%
+    max_queue_time: int = (60,)  # Maximum time a request can wait in the queue (in seconds)
+    queue_check_interval: float = (0.1,)  # Time between checks for available instances (in seconds)
+    tts_request_timeout: int = (30,)  # Timeout for individual TTS requests (in seconds)
+    text_length_factor: float = (0.2,)  # Increase timeout by 20% per 100 characters
+    concurrent_request_factor: float = (0.5,)  # Increase timeout by 50% per concurrent request
+    diminishing_factor: float = (0.5,)  # Reduce additional time for long-running requests by 50%
     queue_position_factor: float = 1.0  # Add 100% of base timeout for each queue position
+
 
 class AlltalkMultiEngineManagerConfigModel(BaseModel, AlltalkMultiEngineManagerConfigFields):
     pass
+
 
 class AlltalkMultiEngineManagerConfig(AbstractJsonConfig, AlltalkMultiEngineManagerConfigFields):
     __instance = None

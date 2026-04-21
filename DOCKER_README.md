@@ -8,7 +8,7 @@ The Docker image currently works on Windows and Linux supporting NVIDIA GPUs.
 - At least 25GB of free disk space
 
 ## Quickstart
-Use `docker-start.sh` to pull the latest docker image using the XTTS model from Docker Hub and 
+Use `docker-start.sh` to pull the latest docker image using the XTTS model from Docker Hub and
 visit `http://localhost:7851/`. See instructions below for passing more arguments to the start script.
 
 ## Installing Prerequisites
@@ -41,7 +41,7 @@ visit `http://localhost:7851/`. See instructions below for passing more argument
 11. Open PowerShell, type ```ubuntu```, [then follow below](#quickstart)
 
 ## Arguments for starting the Docker container
-To make it as simple as possible to use Docker, the script `docker-start.sh` can be used. It provides the 
+To make it as simple as possible to use Docker, the script `docker-start.sh` can be used. It provides the
 following optional arguments:
 
 - `--config` lets you choose a config JSON file which can subset of `confignew.json`. This allows you to change only
@@ -58,20 +58,20 @@ following optional arguments:
 - `--with-multi-engine-manager` enables the use of the [multi engine manager (MEM)](https://github.com/erew123/alltalk_tts/wiki/Multi-Engine-Manager)
     which allows for more parallel requests. By default, one TTS engine is started. Optionally, you can pass the
     file path of a JSON file which can be a subset of `mem_config.json` with more fine-grained configuration options.
-  - Example: `docker-start.sh --with-multi_engine_manager` to use MEM with default settings or 
+  - Example: `docker-start.sh --with-multi_engine_manager` to use MEM with default settings or
     `docker-start.sh --with-multi_engine_manager /my/config/file.json` to pass a JSON file containing more settings.
 - `--tag` allows to choose the docker tag of the image to run. Defaults to `latest-xtts`.
     - Example: `docker-start.sh --tag mytag`
-- `--docker-repository` allows to choose another Docker repository for pulling the image from. Use an empty 
+- `--docker-repository` allows to choose another Docker repository for pulling the image from. Use an empty
   string for the local repo.
 - Since the above commands only address the most important options, you might pass additional arbitrary docker arguments
   to the `docker-start.sh`.
 
-Of course, like for any other Docker image, you can also directly use `docker run` directly and use 
+Of course, like for any other Docker image, you can also directly use `docker run` directly and use
 [docker-start.sh](https://github.com/erew123/alltalk_tts/blob/alltalkbeta/docker-start.sh) as an inspiration.
 
 ### Using environment variables for setting config values
-Instead of using config JSON files, there are config settings that can be directly set using environment (ENV) variables 
+Instead of using config JSON files, there are config settings that can be directly set using environment (ENV) variables
 when starting the application. This is also what is used internally in `docker-start.sh`.
 
 Since `docker-start.sh` allows to pass arbitrary params, it can also be used to set env variables, e.g:
@@ -85,8 +85,8 @@ or when using Docker directly:
 docker run -e ALLTALK_BRANDING="My Brand " -e ALLTALK_API_PORT_NUMBER=9876 ...
 ```
 
-Consult [docker_default_confignew.json](https://github.com/erew123/alltalk_tts/blob/alltalkbeta/docker_default_confignew.json) 
-and [docker_default_mem_config.json](https://github.com/erew123/alltalk_tts/blob/alltalkbeta/docker_default_mem_config.json) 
+Consult [docker_default_confignew.json](https://github.com/erew123/alltalk_tts/blob/alltalkbeta/docker_default_confignew.json)
+and [docker_default_mem_config.json](https://github.com/erew123/alltalk_tts/blob/alltalkbeta/docker_default_mem_config.json)
 for a list of all available env variables.
 
 

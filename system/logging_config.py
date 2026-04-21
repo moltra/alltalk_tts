@@ -4,8 +4,10 @@ Centralized logging configuration for AllTalk TTS.
 This module provides a consistent logging setup using Loguru,
 replacing the standard library logging module.
 """
+
 import sys
 from pathlib import Path
+
 from loguru import logger
 
 

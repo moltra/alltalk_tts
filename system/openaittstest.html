@@ -136,18 +136,18 @@
         // Real-time character count
         const inputField = document.getElementById('input');
         const charCountDisplay = document.getElementById('charCount');
-    
+
         inputField.addEventListener('input', () => {
             const trimmedInput = inputField.value.trim();
             charCountDisplay.textContent = `Character count: ${trimmedInput.length}`;
         });
-    
+
         document.getElementById('ttsForm').addEventListener('submit', async function (event) {
             event.preventDefault();
-    
+
             const formData = new FormData(event.target);
             const jsonData = {};
-    
+
             // Sanitize input: trim spaces
             formData.forEach((value, key) => {
                 if (key === 'input') {
@@ -155,14 +155,14 @@
                 }
                 jsonData[key] = key === 'speed' ? parseFloat(value) : value;
             });
-    
+
             const ip = document.getElementById('ip').value;
             const port = document.getElementById('port').value;
             const url = `http://${ip}:${port}/v1/audio/speech`;
-    
+
             const responseDiv = document.getElementById('response');
             responseDiv.innerHTML = 'Sending request...';
-    
+
             try {
                 const response = await fetch(url, {
                     method: 'POST',
@@ -171,7 +171,7 @@
                     },
                     body: JSON.stringify(jsonData),
                 });
-    
+
                 if (response.ok) {
                     const blob = await response.blob();
                     const url = URL.createObjectURL(blob);
@@ -191,6 +191,6 @@
             }
         });
     </script>
-   
+
 </body>
 </html>

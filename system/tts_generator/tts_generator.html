@@ -835,17 +835,17 @@
                 const batchUrls = fileUrls.slice(i, Math.min(i + splitEvery, fileUrls.length));
                 const audioBuffers = await crunker.fetchAudio(...batchUrls);
                 const combined = crunker.concatAudio(audioBuffers);
-                
+
                 const sampleRate = 44100;
                 const channels = 1;
                 const kbps = 192;
-                
+
                 const mp3Encoder = new lamejs.Mp3Encoder(channels, sampleRate, kbps);
                 const mp3Data = [];
 
                 const samples = new Int16Array(combined.length * channels);
                 const leftChannel = combined.getChannelData(0);
-                
+
                 for (let i = 0; i < leftChannel.length; i++) {
                     const sample = Math.max(-1, Math.min(1, leftChannel[i]));
                     samples[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
@@ -1116,9 +1116,9 @@
             cleanedText = cleanedText.replace(/-\\s/g, '; ');
             cleanedText = cleanedText.replace(/--/g, '; ');
             // Split by Fullwidth/CJK punctuation regardless of if there are spaces behind them
-            // Please test if it works properly. In my test they it should be 
-            // (?<=[.!?:])\s+ instead of 
-            // (?<=\[.!?:\])\\s+ 
+            // Please test if it works properly. In my test they it should be
+            // (?<=[.!?:])\s+ instead of
+            // (?<=\[.!?:\])\\s+
             // so I don't know whats going on here
             // let sentences = cleanedText.split(/(?<=[\[.!?:\]])\s+|(?<=[\u3002\uFF01\uFF1A\uFF1F])/);
             let sentences = cleanedText.split(/(?<=[\[.!?:\]]['"\u2018\u2019\u201C\u201D]*)\s+|(?<=[\u3002\uFF01\uFF1A\uFF1F])/);

@@ -1,14 +1,26 @@
+import json
+import signal
 import sys
 import time
-import signal
-import json
 import warnings
+
 import pyperclip
 import requests
-from PyQt5.QtWidgets import (QApplication, QSystemTrayIcon, QMenu, QWidget, QVBoxLayout, QLabel, 
-                             QLineEdit, QPushButton, QMessageBox, QComboBox, QSlider)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt5.QtCore import Qt, QThread, QTimer, pyqtSignal
 from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QSlider,
+    QSystemTrayIcon,
+    QVBoxLayout,
+    QWidget,
+)
 
 # Suppress the specific warning
 warnings.filterwarnings("ignore", category=UserWarning, module="charset_normalizer")
@@ -17,11 +29,25 @@ SETTINGS_FILE = "tts_settings.json"
 TTS_SERVER_URL = "http://127.0.0.1:7851"
 
 LANGUAGES = {
-    "ar": "Arabic", "zh-cn": "Chinese (Simplified)", "cs": "Czech", "nl": "Dutch",
-    "en": "English", "fr": "French", "de": "German", "hi": "Hindi (limited support)",
-    "hu": "Hungarian", "it": "Italian", "ja": "Japanese", "ko": "Korean",
-    "pl": "Polish", "pt": "Portuguese", "ru": "Russian", "es": "Spanish", "tr": "Turkish"
+    "ar": "Arabic",
+    "zh-cn": "Chinese (Simplified)",
+    "cs": "Czech",
+    "nl": "Dutch",
+    "en": "English",
+    "fr": "French",
+    "de": "German",
+    "hi": "Hindi (limited support)",
+    "hu": "Hungarian",
+    "it": "Italian",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "pl": "Polish",
+    "pt": "Portuguese",
+    "ru": "Russian",
+    "es": "Spanish",
+    "tr": "Turkish",
 }
+
 
 class ClipboardMonitor(QThread):
     text_changed = pyqtSignal(str)
@@ -41,6 +67,7 @@ class ClipboardMonitor(QThread):
 
     def stop(self):
         self.running = False
+
 
 class TTSWorker(QThread):
     error_occurred = pyqtSignal(str)
@@ -69,13 +96,16 @@ class TTSWorker(QThread):
         try:
             response = requests.post(f"{self.api_url}/api/tts-generate", data=params)
             if response.status_code != 200:
-                error_message = f"TTS generation failed with status code: {response.status_code}. Response: {response.text}"
+                error_message = (
+                    f"TTS generation failed with status code: {response.status_code}. Response: {response.text}"
+                )
                 print(error_message)
                 self.error_occurred.emit(error_message)
         except requests.RequestException as e:
             error_message = f"Error sending request to TTS API: {e}"
             print(error_message)
             self.error_occurred.emit(error_message)
+
 
 class SettingsWindow(QWidget):
     settings_updated = pyqtSignal(dict)
@@ -152,23 +182,24 @@ class SettingsWindow(QWidget):
             else:
                 QMessageBox.warning(self, "Error", f"Failed to fetch voices. Status code: {response.status_code}")
         except requests.RequestException as e:
-            QMessageBox.warning(self, "Error", f"Failed to fetch voices: {str(e)}")
+            QMessageBox.warning(self, "Error", f"Failed to fetch voices: {e!s}")
 
     def save_settings(self):
-            new_settings = {
-                "api_url": self.api_url_input.text(),
-                "params": {
-                    "character_voice_gen": self.voice_combo.currentText(),
-                    "language": self.language_combo.currentData(),
-                    "text_filtering": self.text_filtering_input.text(),
-                    "output_file_name": "clipboard_tts",
-                    "output_file_timestamp": "true",
-                    "autoplay": "true",
-                    "autoplay_volume": str(self.volume_slider.value() / 10.0)
-                }
-            }
-            self.settings_updated.emit(new_settings)
-            self.hide()
+        new_settings = {
+            "api_url": self.api_url_input.text(),
+            "params": {
+                "character_voice_gen": self.voice_combo.currentText(),
+                "language": self.language_combo.currentData(),
+                "text_filtering": self.text_filtering_input.text(),
+                "output_file_name": "clipboard_tts",
+                "output_file_timestamp": "true",
+                "autoplay": "true",
+                "autoplay_volume": str(self.volume_slider.value() / 10.0),
+            },
+        }
+        self.settings_updated.emit(new_settings)
+        self.hide()
+
 
 class TTSApp(QSystemTrayIcon):
     def __init__(self, app):
@@ -179,7 +210,7 @@ class TTSApp(QSystemTrayIcon):
 
     def load_settings(self):
         try:
-            with open(SETTINGS_FILE, 'r') as f:
+            with open(SETTINGS_FILE) as f:
                 self.settings = json.load(f)
         except FileNotFoundError:
             self.settings = {
@@ -191,12 +222,12 @@ class TTSApp(QSystemTrayIcon):
                     "output_file_name": "clipboard_tts",
                     "output_file_timestamp": "true",
                     "autoplay": "true",
-                    "autoplay_volume": "0.8"
-                }
+                    "autoplay_volume": "0.8",
+                },
             }
 
     def save_settings(self):
-        with open(SETTINGS_FILE, 'w') as f:
+        with open(SETTINGS_FILE, "w") as f:
             json.dump(self.settings, f)
 
     def init_ui(self):
@@ -253,6 +284,7 @@ class TTSApp(QSystemTrayIcon):
         self.tts_worker.quit()
         QApplication.instance().quit()
 
+
 def check_server_ready(url, timeout=10):
     start_time = time.time()
     while time.time() - start_time < timeout:
@@ -265,27 +297,31 @@ def check_server_ready(url, timeout=10):
         time.sleep(1)
     return False
 
+
 def signal_handler(signal, frame):
     print("[Clipboard to TTS] Exiting...")
     QApplication.instance().quit()
+
 
 if __name__ == "__main__":
     print("[Clipboard to TTS] AllTalk Clipboard to TTS is starting...")
 
     if not check_server_ready(TTS_SERVER_URL):
-        print("[Clipboard to TTS] Error: AllTalk TTS server is not ready. Please start the AllTalk server and try again.")
+        print(
+            "[Clipboard to TTS] Error: AllTalk TTS server is not ready. Please start the AllTalk server and try again."
+        )
         sys.exit(1)
 
     signal.signal(signal.SIGINT, signal_handler)
 
     app = QApplication(sys.argv)
-    
+
     if not QSystemTrayIcon.isSystemTrayAvailable():
         print("[Clipboard to TTS] System tray is not available on this system.")
         sys.exit(1)
 
     tts_app = TTSApp(app)
-    
+
     # This allows for Ctrl+C to work
     timer = QTimer()
     timer.start(500)

@@ -1,36 +1,39 @@
-from loguru import logger
-from typing import Dict, Any, Set
 import time
 from collections import defaultdict
 from dataclasses import dataclass
 from threading import Lock
+from typing import Any
+
+from loguru import logger
+
 
 @dataclass
 class SecurityMetrics:
     total_requests: int = 0
     blocked_requests: int = 0
     last_incident: float = 0
-    blacklisted_ips: Set[str] = None
-    
+    blacklisted_ips: set[str] = None
+
     def __post_init__(self):
         if self.blacklisted_ips is None:
             self.blacklisted_ips = set()
 
+
 class SecurityManager:
     def __init__(self, proxy_manager):
         self.proxy_manager = proxy_manager
-# Loguru logger imported from loguru
+        # Loguru logger imported from loguru
         self.metrics = SecurityMetrics()
         self.rate_limits = defaultdict(lambda: {"count": 0, "reset_time": 0})
         self.rate_limit_lock = Lock()
-        
+
     def check_rate_limit(self, ip: str, limit: int = 100, window: int = 60) -> bool:
         """Check if IP has exceeded rate limit"""
         with self.rate_limit_lock:
             current_time = time.time()
             if self.rate_limits[ip]["reset_time"] < current_time:
                 self.rate_limits[ip] = {"count": 0, "reset_time": current_time + window}
-            
+
             self.rate_limits[ip]["count"] += 1
             return self.rate_limits[ip]["count"] <= limit
 
@@ -49,13 +52,13 @@ class SecurityManager:
         self.metrics.blacklisted_ips.discard(ip)
         logger.info(f"IP {ip} removed from blacklist")
 
-    def get_security_status(self) -> Dict[str, Any]:
+    def get_security_status(self) -> dict[str, Any]:
         """Get current security metrics"""
         return {
             "total_requests": self.metrics.total_requests,
             "blocked_requests": self.metrics.blocked_requests,
             "blacklisted_ips": len(self.metrics.blacklisted_ips),
-            "last_incident": time.strftime('%Y-%m-%d %H:%M:%S', 
-                                         time.localtime(self.metrics.last_incident)) 
-                            if self.metrics.last_incident else "None"
+            "last_incident": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.metrics.last_incident))
+            if self.metrics.last_incident
+            else "None",
         }

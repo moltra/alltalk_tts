@@ -1,8 +1,6 @@
+import numpy as np
 import torch
 from torch.nn import functional as F
-
-import numpy as np
-
 
 DEFAULT_MIN_BIN_WIDTH = 1e-3
 DEFAULT_MIN_BIN_HEIGHT = 1e-3
@@ -37,7 +35,7 @@ def piecewise_rational_quadratic_transform(
         min_bin_width=min_bin_width,
         min_bin_height=min_bin_height,
         min_derivative=min_derivative,
-        **spline_kwargs
+        **spline_kwargs,
     )
     return outputs, logabsdet
 
@@ -74,7 +72,7 @@ def unconstrained_rational_quadratic_spline(
         outputs[outside_interval_mask] = inputs[outside_interval_mask]
         logabsdet[outside_interval_mask] = 0
     else:
-        raise RuntimeError("{} tails are not implemented.".format(tails))
+        raise RuntimeError(f"{tails} tails are not implemented.")
 
     (
         outputs[inside_interval_mask],
@@ -175,8 +173,7 @@ def rational_quadratic_spline(
 
         theta_one_minus_theta = root * (1 - root)
         denominator = input_delta + (
-            (input_derivatives + input_derivatives_plus_one - 2 * input_delta)
-            * theta_one_minus_theta
+            (input_derivatives + input_derivatives_plus_one - 2 * input_delta) * theta_one_minus_theta
         )
         derivative_numerator = input_delta.pow(2) * (
             input_derivatives_plus_one * root.pow(2)
@@ -190,12 +187,9 @@ def rational_quadratic_spline(
         theta = (inputs - input_cumwidths) / input_bin_widths
         theta_one_minus_theta = theta * (1 - theta)
 
-        numerator = input_heights * (
-            input_delta * theta.pow(2) + input_derivatives * theta_one_minus_theta
-        )
+        numerator = input_heights * (input_delta * theta.pow(2) + input_derivatives * theta_one_minus_theta)
         denominator = input_delta + (
-            (input_derivatives + input_derivatives_plus_one - 2 * input_delta)
-            * theta_one_minus_theta
+            (input_derivatives + input_derivatives_plus_one - 2 * input_delta) * theta_one_minus_theta
         )
         outputs = input_cumheights + numerator / denominator
 

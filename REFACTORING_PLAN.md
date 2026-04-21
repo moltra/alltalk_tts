@@ -1,7 +1,7 @@
 # AllTalk TTS v2 - Comprehensive Refactoring Plan
 
-**Created:** 2025-04-21  
-**Objective:** Fix all identified issues and standardize testing using pytest and Loguru  
+**Created:** 2025-04-21
+**Objective:** Fix all identified issues and standardize testing using pytest and Loguru
 **Estimated Duration:** 4-6 weeks (depending on team size and availability)
 
 ---
@@ -15,8 +15,8 @@ This plan addresses all 23 issues identified in the code review and establishes 
 ## Phase 1: Critical Security Fixes (Week 1)
 
 ### 1.1 Fix CORS Configuration
-**File:** `tts_server.py:229`  
-**Priority:** Critical  
+**File:** `tts_server.py:229`
+**Priority:** Critical
 **Effort:** 2 hours
 
 **Tasks:**
@@ -51,8 +51,8 @@ app.add_middleware(
 ---
 
 ### 1.2 Secure Subprocess Execution
-**File:** `diagnostics.py:1015`  
-**Priority:** Critical  
+**File:** `diagnostics.py:1015`
+**Priority:** Critical
 **Effort:** 4 hours
 
 **Tasks:**
@@ -78,7 +78,7 @@ def execute_pip_command(command: str):
     parts = command.split()
     if not parts or parts[0] not in ALLOWED_PIP_COMMANDS:
         raise ValueError(f"Command not allowed: {parts[0] if parts else 'empty'}")
-    
+
     # Use list instead of shell=True
     result = subprocess.run(
         [sys.executable, "-m", "pip"] + parts[1:],
@@ -98,8 +98,8 @@ def execute_pip_command(command: str):
 ---
 
 ### 1.3 Begin Global State Refactoring
-**Files:** `tts_server.py`, `tts_mem.py`, `finetune.py`, `script.py`  
-**Priority:** Critical  
+**Files:** `tts_server.py`, `tts_mem.py`, `finetune.py`, `script.py`
+**Priority:** Critical
 **Effort:** 40 hours (ongoing across phases)
 
 **Tasks:**
@@ -115,25 +115,25 @@ def execute_pip_command(command: str):
 # Create system/state_manager.py
 class StateManager:
     """Centralized state management for AllTalk application"""
-    
+
     def __init__(self):
         self._config: Optional[AlltalkConfig] = None
         self._tts_engines_config: Optional[AlltalkTTSEnginesConfig] = None
         self._infer_pipeline = None
         self._lock = Lock()
-    
+
     @property
     def config(self) -> AlltalkConfig:
         if self._config is None:
             self._config = AlltalkConfig.get_instance()
         return self._config
-    
+
     @property
     def tts_engines_config(self) -> AlltalkTTSEnginesConfig:
         if self._tts_engines_config is None:
             self._tts_engines_config = AlltalkTTSEnginesConfig.get_instance()
         return self._tts_engines_config
-    
+
     async def reload_config(self, force: bool = False):
         async with self._lock:
             self._config = AlltalkConfig.get_instance(force_reload=force)
@@ -153,8 +153,8 @@ state_manager = StateManager()
 ## Phase 2: Logging Standardization (Week 1-2)
 
 ### 2.1 Replace logging.disable with Loguru Setup
-**Files:** Multiple files  
-**Priority:** High  
+**Files:** Multiple files
+**Priority:** High
 **Effort:** 8 hours
 
 **Tasks:**
@@ -172,10 +172,10 @@ import sys
 
 def setup_logging(log_level: str = "INFO", log_file: str = "alltalk.log"):
     """Configure Loguru for AllTalk application"""
-    
+
     # Remove default handler
     logger.remove()
-    
+
     # Add console handler with colors
     logger.add(
         sys.stdout,
@@ -183,7 +183,7 @@ def setup_logging(log_level: str = "INFO", log_file: str = "alltalk.log"):
         level=log_level,
         colorize=True
     )
-    
+
     # Add file handler with rotation
     logger.add(
         log_file,
@@ -193,7 +193,7 @@ def setup_logging(log_level: str = "INFO", log_file: str = "alltalk.log"):
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
         level=log_level
     )
-    
+
     # Add error file handler
     logger.add(
         "errors.log",
@@ -202,7 +202,7 @@ def setup_logging(log_level: str = "INFO", log_file: str = "alltalk.log"):
         level="ERROR",
         format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
     )
-    
+
     return logger
 
 # Initialize at application startup
@@ -218,8 +218,8 @@ alltalk_logger = setup_logging()
 ---
 
 ### 2.2 Replace Print Statements with Loguru
-**Files:** `tts_server.py`, `tts_mem.py`, and others  
-**Priority:** High  
+**Files:** `tts_server.py`, `tts_mem.py`, and others
+**Priority:** High
 **Effort:** 16 hours
 
 **Tasks:**
@@ -237,7 +237,7 @@ def print_message(message: str, message_type: str = "standard", component: str =
     """Centralized logging function using Loguru"""
     prefix = f"[{config.branding}{component}]"
     full_message = f"{prefix} {message}"
-    
+
     if message_type.startswith("debug_"):
         debug_flag = getattr(config.debugging, message_type, False)
         if not debug_flag:
@@ -259,8 +259,8 @@ def print_message(message: str, message_type: str = "standard", component: str =
 ---
 
 ### 2.3 Create Centralized Logging Configuration
-**File:** `system/logging_config.py`  
-**Priority:** High  
+**File:** `system/logging_config.py`
+**Priority:** High
 **Effort:** 4 hours
 
 **Tasks:**
@@ -281,7 +281,7 @@ import uuid
 
 class LoggingConfig:
     """Centralized logging configuration for AllTalk"""
-    
+
     def __init__(
         self,
         log_level: str = "INFO",
@@ -294,11 +294,11 @@ class LoggingConfig:
         self.structured = structured
         self.enable_correlation = enable_correlation
         self._correlation_id: Optional[str] = None
-    
+
     def setup(self):
         """Configure Loguru handlers"""
         logger.remove()
-        
+
         # Console handler
         console_format = self._get_console_format()
         logger.add(
@@ -307,7 +307,7 @@ class LoggingConfig:
             level=self.log_level,
             colorize=True
         )
-        
+
         # File handler
         logger.add(
             self.log_file,
@@ -317,23 +317,23 @@ class LoggingConfig:
             format=self._get_file_format(),
             level=self.log_level
         )
-        
+
         return logger
-    
+
     def _get_console_format(self) -> str:
         if self.structured:
             return "{message}"
         return "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
-    
+
     def _get_file_format(self) -> str:
         if self.structured:
             return "{message}"
         return "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
-    
+
     def set_correlation_id(self, correlation_id: str):
         """Set correlation ID for request tracking"""
         self._correlation_id = correlation_id
-    
+
     def get_correlation_id(self) -> str:
         """Get or generate correlation ID"""
         if self._correlation_id is None and self.enable_correlation:
@@ -351,8 +351,8 @@ class LoggingConfig:
 ## Phase 3: Error Handling (Week 2)
 
 ### 3.1 Replace Bare Except Clauses
-**Files:** `tts_mem.py:1090`, `system/tts_engines/rvc/train/utils.py:67`, `system/tts_engines/rvc/train/train.py:291`, `system/ft_tokenizer/tokenizer.py:560`, `finetune.py:167,177`  
-**Priority:** High  
+**Files:** `tts_mem.py:1090`, `system/tts_engines/rvc/train/utils.py:67`, `system/tts_engines/rvc/train/train.py:291`, `system/ft_tokenizer/tokenizer.py:560`, `finetune.py:167,177`
+**Priority:** High
 **Effort:** 8 hours
 
 **Tasks:**
@@ -387,8 +387,8 @@ except Exception as e:
 ---
 
 ### 3.2 Establish Consistent Error Handling Policy
-**Files:** Throughout codebase  
-**Priority:** High  
+**Files:** Throughout codebase
+**Priority:** High
 **Effort:** 12 hours
 
 **Tasks:**
@@ -442,7 +442,7 @@ def handle_errors(component: str = "TTS"):
             except Exception as e:
                 logger.exception(f"[{component}] Unexpected error in {func.__name__}")
                 raise AllTalkError(f"Unexpected error: {e}") from e
-        
+
         @wraps(func)
         def sync_wrapper(*args, **kwargs):
             try:
@@ -453,7 +453,7 @@ def handle_errors(component: str = "TTS"):
             except Exception as e:
                 logger.exception(f"[{component}] Unexpected error in {func.__name__}")
                 raise AllTalkError(f"Unexpected error: {e}") from e
-        
+
         return async_wrapper if asyncio.iscoroutinefunction(func) else sync_wrapper
     return decorator
 ```
@@ -466,8 +466,8 @@ def handle_errors(component: str = "TTS"):
 ---
 
 ### 3.3 Replace os.system Calls
-**File:** `diagnostics.py:1037, 1039`  
-**Priority:** High  
+**File:** `diagnostics.py:1037, 1039`
+**Priority:** High
 **Effort:** 2 hours
 
 **Tasks:**
@@ -499,8 +499,8 @@ def clear_screen():
 ## Phase 4: Code Quality (Week 2-3)
 
 ### 4.1 Add Type Hints
-**Files:** Throughout codebase  
-**Priority:** Medium  
+**Files:** Throughout codebase
+**Priority:** Medium
 **Effort:** 24 hours
 
 **Tasks:**
@@ -526,23 +526,23 @@ def load_config(force_reload: bool = False) -> None:
 async def apifunction_reload(request: Request) -> Response:
     """Handle API request to change TTS model"""
     debug_func_entry()
-    
+
     if model_change_lock.locked():
         print_message("Model change already in progress", "debug_api", "API")
         return Response(
             content=json.dumps({"status": "model-is currently changing"}),
             media_type="application/json"
         )
-    
+
     async with model_change_lock:
         requested_model = request.query_params.get("tts_method")
         if requested_model not in model_engine.available_models:
             print_message(f"Invalid TTS method requested: {requested_model}", "error", "API")
             return {"status": "error", "message": "Invalid TTS method specified"}
-        
+
         print_message(f"Attempting to change model to: {requested_model}", "debug_api", "API")
         success = await model_engine.handle_tts_method_change(requested_model)
-        
+
         if success:
             model_engine.current_model_loaded = requested_model
             print_message(f"Model successfully changed to: {requested_model}", "debug_api", "API")
@@ -550,7 +550,7 @@ async def apifunction_reload(request: Request) -> Response:
                 content=json.dumps({"status": "model-success"}),
                 media_type="application/json"
             )
-        
+
         print_message(f"Failed to change model to: {requested_model}", "error", "API")
         return Response(
             content=json.dumps({"status": "model-failure"}),
@@ -565,8 +565,8 @@ async def apifunction_reload(request: Request) -> Response:
 ---
 
 ### 4.2 Split Large Files
-**Files:** `diagnostics.py` (~1,400 lines), `script.py` (~4,965 lines), `tts_server.py` (~2,620 lines), `finetune.py` (~4,810 lines)  
-**Priority:** Medium  
+**Files:** `diagnostics.py` (~1,400 lines), `script.py` (~4,965 lines), `tts_server.py` (~2,620 lines), `finetune.py` (~4,810 lines)
+**Priority:** Medium
 **Effort:** 40 hours
 
 **Tasks:**
@@ -623,8 +623,8 @@ system/
 ---
 
 ### 4.3 Fix Pylint Warnings
-**Files:** Throughout codebase  
-**Priority:** Medium  
+**Files:** Throughout codebase
+**Priority:** Medium
 **Effort:** 16 hours
 
 **Tasks:**
@@ -663,8 +663,8 @@ async def startup_shutdown(_app: FastAPI) -> AsyncGenerator:
 ---
 
 ### 4.4 Remove Unused Variables and Fix Issues
-**Files:** `tts_server.py`, `trainer_alltalk/trainer.py`  
-**Priority:** Medium  
+**Files:** `tts_server.py`, `trainer_alltalk/trainer.py`
+**Priority:** Medium
 **Effort:** 4 hours
 
 **Tasks:**
@@ -678,8 +678,8 @@ async def startup_shutdown(_app: FastAPI) -> AsyncGenerator:
 ## Phase 5: Testing Infrastructure (Week 3)
 
 ### 5.1 Set Up Pytest Configuration
-**File:** `pytest.ini` (already exists, needs enhancement)  
-**Priority:** High  
+**File:** `pytest.ini` (already exists, needs enhancement)
+**Priority:** High
 **Effort:** 4 hours
 
 **Tasks:**
@@ -696,7 +696,7 @@ testpaths = tests
 python_files = test_*.py
 python_classes = Test*
 python_functions = test_*
-addopts = 
+addopts =
     --strict-markers
     --strict-config
     --cov=.
@@ -734,8 +734,8 @@ pytest-mock>=3.11.0
 ---
 
 ### 5.2 Create Test Fixtures and conftest.py
-**File:** `tests/conftest.py`  
-**Priority:** High  
+**File:** `tests/conftest.py`
+**Priority:** High
 **Effort:** 8 hours
 
 **Tasks:**
@@ -820,16 +820,16 @@ def loguru_capture():
     """Capture Loguru output for testing"""
     from io import StringIO
     log_stream = StringIO()
-    
+
     handler_id = logger.add(
         log_stream,
         format="{message}",
         level="DEBUG",
         serialize=False
     )
-    
+
     yield log_stream
-    
+
     logger.remove(handler_id)
 
 @pytest.fixture(autouse=True)
@@ -850,8 +850,8 @@ def reset_singletons():
 ---
 
 ### 5.3 Add Loguru Capture for Pytest
-**File:** `tests/conftest.py`  
-**Priority:** High  
+**File:** `tests/conftest.py`
+**Priority:** High
 **Effort:** 2 hours
 
 **Tasks:**
@@ -869,25 +869,25 @@ def log_capture():
     """Capture loguru logs for testing"""
     import io
     log_output = io.StringIO()
-    
+
     handler_id = logger.add(
         log_output,
         format="{level} - {message}",
         level="DEBUG",
         serialize=False
     )
-    
+
     class LogCapture:
         def get_logs(self):
             return log_output.getvalue()
-        
+
         def assert_log_contains(self, text: str):
             assert text in log_output.getvalue(), f"Expected '{text}' in logs"
-        
+
         def clear(self):
             log_output.truncate(0)
             log_output.seek(0)
-    
+
     yield LogCapture()
     logger.remove(handler_id)
 ```
@@ -901,8 +901,8 @@ def log_capture():
 ## Phase 6: Unit Tests (Week 3-4)
 
 ### 6.1 Write Tests for config.py
-**File:** `tests/test_config.py` (already exists, needs expansion)  
-**Priority:** High  
+**File:** `tests/test_config.py` (already exists, needs expansion)
+**Priority:** High
 **Effort:** 12 hours
 
 **Tasks:**
@@ -927,55 +927,55 @@ class TestAlltalkConfig:
         """Test config initializes with default values"""
         config_path = temp_dir / "config.json"
         config = AlltalkConfig(config_path=config_path)
-        
+
         assert config.branding == "AllTalk "
         assert config.gradio_interface == True
         assert config.output_folder == "outputs"
-    
+
     def test_config_save_and_load(self, temp_dir):
         """Test config saves and loads correctly"""
         config_path = temp_dir / "config.json"
         config = AlltalkConfig(config_path=config_path)
         config.branding = "TestBranding"
         config.save()
-        
+
         # Load new instance
         config2 = AlltalkConfig(config_path=config_path)
         assert config2.branding == "TestBranding"
-    
+
     def test_config_hot_reload(self, temp_dir):
         """Test config reloads on file change"""
         config_path = temp_dir / "config.json"
         config = AlltalkConfig(config_path=config_path, file_check_interval=1)
-        
+
         # Modify file externally
         with open(config_path, 'w') as f:
             json.dump({"branding": "Reloaded"}, f)
-        
+
         # Wait for reload
         import time
         time.sleep(2)
         config._reload_on_change()
-        
+
         assert config.branding == "Reloaded"
-    
+
     def test_config_validation(self, temp_dir):
         """Test config validates Pydantic models"""
         config_path = temp_dir / "config.json"
-        
+
         # Write invalid config
         with open(config_path, 'w') as f:
             json.dump({"gradio_port_number": "invalid"}, f)
-        
+
         with pytest.raises(Exception):
             AlltalkConfig(config_path=config_path)
-    
+
     def test_singleton_pattern(self, temp_dir):
         """Test singleton pattern works"""
         config_path = temp_dir / "config.json"
         config1 = AlltalkConfig(config_path=config_path)
         config2 = AlltalkConfig.get_instance()
-        
+
         # Should be same instance if path matches
         assert config1.get_config_path() == config2.get_config_path()
 
@@ -989,10 +989,10 @@ class TestAlltalkTTSEnginesConfig:
             {"name": "vits", "selected_model": "model2"}
         ]
         config.save()
-        
+
         assert config.is_valid_engine("xtts") == True
         assert config.is_valid_engine("invalid") == False
-    
+
     def test_engine_change(self, temp_dir):
         """Test engine change"""
         config_path = temp_dir / "engines.json"
@@ -1003,7 +1003,7 @@ class TestAlltalkTTSEnginesConfig:
         ]
         config.engine_loaded = "xtts"
         config.save()
-        
+
         config.change_engine("vits")
         assert config.engine_loaded == "vits"
         assert config.selected_model == "model2"
@@ -1016,8 +1016,8 @@ class TestAlltalkTTSEnginesConfig:
 ---
 
 ### 6.2 Write Tests for tts_server.py API Endpoints
-**File:** `tests/test_api_endpoints.py`  
-**Priority:** High  
+**File:** `tests/test_api_endpoints.py`
+**Priority:** High
 **Effort:** 16 hours
 
 **Tasks:**
@@ -1054,7 +1054,7 @@ class TestReloadEndpoint:
             response = client.post("/api/reload?tts_method=test_model")
             assert response.status_code == 200
             assert response.json() == {"status": "model-success"}
-    
+
     def test_reload_invalid_model(self, client, mock_model_engine):
         """Test reload with invalid model"""
         mock_model_engine.available_models = {"valid_model": {}}
@@ -1068,17 +1068,17 @@ class TestVoicesEndpoint:
         """Test getting voices list"""
         mock_model_engine.multivoice_capable = True
         mock_model_engine.voices_file_list = Mock(return_value=["voice1.wav", "voice2.wav"])
-        
+
         with patch('tts_server.model_engine', mock_model_engine):
             response = client.get("/api/voices")
             assert response.status_code == 200
             assert response.json()["status"] == "success"
             assert len(response.json()["voices"]) == 2
-    
+
     def test_get_voices_not_supported(self, client, mock_model_engine):
         """Test voices when engine doesn't support it"""
         mock_model_engine.multivoice_capable = False
-        
+
         with patch('tts_server.model_engine', mock_model_engine):
             response = client.get("/api/voices")
             assert response.status_code == 500
@@ -1089,16 +1089,16 @@ class TestAudioEndpoint:
         """Test getting audio file"""
         with patch('tts_server.config') as mock_config:
             mock_config.get_output_directory.return_value = test_audio_file.parent
-            
+
             response = client.get(f"/audio/{test_audio_file.name}")
             assert response.status_code == 200
             assert response.headers["content-type"] == "audio/wav"
-    
+
     def test_get_audio_not_found(self, client):
         """Test getting non-existent audio file"""
         with patch('tts_server.config') as mock_config:
             mock_config.get_output_directory.return_value = Path("/fake/path")
-            
+
             response = client.get("/audio/nonexistent.wav")
             assert response.status_code == 404
 ```
@@ -1110,8 +1110,8 @@ class TestAudioEndpoint:
 ---
 
 ### 6.3 Write Tests for TTS Engine Interfaces
-**File:** `tests/test_tts_engines.py`  
-**Priority:** Medium  
+**File:** `tests/test_tts_engines.py`
+**Priority:** Medium
 **Effort:** 12 hours
 
 **Tasks:**
@@ -1134,14 +1134,14 @@ class TestXTTSEngine:
     def test_xtts_setup(self):
         """Test XTTS engine setup (requires GPU)"""
         from system.tts_engines.xtts.model_engine import tts_class
-        
+
         engine = tts_class()
         # Test setup logic
-    
+
     def test_xtts_capabilities(self):
         """Test XTTS capability flags"""
         from system.tts_engines.xtts.model_engine import tts_class
-        
+
         engine = tts_class()
         assert hasattr(engine, 'deepspeed_capable')
         assert hasattr(engine, 'lowvram_capable')
@@ -1151,7 +1151,7 @@ class TestPiperEngine:
     def test_piper_setup(self):
         """Test Piper engine setup"""
         from system.tts_engines.piper.model_engine import tts_class
-        
+
         engine = tts_class()
         # Test setup logic
 
@@ -1165,14 +1165,14 @@ class TestEngineInterface:
             'tts_generate',
             'voices_file_list'
         ]
-        
+
         engines = ['xtts', 'vits', 'piper', 'parler', 'f5tts']
-        
+
         for engine_name in engines:
             module = __import__(f'system.tts_engines.{engine_name}.model_engine', fromlist=['tts_class'])
             engine_class = getattr(module, 'tts_class')
             engine = engine_class()
-            
+
             for method in required_methods:
                 assert hasattr(engine, method), f"{engine_name} missing {method}"
 ```
@@ -1184,8 +1184,8 @@ class TestEngineInterface:
 ---
 
 ### 6.4 Write Tests for RVC Pipeline
-**File:** `tests/test_rvc.py`  
-**Priority:** Medium  
+**File:** `tests/test_rvc.py`
+**Priority:** Medium
 **Effort:** 8 hours
 
 **Tasks:**
@@ -1205,20 +1205,20 @@ class TestRVCPipeline:
     def test_rvc_inference(self, test_audio_file, temp_dir):
         """Test RVC inference"""
         from system.tts_engines.rvc.infer.infer import infer_pipeline
-        
+
         # Mock the pipeline for testing
         with patch('system.tts_engines.rvc.infer.infer.infer_pipeline') as mock_pipeline:
             mock_pipeline.return_value = str(temp_dir / "output.wav")
-            
+
             result = infer_pipeline(
                 pitch=0,
                 filter_radius=3,
                 index_rate=0.75,
                 # ... other parameters
             )
-            
+
             assert result == str(temp_dir / "output.wav")
-    
+
     def test_rvc_error_handling(self, test_audio_file):
         """Test RVC error handling"""
         with pytest.raises(Exception):
@@ -1233,8 +1233,8 @@ class TestRVCPipeline:
 ---
 
 ### 6.5 Write Tests for Error Handling Paths
-**File:** `tests/test_error_handling.py`  
-**Priority:** Medium  
+**File:** `tests/test_error_handling.py`
+**Priority:** Medium
 **Effort:** 8 hours
 
 **Tasks:**
@@ -1256,7 +1256,7 @@ class TestCustomExceptions:
         """Test ConfigurationError"""
         with pytest.raises(ConfigurationError):
             raise ConfigurationError("Invalid config")
-    
+
     def test_tts_engine_error(self):
         """Test TTSEngineError"""
         with pytest.raises(TTSEngineError):
@@ -1268,21 +1268,21 @@ class TestErrorDecorator:
         @handle_errors("TEST")
         async def failing_function():
             raise ConfigurationError("Test error")
-        
+
         with pytest.raises(ConfigurationError):
             await failing_function()
-        
+
         loguru_capture.assert_log_contains("ConfigurationError")
-    
+
     def test_decorator_wraps_unexpected_errors(self, loguru_capture):
         """Test decorator wraps unexpected errors"""
         @handle_errors("TEST")
         async def failing_function():
             raise ValueError("Unexpected error")
-        
+
         with pytest.raises(AllTalkError):
             await failing_function()
-        
+
         loguru_capture.assert_log_contains("Unexpected error")
 ```
 
@@ -1293,8 +1293,8 @@ class TestErrorDecorator:
 ---
 
 ### 6.6 Write Tests for File Operations and Config Reload
-**File:** `tests/test_file_operations.py`  
-**Priority:** Medium  
+**File:** `tests/test_file_operations.py`
+**Priority:** Medium
 **Effort:** 8 hours
 
 **Tasks:**
@@ -1317,32 +1317,32 @@ class TestFileOperations:
         config_path = temp_dir / "config.json"
         config = AlltalkConfig(config_path=config_path)
         config.save()
-        
+
         backup_path = config_path.with_suffix('.backup')
         assert not backup_path.exists()  # Backup should be cleaned up
-    
+
     def test_file_locking(self, temp_dir):
         """Test file locking prevents concurrent access"""
         config_path = temp_dir / "config.json"
         config1 = AlltalkConfig(config_path=config_path)
         config2 = AlltalkConfig(config_path=config_path)
-        
+
         # Test that file locking works
         config1.save()
         config2.save()  # Should wait for lock
-    
+
     @pytest.mark.asyncio
     async def test_concurrent_config_access(self, temp_dir):
         """Test concurrent config access"""
         config_path = temp_dir / "config.json"
-        
+
         async def modify_config():
             config = AlltalkConfig(config_path=config_path)
             config.save()
-        
+
         # Run multiple concurrent saves
         await asyncio.gather(*[modify_config() for _ in range(5)])
-        
+
         # Verify config is still valid
         config = AlltalkConfig(config_path=config_path)
         assert config.branding == "AllTalk "
@@ -1357,8 +1357,8 @@ class TestFileOperations:
 ## Phase 7: Integration Tests (Week 4)
 
 ### 7.1 Write Tests for API Integration
-**File:** `tests/integration/test_api_integration.py`  
-**Priority:** Medium  
+**File:** `tests/integration/test_api_integration.py`
+**Priority:** Medium
 **Effort:** 12 hours
 
 **Tasks:**
@@ -1384,18 +1384,18 @@ def test_full_tts_workflow(client, temp_dir):
     # 1. Check if ready
     response = client.get("/api/ready")
     assert response.status_code == 200
-    
+
     # 2. Get available voices
     response = client.get("/api/voices")
     assert response.status_code == 200
-    
+
     # 3. Generate TTS
     response = client.post("/api/tts", json={
         "text": "Test text",
         "voice": "test_voice.wav"
     })
     assert response.status_code == 200
-    
+
     # 4. Get audio
     audio_url = response.json()["output_file_url"]
     response = client.get(audio_url)
@@ -1409,8 +1409,8 @@ def test_full_tts_workflow(client, temp_dir):
 ---
 
 ### 7.2 Write Tests for TTS Generation Workflow
-**File:** `tests/integration/test_tts_workflow.py`  
-**Priority:** Medium  
+**File:** `tests/integration/test_tts_workflow.py`
+**Priority:** Medium
 **Effort:** 12 hours
 
 **Tasks:**
@@ -1453,8 +1453,8 @@ def test_text_preprocessing():
 ## Phase 8: Documentation (Week 4-5)
 
 ### 8.1 Update Docstrings to Consistent Format
-**Files:** Throughout codebase  
-**Priority:** Low  
+**Files:** Throughout codebase
+**Priority:** Low
 **Effort:** 16 hours
 
 **Tasks:**
@@ -1469,18 +1469,18 @@ def test_text_preprocessing():
 # Google style docstring example
 def load_config(force_reload: bool = False) -> None:
     """Initialize all configuration instances.
-    
+
     Loads the AlltalkConfig and AlltalkTTSEnginesConfig singletons.
     Optionally forces a reload of the configuration from disk.
-    
+
     Args:
         force_reload: If True, forces a reload even if the file
             hasn't been modified. Defaults to False.
-    
+
     Raises:
         ConfigurationError: If configuration file is invalid or
             cannot be loaded.
-    
+
     Example:
         >>> load_config(force_reload=True)
         Configuration reloaded successfully
@@ -1498,8 +1498,8 @@ def load_config(force_reload: bool = False) -> None:
 ---
 
 ### 8.2 Extract Magic Numbers to Named Constants
-**Files:** Throughout codebase  
-**Priority:** Low  
+**Files:** Throughout codebase
+**Priority:** Low
 **Effort:** 8 hours
 
 **Tasks:**
@@ -1557,8 +1557,8 @@ timeout = DEFAULT_TIMEOUT
 ---
 
 ### 8.3 Standardize Naming Conventions
-**Files:** Throughout codebase  
-**Priority:** Low  
+**Files:** Throughout codebase
+**Priority:** Low
 **Effort:** 8 hours
 
 **Tasks:**
@@ -1588,8 +1588,8 @@ def process_audio_file(input_path: Path) -> None:
 ## Phase 9: CI/CD (Week 5)
 
 ### 9.1 Set Up Pytest in CI Pipeline
-**File:** `.github/workflows/test.yml`  
-**Priority:** Medium  
+**File:** `.github/workflows/test.yml`
+**Priority:** Medium
 **Effort:** 4 hours
 
 **Tasks:**
@@ -1615,25 +1615,25 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11']
-    
+
     steps:
     - uses: actions/checkout@v3
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r system/requirements/requirements_unit_test.txt
         pip install pytest pytest-asyncio pytest-cov pytest-loguru
-    
+
     - name: Run tests
       run: |
         pytest --cov=. --cov-report=xml --cov-report=html
-    
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
@@ -1647,8 +1647,8 @@ jobs:
 ---
 
 ### 9.2 Add MyPy Type Checking to CI
-**File:** `.github/workflows/test.yml`  
-**Priority:** Medium  
+**File:** `.github/workflows/test.yml`
+**Priority:** Medium
 **Effort:** 4 hours
 
 **Tasks:**
@@ -1685,8 +1685,8 @@ disallow_untyped_defs = False
 ---
 
 ### 9.3 Add Pre-commit Hooks
-**File:** `.pre-commit-config.yaml`  
-**Priority:** Medium  
+**File:** `.pre-commit-config.yaml`
+**Priority:** Medium
 **Effort**: 4 hours
 
 **Tasks:**
@@ -1828,7 +1828,7 @@ pre-commit>=3.3.0
 
 ---
 
-**Plan Created:** 2025-04-21  
-**Last Updated:** 2025-04-21  
-**Owner:** Development Team  
+**Plan Created:** 2025-04-21
+**Last Updated:** 2025-04-21
+**Owner:** Development Team
 **Review Date:** End of each phase

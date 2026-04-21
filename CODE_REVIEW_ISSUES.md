@@ -1,7 +1,7 @@
 # AllTalk TTS v2 - Code Review Issues
 
-**Review Date:** 2025-04-21  
-**Repository:** https://github.com/erew123/alltalk_tts  
+**Review Date:** 2025-04-21
+**Repository:** https://github.com/erew123/alltalk_tts
 **Scope:** Full codebase review focusing on security, code quality, and best practices
 
 ---
@@ -21,8 +21,8 @@ This document outlines issues found during a comprehensive code review of the Al
 ## Critical Issues
 
 ### 1. CORS Configuration - Allows All Origins
-**File:** `tts_server.py` (Line 229)  
-**Severity:** Critical  
+**File:** `tts_server.py` (Line 229)
+**Severity:** Critical
 **Category:** Security
 
 ```python
@@ -39,7 +39,7 @@ app.add_middleware(
 
 **Risk:** Cross-Origin attacks, CSRF vulnerabilities, unauthorized API access
 
-**Recommendation:** 
+**Recommendation:**
 - Replace `["*"]` with a list of trusted origins
 - If credentials are needed, use specific origins only (browsers reject wildcard with credentials)
 - Consider environment-based configuration for different deployment scenarios
@@ -47,8 +47,8 @@ app.add_middleware(
 ---
 
 ### 2. Subprocess Execution with Shell=True
-**File:** `diagnostics.py` (Line 1015)  
-**Severity:** Critical  
+**File:** `diagnostics.py` (Line 1015)
+**Severity:** Critical
 **Category:** Security
 
 ```python
@@ -68,8 +68,8 @@ subprocess.run(command, shell=True, check=True)
 ---
 
 ### 3. Global State Management
-**Files:** Multiple files throughout codebase  
-**Severity:** Critical  
+**Files:** Multiple files throughout codebase
+**Severity:** Critical
 **Category:** Architecture/Code Quality
 
 **Affected Files:**
@@ -105,8 +105,8 @@ global tts_instances  # tts_mem.py:1070
 ## High Priority Issues
 
 ### 4. Bare Except Clauses
-**Files:** Multiple files  
-**Severity:** High  
+**Files:** Multiple files
+**Severity:** High
 **Category:** Error Handling
 
 **Affected Files:**
@@ -133,8 +133,8 @@ except:  # Catches everything - bad practice
 ---
 
 ### 5. Global Logging Disabled
-**Files:** Multiple files  
-**Severity:** High  
+**Files:** Multiple files
+**Severity:** High
 **Category:** Logging/Debugging
 
 **Affected Files:**
@@ -160,8 +160,8 @@ logging.disable(logging.WARNING)
 ---
 
 ### 6. os.system() Calls
-**File:** `diagnostics.py` (Lines 1037, 1039)  
-**Severity:** High  
+**File:** `diagnostics.py` (Lines 1037, 1039)
+**Severity:** High
 **Category:** Security
 
 ```python
@@ -179,8 +179,8 @@ os.system("clear")  # Line 1039
 ---
 
 ### 7. Inconsistent Error Handling
-**Files:** Throughout codebase  
-**Severity:** High  
+**Files:** Throughout codebase
+**Severity:** High
 **Category:** Error Handling
 
 **Issue:** Error handling is inconsistent across the codebase:
@@ -199,8 +199,8 @@ os.system("clear")  # Line 1039
 ---
 
 ### 8. Missing Type Hints
-**Files:** Throughout codebase  
-**Severity:** High  
+**Files:** Throughout codebase
+**Severity:** High
 **Category:** Code Quality
 
 **Issue:** Many functions lack type hints, making the code harder to understand, maintain, and use with IDE tooling.
@@ -225,8 +225,8 @@ def load_config(force_reload = False):  # No return type hint
 ---
 
 ### 9. Large File Sizes
-**Files:** Multiple files  
-**Severity:** High  
+**Files:** Multiple files
+**Severity:** High
 **Category:** Maintainability
 
 **Affected Files:**
@@ -247,8 +247,8 @@ def load_config(force_reload = False):  # No return type hint
 ---
 
 ### 10. Print Statements Instead of Logging
-**Files:** `tts_server.py`, `tts_mem.py`, and others  
-**Severity:** High  
+**Files:** `tts_server.py`, `tts_mem.py`, and others
+**Severity:** High
 **Category:** Logging
 
 **Issue:** Using `print()` statements instead of proper logging makes it difficult to:
@@ -274,8 +274,8 @@ print(f"{prefix}{BLUE}Debug{RESET} {YELLOW}{message_type}{RESET} {message}")
 ## Medium Priority Issues
 
 ### 11. Pylint Disable Comments
-**Files:** Multiple files  
-**Severity:** Medium  
+**Files:** Multiple files
+**Severity:** Medium
 **Category:** Code Quality
 
 **Issue:** Frequent use of `# pylint: disable` comments indicates code quality issues that are being suppressed rather than fixed.
@@ -299,8 +299,8 @@ print(f"{prefix}{BLUE}Debug{RESET} {YELLOW}{message_type}{RESET} {message}")
 ---
 
 ### 12. Dangerous Default Values
-**File:** `trainer_alltalk/trainer.py` (Line 294)  
-**Severity:** Medium  
+**File:** `trainer_alltalk/trainer.py` (Line 294)
+**Severity:** Medium
 **Category:** Code Quality
 
 ```python
@@ -317,8 +317,8 @@ def __init__(  # pylint: disable=dangerous-default-value
 ---
 
 ### 13. Assignment from No Return
-**File:** `tts_server.py` (Line 2615)  
-**Severity:** Medium  
+**File:** `tts_server.py` (Line 2615)
+**Severity:** Medium
 **Category:** Code Quality
 
 ```python
@@ -335,8 +335,8 @@ uvicorn_server = uvicorn.run(app, host="0.0.0.0", port=port_to_use, log_level="d
 ---
 
 ### 14. Broad Exception Caught
-**File:** `tts_server.py` (Line 1504)  
-**Severity:** Medium  
+**File:** `tts_server.py` (Line 1504)
+**Severity:** Medium
 **Category:** Error Handling
 
 ```python
@@ -353,8 +353,8 @@ except Exception as e:  # pylint: disable=broad-exception-caught
 ---
 
 ### 15. Unused Variables
-**File:** `tts_server.py` (Line 2022)  
-**Severity:** Medium  
+**File:** `tts_server.py` (Line 2022)
+**Severity:** Medium
 **Category:** Code Quality
 
 ```python
@@ -371,8 +371,8 @@ output_file_path, output_file_url, output_cache_url = await tts_handle_output_pa
 ---
 
 ### 16. Unused Arguments
-**File:** `tts_server.py` (Line 213)  
-**Severity:** Medium  
+**File:** `tts_server.py` (Line 213)
+**Severity:** Medium
 **Category:** Code Quality
 
 ```python
@@ -389,8 +389,8 @@ async def startup_shutdown(no_actual_value_it_demanded_something_be_here):  # py
 ---
 
 ### 17. Import Outside Toplevel
-**File:** `tts_server.py` (Line 90)  
-**Severity:** Medium  
+**File:** `tts_server.py` (Line 90)
+**Severity:** Medium
 **Category:** Code Quality
 
 ```python
@@ -407,8 +407,8 @@ from system.tts_engines.rvc.infer.infer import infer_pipeline as rvc_pipeline  #
 ---
 
 ### 18. Inconsistent Docstring Style
-**Files:** Throughout codebase  
-**Severity:** Medium  
+**Files:** Throughout codebase
+**Severity:** Medium
 **Category:** Documentation
 
 **Issue:** Docstrings are inconsistent in style, format, and completeness. Some functions have detailed docstrings, others have none or minimal documentation.
@@ -424,8 +424,8 @@ from system.tts_engines.rvc.infer.infer import infer_pipeline as rvc_pipeline  #
 ## Low Priority Issues
 
 ### 19. Magic Numbers
-**Files:** Throughout codebase  
-**Severity:** Low  
+**Files:** Throughout codebase
+**Severity:** Low
 **Category:** Code Quality
 
 **Issue:** Hard-coded numeric values without explanation make code harder to maintain.
@@ -440,8 +440,8 @@ from system.tts_engines.rvc.infer.infer import infer_pipeline as rvc_pipeline  #
 ---
 
 ### 20. Inconsistent Naming Conventions
-**Files:** Throughout codebase  
-**Severity:** Low  
+**Files:** Throughout codebase
+**Severity:** Low
 **Category:** Code Quality
 
 **Issue:** Naming conventions are inconsistent:
@@ -457,8 +457,8 @@ from system.tts_engines.rvc.infer.infer import infer_pipeline as rvc_pipeline  #
 ---
 
 ### 21. Missing Unit Tests
-**Files:** Throughout codebase  
-**Severity:** Low  
+**Files:** Throughout codebase
+**Severity:** Low
 **Category:** Testing
 
 **Issue:** Limited unit test coverage. Only basic configuration tests exist in `test/` directory.
@@ -473,8 +473,8 @@ from system.tts_engines.rvc.infer.infer import infer_pipeline as rvc_pipeline  #
 ---
 
 ### 22. No Input Validation on API Endpoints
-**File:** `tts_server.py`  
-**Severity:** Low  
+**File:** `tts_server.py`
+**Severity:** Low
 **Category:** Security/Validation
 
 **Issue:** Some API endpoints lack comprehensive input validation, relying on Pydantic models which may not catch all edge cases.
@@ -488,8 +488,8 @@ from system.tts_engines.rvc.infer.infer import infer_pipeline as rvc_pipeline  #
 ---
 
 ### 23. Deprecated or Outdated Dependencies
-**Files:** `system/requirements/`  
-**Severity:** Low  
+**Files:** `system/requirements/`
+**Severity:** Low
 **Category:** Dependencies
 
 **Issue:** Some dependencies may be outdated or deprecated. Regular updates are needed for security and performance.
@@ -602,6 +602,6 @@ Addressing these issues will significantly improve the codebase quality and make
 
 ---
 
-**Review Completed:** 2025-04-21  
-**Reviewer:** Cascade AI Assistant  
+**Review Completed:** 2025-04-21
+**Reviewer:** Cascade AI Assistant
 **Next Review Recommended:** After critical issues are resolved

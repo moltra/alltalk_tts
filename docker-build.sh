@@ -67,7 +67,7 @@ if [ "$CLEAN" = true ]; then
   rm -rf ${SCRIPT_DIR=}/docker/deepspeed/build
   # Recreate directories after clean
   mkdir -p ${SCRIPT_DIR=}/docker/deepspeed/build
-  echo "Cleaned and recreated build directories"  
+  echo "Cleaned and recreated build directories"
 fi
 
 echo "Building base environment image"

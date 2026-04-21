@@ -1,18 +1,18 @@
 import os.path
 import tempfile
-from unittest import TestCase
 from pathlib import Path
-from config import AlltalkConfig, AlltalkTTSEnginesConfig, AlltalkNewEnginesConfig, AlltalkMultiEngineManagerConfig
+from unittest import TestCase
+
+from config import AlltalkConfig, AlltalkMultiEngineManagerConfig, AlltalkNewEnginesConfig, AlltalkTTSEnginesConfig
 
 
 class TestAlltalkConfig(TestCase):
-
     def setUp(self):
         self.config = AlltalkConfig.get_instance()
         self.config.reload()
 
     def test_default_values_loaded(self):
-        cfg = AlltalkConfig(Path(__file__).parent.resolve() / 'empty.json')
+        cfg = AlltalkConfig(Path(__file__).parent.resolve() / "empty.json")
 
         # Since the default config file is expected to also contain the
         # default values, we can simply check that both dictionaries are identical:
@@ -20,16 +20,16 @@ class TestAlltalkConfig(TestCase):
 
     def test_no_default_values_missing(self):
         # Loading the empty JSON will populate the config with defaults from the code:
-        cfg = AlltalkConfig(Path(__file__).parent.resolve() / 'empty.json')
+        cfg = AlltalkConfig(Path(__file__).parent.resolve() / "empty.json")
         with tempfile.NamedTemporaryFile(suffix=".json") as tmp:
             cfg.save(tmp.name)
             # Compare the defaults from code (when written to a file) to the actual default config file:
-            with open(tmp.name, "r") as file1:
-                with open(self.config.get_config_path(), "r") as file2:
+            with open(tmp.name) as file1:
+                with open(self.config.get_config_path()) as file2:
                     self.assertEqual(file1.read(), file2.read())
 
     def test_values_merged_with_defaults(self):
-        cfg = AlltalkConfig(Path(__file__).parent.resolve() / 'confignew_partial.json')
+        cfg = AlltalkConfig(Path(__file__).parent.resolve() / "confignew_partial.json")
 
         # Check some values that are missing in the JSON:
         self.assertEqual(cfg.gradio_port_number, 7852)
@@ -44,7 +44,7 @@ class TestAlltalkConfig(TestCase):
         self.assertFalse(cfg.debugging.debug_openai)
 
     def test_loading_values(self):
-        cfg = AlltalkConfig(Path(__file__).parent.resolve() / 'confignew_partial.json')
+        cfg = AlltalkConfig(Path(__file__).parent.resolve() / "confignew_partial.json")
 
         # Check that some values that are in the JSON:
         self.assertEqual(cfg.branding, "Another AllTalk ")
@@ -166,7 +166,7 @@ class TestAlltalkConfig(TestCase):
             self.assertEqual(new_config.theme.clazz, "bar")
 
             # Test serialization of field 'clazz' to field "class"
-            with open(tmp.name, "r") as file:
+            with open(tmp.name) as file:
                 json = file.read()
                 self.assertTrue("class" in json)
                 self.assertFalse("clazz" in json)
@@ -175,8 +175,8 @@ class TestAlltalkConfig(TestCase):
         for attr in self.config.to_dict().keys():
             self.assertTrue(not attr.startswith("_"))
 
-class TestAlltalkTTSEnginesConfig(TestCase):
 
+class TestAlltalkTTSEnginesConfig(TestCase):
     def setUp(self):
         self.tts_engines_config = AlltalkTTSEnginesConfig.get_instance()
         self.tts_engines_config.reload()
@@ -184,7 +184,9 @@ class TestAlltalkTTSEnginesConfig(TestCase):
     def test_tts_engines(self):
         self.assertEqual(self.tts_engines_config.engine_loaded, "piper")
         self.assertEqual(self.tts_engines_config.selected_model, "piper")
-        self.assertListEqual(self.tts_engines_config.get_engine_names_available(), ["parler", "piper", "vits", "xtts", "f5tts"])
+        self.assertListEqual(
+            self.tts_engines_config.get_engine_names_available(), ["parler", "piper", "vits", "xtts", "f5tts"]
+        )
 
     def test_is_valid_engine(self):
         for engine in ["parler", "piper", "vits", "xtts", "f5tts"]:
@@ -198,7 +200,9 @@ class TestAlltalkTTSEnginesConfig(TestCase):
         self.assertEqual(self.tts_engines_config.selected_model, "vits - tts_models--en--vctk--vits")
 
     def test_tts_engines_default_config_path(self):
-        expected_config_path = os.path.join(Path(__file__).parent.parent.resolve(), "system", "tts_engines", "tts_engines.json")
+        expected_config_path = os.path.join(
+            Path(__file__).parent.parent.resolve(), "system", "tts_engines", "tts_engines.json"
+        )
         self.assertEqual(self.tts_engines_config.get_config_path(), Path(expected_config_path))
 
     def test_tts_engines_save(self):
@@ -227,7 +231,6 @@ class TestAlltalkTTSEnginesConfig(TestCase):
 
 
 class TestAlltalkNewEnginesConfig(TestCase):
-
     def setUp(self):
         self.new_engines_config = AlltalkNewEnginesConfig.get_instance()
         self.new_engines_config.reload()
@@ -243,8 +246,8 @@ class TestAlltalkNewEnginesConfig(TestCase):
         for attr in self.new_engines_config.to_dict().keys():
             self.assertTrue(not attr.startswith("_"))
 
-class TestAlltalkMultiEngineManagerConfig(TestCase):
 
+class TestAlltalkMultiEngineManagerConfig(TestCase):
     def setUp(self):
         self.mem_config = AlltalkMultiEngineManagerConfig.get_instance()
         self.mem_config.reload()

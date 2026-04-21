@@ -17,4 +17,3 @@ Newer version of SillyTavern store `settings.json` file in `\SillyTavern\data\de
 Within the `settings.json` file you will find a section called `"AllTalk": {` and it is closed out a few lines down with `},`
 
 You can either manually edit any of the settings in there OR you can delete the entire section from the start of `"AllTalk":` to the end of `},` and when you refresh the SillyTavern web page OR restart SillyTavern, new settings for AllTalk will be created/saved.
-

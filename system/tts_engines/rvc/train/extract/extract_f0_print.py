@@ -1,19 +1,19 @@
 import os
 import sys
-import numpy as np
-import pyworld
-import torchcrepe
-import torch
-import parselmouth
-import tqdm
 from multiprocessing import Process, cpu_count
+
+import numpy as np
+import parselmouth
+import pyworld
+import torch
+import torchcrepe
+import tqdm
 
 current_directory = os.getcwd()
 sys.path.append(current_directory)
 
 
 from rvc.lib.utils import load_audio
-
 
 exp_dir = sys.argv[1]
 f0_method = sys.argv[2]
@@ -48,11 +48,7 @@ class FeatureInput:
         torch_device = (
             torch.device(f"cuda:{torch_device_index % torch.cuda.device_count()}")
             if torch.cuda.is_available()
-            else (
-                torch.device("mps")
-                if torch.backends.mps.is_available()
-                else torch.device("cpu")
-            )
+            else (torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu"))
         )
 
         audio = torch.from_numpy(x.astype(np.float32)).to(torch_device, copy=True)
@@ -133,7 +129,9 @@ class FeatureInput:
         if not hasattr(self, "model_rmvpe"):
             from rvc.lib.rmvpe import RMVPE
 
-            self.model_rmvpe = RMVPE(current_directory / "models" / "rvc_base" / "rmvpe.pt", is_half=False, device="cpu")
+            self.model_rmvpe = RMVPE(
+                current_directory / "models" / "rvc_base" / "rmvpe.pt", is_half=False, device="cpu"
+            )
         return self.model_rmvpe.infer_from_audio(x, thred=0.03)
 
     def get_f0_method_dict(self):
@@ -149,20 +147,16 @@ class FeatureInput:
         p_len = x.shape[0] // self.hop
 
         if f0_method in self.f0_method_dict:
-            f0 = (
-                self.f0_method_dict[f0_method](x, p_len)
-                if f0_method == "pm"
-                else self.f0_method_dict[f0_method](x)
-            )
+            f0 = self.f0_method_dict[f0_method](x, p_len) if f0_method == "pm" else self.f0_method_dict[f0_method](x)
         elif f0_method == "crepe":
             f0 = self.mncrepe(f0_method, x, p_len, hop_length)
         return f0
 
     def coarse_f0(self, f0):
         f0_mel = 1127 * np.log(1 + f0 / 700)
-        f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - self.f0_mel_min) * (
-            self.f0_bin - 2
-        ) / (self.f0_mel_max - self.f0_mel_min) + 1
+        f0_mel[f0_mel > 0] = (f0_mel[f0_mel > 0] - self.f0_mel_min) * (self.f0_bin - 2) / (
+            self.f0_mel_max - self.f0_mel_min
+        ) + 1
 
         # use 0 or 1
         f0_mel[f0_mel <= 1] = 1
@@ -184,9 +178,7 @@ class FeatureInput:
 
             for idx, (inp_path, opt_path1, opt_path2) in enumerate(paths):
                 try:
-                    if os.path.exists(opt_path1 + ".npy") and os.path.exists(
-                        opt_path2 + ".npy"
-                    ):
+                    if os.path.exists(opt_path1 + ".npy") and os.path.exists(opt_path2 + ".npy"):
                         pbar.update(1)
                         continue
 

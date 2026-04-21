@@ -1,8 +1,10 @@
 # finetune_content.py
 # pylint: disable=no-member
 
+
 class FinetuneContent:
     """CSS and help content for finetune.py"""
+
     custom_css = """
     /* Add this to your existing CSS */
     .gradio-container .prose {
@@ -32,7 +34,7 @@ class FinetuneContent:
         max-width: 100% !important;
         box-sizing: border-box !important;
         /* Default text color for all content (grey) */
-        color: rgba(156, 163, 175, 1) !important; /* Adjust this grey value to match your interface */        
+        color: rgba(156, 163, 175, 1) !important; /* Adjust this grey value to match your interface */
     }
 
     /* Make headings white */
@@ -53,7 +55,7 @@ class FinetuneContent:
     .custom-markdown ol {
         color: rgba(156, 163, 175, 1) !important; /* Same grey as the base text */
     }
-   
+
     /* Additional targeting for any wrapping elements */
     .gradio-container .prose > * {
         margin: 0 !important;
@@ -138,18 +140,18 @@ class FinetuneContent:
         min-width: 0 !important; /* Prevents flex items from overflowing */
     }
 
-    .small-file-upload { 
+    .small-file-upload {
     min-height: 200px;
     max-height: 200px;
     }
 
-    .small-file-upload2 { 
+    .small-file-upload2 {
     min-height: 90px;
     max-height: 90px;
-    }    
+    }
 
     """
-    
+
     STEP1_QUICKSTART = """
     1. Place audio files (MP3, WAV, or FLAC) in folder `/alltalk_tts/finetune/put-voice-samples-in-here` or upload through the interface
     2. Provide 2+ minutes of clear audio (more is better and 5+ recommended). Variation in cadence and speech patterns recommended
@@ -162,7 +164,7 @@ class FinetuneContent:
     - Consistent audio quality
     - Minimal background noise
     """
-    
+
     STEP1_DETAILED_INSTRUCTIONS = """
     #### Step-by-Step Process
     1. Review [Coqui's guide on creating a good dataset](https://docs.coqui.ai/en/latest/what_makes_a_good_dataset.html)
@@ -217,7 +219,7 @@ class FinetuneContent:
     | `large-v3-turbo` | All      | ⚡️⚡️⚡️         | 10GB  | Fast high quality           |
     | `turbo`          | All      | ⚡️⚡️⚡️⚡️        | 10GB  | Fastest high quality        |
     """
-    
+
     STEP1_ADVANCED_SETTINGS = """
     ### Voice Activity Detection (VAD)
     - Recommended: Enabled
@@ -254,7 +256,7 @@ class FinetuneContent:
     | **Mixed Precision (Recommended)** | Balances speed and accuracy, auto-switches between FP16 and FP32 | NVIDIA Turing (RTX 20 series) and newer       | RTX 20 series, RTX 30 series, RTX 40 series, Tesla V100, A100        |
     | **FP16 (Half Precision)** | Fastest processing, lowest memory usage     | NVIDIA Turing and newer (with Tensor Cores)    | RTX 20 series, RTX 30 series, RTX 40 series, Tesla V100, A100        |
     """
-    
+
     STEP1_DEBUG_SETTINGS = """
     Each debug category serves a specific purpose in helping you understand what's happening during the dataset creation process:
 
@@ -351,7 +353,7 @@ class FinetuneContent:
     - Enable Audio when investigating quality issues
     - Turn on Model Ops when dealing with model-related problems
     """
-    
+
     STEP1_TROUBLESHOOTING = """
     ### Common Issues
 
@@ -410,7 +412,7 @@ class FinetuneContent:
     - New model downloads will occur next time you use a model
     - Consider keeping frequently used models to avoid redownloading
     """
-    
+
     DATASET_VALIDATION_1 = """
     # Dataset Validation and Correction Tool
 
@@ -492,7 +494,7 @@ class FinetuneContent:
 
     Changes automatically update the appropriate CSV file and refresh the display.
     """
-    
+
     STEP2_QUICKSTART = """
     Before diving into specific settings, it's important to understand the basic workflow of training your model.
     This section provides an overview of the essential parameters you'll need to get started with training.
@@ -820,7 +822,7 @@ class FinetuneContent:
 
     The warmup feature, labeled as **Perform Warmup Learning**, provides a smoother start to the training process, making it ideal for ensuring stability and allowing the model to settle into a balanced learning pattern.
     """
-    
+
     STEP2_OPTIMIZERS = """
     Optimizers are the algorithms that actually update your model's weights during training. Different optimizers
     have different characteristics and can be better suited for certain types of training tasks.
@@ -942,7 +944,7 @@ class FinetuneContent:
 
     After testing, you'll be ready to export your model and prepare it for integration into your TTS applications.
     """
- 
+
     STEP3_IMPORTANT = """
     Before beginning the testing phase, please review these important considerations to ensure a smooth experience.
 
@@ -951,7 +953,7 @@ class FinetuneContent:
     - **Reference File Length Requirement**: Any audio clips under 6 seconds are excluded from the reference list by default, as shorter clips generally do not provide sufficient information for quality TTS generation. Change with `Min Audio Length` and click refresh.
     - **Unexpected Reference Counts**: If the number of reference files is lower than anticipated, it may be due to Whisper's initial segmentation step, which sometimes results in shorter or longer-than-ideal clips. If needed, try manually segmenting your audio files to ensure optimal segments for Whisper processing and training.
     """
-    
+
     STEP3_INSTRUCTIONS = """
     Follow these instructions to test and validate your fine-tuned model effectively.
 
@@ -965,7 +967,7 @@ class FinetuneContent:
 
     Once satisfied with the TTS performance, you can move to the next stage for exporting your model and managing your training data.
     """
-    
+
     STEP3_WHAT_IT_DOES = """
     The testing step serves as the final stage for validating your fine-tuned model's performance.
 
@@ -988,7 +990,7 @@ class FinetuneContent:
 
     Your model will be moved to `/alltalk_tts/models/xtts/{your-chosen-folder-name}`
     """
-    
+
     EXPORT_VOICE_SAMPLES = """
     During export, your voice samples are automatically analyzed and organized into three categories:
 
@@ -1035,7 +1037,7 @@ class FinetuneContent:
     - Optional cleanup step
     - Consider keeping originals for future training
     """
-    
+
     EXPORT_STORAGE = """
     After export, you can free up additional disk space:
 
@@ -1060,7 +1062,7 @@ class FinetuneContent:
 
     Remember to test your exported model and voice samples in the main AllTalk interface before removing any files.
     """
-    
+
     report_content = """WAV Files Processing Report
     ===========================
 
@@ -1108,7 +1110,7 @@ class FinetuneContent:
     Summary:
     --------
     """
-    
+
     report_content2 = """
     Notes:
     ------
@@ -1116,6 +1118,4 @@ class FinetuneContent:
     - Files in 'too_short' are under 6 seconds and may need to be checked or excluded
     - Files in 'too_long' are over 30 seconds and may need to be split or excluded
 
-    Please review the files in 'too_short' and 'too_long' directories."""    
-
-    
+    Please review the files in 'too_short' and 'too_long' directories."""

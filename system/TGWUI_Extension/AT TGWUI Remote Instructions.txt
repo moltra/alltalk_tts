@@ -1,4 +1,4 @@
-Text-generation-webui remote extension for AllTalk! 
+Text-generation-webui remote extension for AllTalk!
 
 This folder contains everything you need to set up a Text-generation-webui extension that can communicate with an AllTalk server remotely.
 

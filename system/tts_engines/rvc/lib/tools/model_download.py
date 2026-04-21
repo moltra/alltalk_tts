@@ -1,13 +1,14 @@
 import os
-import sys
-import wget
-import zipfile
-from bs4 import BeautifulSoup
-import requests
-from urllib.parse import unquote, urlencode, parse_qs, urlparse
 import re
 import shutil
+import sys
+import zipfile
+from urllib.parse import parse_qs, unquote, urlencode, urlparse
+
+import requests
 import six
+import wget
+from bs4 import BeautifulSoup
 
 
 def find_folder_parent(search_dir, folder_name):
@@ -20,9 +21,8 @@ def find_folder_parent(search_dir, folder_name):
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
-from rvc.lib.utils import format_title
-
 from rvc.lib.tools import gdown
+from rvc.lib.utils import format_title
 
 file_path = find_folder_parent(now_dir, "logs")
 
@@ -48,9 +48,7 @@ def get_mediafire_download_link(url):
     response = requests.get(url)
     response.raise_for_status()
     soup = BeautifulSoup(response.text, "html.parser")
-    download_button = soup.find(
-        "a", {"class": "input popsok", "aria-label": "Download file"}
-    )
+    download_button = soup.find("a", {"class": "input popsok", "aria-label": "Download file"})
     if download_button:
         download_link = download_button.get("href")
         return download_link
@@ -79,15 +77,10 @@ def download_from_url(url):
                     )
                 except Exception as error:
                     error_message = str(error)
-                    if (
-                        "Too many users have viewed or downloaded this file recently"
-                        in error_message
-                    ):
+                    if "Too many users have viewed or downloaded this file recently" in error_message:
                         os.chdir(now_dir)
                         return "too much use"
-                    elif (
-                        "Cannot retrieve the public link of the file." in error_message
-                    ):
+                    elif "Cannot retrieve the public link of the file." in error_message:
                         os.chdir(now_dir)
                         return "private link"
                     else:
@@ -103,9 +96,7 @@ def download_from_url(url):
             download_response = requests.get(download_url)
 
             if download_response.status_code == 200:
-                filename = parse_qs(urlparse(unquote(download_url)).query).get(
-                    "filename", [""]
-                )[0]
+                filename = parse_qs(urlparse(unquote(download_url)).query).get("filename", [""])[0]
                 if filename:
                     os.chdir(zips_path)
                     with open(filename, "wb") as f:
@@ -121,11 +112,7 @@ def download_from_url(url):
                 print(file_id)
                 response = requests.get(f"https://pixeldrain.com/api/file/{file_id}")
                 if response.status_code == 200:
-                    file_name = (
-                        response.headers.get("Content-Disposition")
-                        .split("filename=")[-1]
-                        .strip('";')
-                    )
+                    file_name = response.headers.get("Content-Disposition").split("filename=")[-1].strip('";')
                     os.makedirs(zips_path, exist_ok=True)
                     with open(os.path.join(zips_path, file_name), "wb") as newfile:
                         newfile.write(response.content)
@@ -155,9 +142,7 @@ def download_from_url(url):
 
             response = requests.get(url, stream=True)
             if response.status_code == 200:
-                content_disposition = six.moves.urllib_parse.unquote(
-                    response.headers["Content-Disposition"]
-                )
+                content_disposition = six.moves.urllib_parse.unquote(response.headers["Content-Disposition"])
                 m = re.search(r'filename="([^"]+)"', content_disposition)
                 file_name = m.groups()[0]
                 file_name = file_name.replace(os.path.sep, "_")
@@ -171,15 +156,8 @@ def download_from_url(url):
                         file.write(data)
                         progress += len(data)
                         progress_percent = int((progress / total_size_in_bytes) * 100)
-                        num_dots = int(
-                            (progress / total_size_in_bytes) * progress_bar_length
-                        )
-                        progress_bar = (
-                            "["
-                            + "." * num_dots
-                            + " " * (progress_bar_length - num_dots)
-                            + "]"
-                        )
+                        num_dots = int((progress / total_size_in_bytes) * progress_bar_length)
+                        progress_bar = "[" + "." * num_dots + " " * (progress_bar_length - num_dots) + "]"
                         print(
                             f"{progress_percent}% {progress_bar} {progress}/{total_size_in_bytes}  ",
                             end="\r",
@@ -288,9 +266,7 @@ def model_download_pipeline(url):
                 success = extract_and_show_progress(zipfile_path, extract_folder_path)
 
                 subfolders = [
-                    f
-                    for f in os.listdir(extract_folder_path)
-                    if os.path.isdir(os.path.join(extract_folder_path, f))
+                    f for f in os.listdir(extract_folder_path) if os.path.isdir(os.path.join(extract_folder_path, f))
                 ]
                 if len(subfolders) == 1:
                     subfolder_path = os.path.join(extract_folder_path, subfolders[0])
@@ -312,32 +288,18 @@ def model_download_pipeline(url):
                         if "v2" not in item:
                             file_name = item.split("_nprobe_1_")[1].split("_v1")[0]
                             if file_name != model_name:
-                                new_file_name = (
-                                    item.split("_nprobe_1_")[0]
-                                    + "_nprobe_1_"
-                                    + model_name
-                                    + "_v1"
-                                )
+                                new_file_name = item.split("_nprobe_1_")[0] + "_nprobe_1_" + model_name + "_v1"
                                 os.rename(
                                     os.path.join(extract_folder_path, item),
-                                    os.path.join(
-                                        extract_folder_path, new_file_name + ".index"
-                                    ),
+                                    os.path.join(extract_folder_path, new_file_name + ".index"),
                                 )
                         else:
                             file_name = item.split("_nprobe_1_")[1].split("_v2")[0]
                             if file_name != model_name:
-                                new_file_name = (
-                                    item.split("_nprobe_1_")[0]
-                                    + "_nprobe_1_"
-                                    + model_name
-                                    + "_v2"
-                                )
+                                new_file_name = item.split("_nprobe_1_")[0] + "_nprobe_1_" + model_name + "_v2"
                                 os.rename(
                                     os.path.join(extract_folder_path, item),
-                                    os.path.join(
-                                        extract_folder_path, new_file_name + ".index"
-                                    ),
+                                    os.path.join(extract_folder_path, new_file_name + ".index"),
                                 )
 
                 if success:

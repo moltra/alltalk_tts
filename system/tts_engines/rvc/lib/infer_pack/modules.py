@@ -1,16 +1,15 @@
 import math
+
 import torch
 from torch import nn
-from torch.nn import functional as F
-
 from torch.nn import Conv1d
+from torch.nn import functional as F
 from torch.nn.utils import remove_weight_norm
 from torch.nn.utils.parametrizations import weight_norm  # Updated import
 
 from . import commons
-from .commons import init_weights, get_padding
+from .commons import get_padding, init_weights
 from .transforms import piecewise_rational_quadratic_transform
-
 
 LRELU_SLOPE = 0.1
 
@@ -51,11 +50,7 @@ class ConvReluNorm(nn.Module):
 
         self.conv_layers = nn.ModuleList()
         self.norm_layers = nn.ModuleList()
-        self.conv_layers.append(
-            nn.Conv1d(
-                in_channels, hidden_channels, kernel_size, padding=kernel_size // 2
-            )
-        )
+        self.conv_layers.append(nn.Conv1d(in_channels, hidden_channels, kernel_size, padding=kernel_size // 2))
         self.norm_layers.append(LayerNorm(hidden_channels))
         self.relu_drop = nn.Sequential(nn.ReLU(), nn.Dropout(p_dropout))
         for _ in range(n_layers - 1):
@@ -151,10 +146,8 @@ class WN(torch.nn.Module):
         self.drop = nn.Dropout(p_dropout)
 
         if gin_channels != 0:
-            cond_layer = torch.nn.Conv1d(
-                gin_channels, 2 * hidden_channels * n_layers, 1
-            )
-            #self.cond_layer = torch.nn.utils.parametrizations.weight_norm(cond_layer, name="weight")
+            cond_layer = torch.nn.Conv1d(gin_channels, 2 * hidden_channels * n_layers, 1)
+            # self.cond_layer = torch.nn.utils.parametrizations.weight_norm(cond_layer, name="weight")
             self.cond_layer = weight_norm(cond_layer, name="weight")  # Updated to use the new import
 
         for i in range(n_layers):
@@ -167,7 +160,7 @@ class WN(torch.nn.Module):
                 dilation=dilation,
                 padding=padding,
             )
-            #in_layer = torch.nn.utils.parametrizations.weight_norm(in_layer, name="weight")
+            # in_layer = torch.nn.utils.parametrizations.weight_norm(in_layer, name="weight")
             in_layer = weight_norm(in_layer, name="weight")  # Updated to use the new impor
             self.in_layers.append(in_layer)
             if i < n_layers - 1:
@@ -176,7 +169,7 @@ class WN(torch.nn.Module):
                 res_skip_channels = hidden_channels
 
             res_skip_layer = torch.nn.Conv1d(hidden_channels, res_skip_channels, 1)
-            #res_skip_layer = torch.nn.utils.parametrizations.weight_norm(res_skip_layer, name="weight")
+            # res_skip_layer = torch.nn.utils.parametrizations.weight_norm(res_skip_layer, name="weight")
             res_skip_layer = weight_norm(res_skip_layer, name="weight")  # Updated to use the new import
             self.res_skip_layers.append(res_skip_layer)
 
@@ -292,7 +285,7 @@ class ResBlock1(torch.nn.Module):
         self.convs2.apply(init_weights)
 
     def forward(self, x, x_mask=None):
-        for c1, c2 in zip(self.convs1, self.convs2):
+        for c1, c2 in zip(self.convs1, self.convs2, strict=False):
             xt = F.leaky_relu(x, LRELU_SLOPE)
             if x_mask is not None:
                 xt = xt * x_mask
@@ -478,9 +471,7 @@ class ConvFlow(nn.Module):
 
         self.pre = nn.Conv1d(self.half_channels, filter_channels, 1)
         self.convs = DDSConv(filter_channels, kernel_size, n_layers, p_dropout=0.0)
-        self.proj = nn.Conv1d(
-            filter_channels, self.half_channels * (num_bins * 3 - 1), 1
-        )
+        self.proj = nn.Conv1d(filter_channels, self.half_channels * (num_bins * 3 - 1), 1)
         self.proj.weight.data.zero_()
         self.proj.bias.data.zero_()
 
@@ -494,9 +485,7 @@ class ConvFlow(nn.Module):
         h = h.reshape(b, c, -1, t).permute(0, 1, 3, 2)
 
         unnormalized_widths = h[..., : self.num_bins] / math.sqrt(self.filter_channels)
-        unnormalized_heights = h[..., self.num_bins : 2 * self.num_bins] / math.sqrt(
-            self.filter_channels
-        )
+        unnormalized_heights = h[..., self.num_bins : 2 * self.num_bins] / math.sqrt(self.filter_channels)
         unnormalized_derivatives = h[..., 2 * self.num_bins :]
 
         x1, logabsdet = piecewise_rational_quadratic_transform(

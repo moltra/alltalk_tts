@@ -5,5 +5,5 @@
     "emmet.includeLanguages": {
         "jinja-html": "html",
         "jinja2": "html"
-    },
+    }
 }

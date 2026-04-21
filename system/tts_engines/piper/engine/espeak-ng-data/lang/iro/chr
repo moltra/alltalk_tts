@@ -17,11 +17,10 @@ words 2 1
 phonemes chr
 
 //stress on all syllables to simulate stress on no syllables
-stressRule 9 
+stressRule 9
 stressLength 175 175 175 175 175 175 175 175 //all vowels the same length regardless of stress
 stressAmp 10 10 10 10 10 10 10 10  //all vowels the same strength regardless of marked stress
 
 intonation 1
 
 tunes	chrs chrc chrq chre
-

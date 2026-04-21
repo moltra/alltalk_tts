@@ -1,10 +1,12 @@
-from loguru import logger
 import threading
 import time
-from typing import Dict, Any
 from collections import defaultdict
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import timedelta
+from typing import Any
+
+from loguru import logger
+
 
 @dataclass
 class ProxyMetrics:
@@ -12,14 +14,15 @@ class ProxyMetrics:
     total_requests: int = 0
     active_connections: int = 0
     bytes_transferred: int = 0
-    request_times: Dict[str, float] = field(default_factory=lambda: defaultdict(float))
-    requests_per_minute: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
-    status_codes: Dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    request_times: dict[str, float] = field(default_factory=lambda: defaultdict(float))
+    requests_per_minute: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+    status_codes: dict[str, int] = field(default_factory=lambda: defaultdict(int))
+
 
 class MetricsCollector:
     def __init__(self, proxy_manager):
         self.proxy_manager = proxy_manager
-# Loguru logger imported from loguru
+        # Loguru logger imported from loguru
         self.metrics = ProxyMetrics()
         self.collecting = False
         self.collector_thread = None
@@ -30,7 +33,7 @@ class MetricsCollector:
         """Start metrics collection"""
         if self.collecting:
             return
-            
+
         self.collecting = True
         self.metrics = ProxyMetrics()  # Reset metrics
         self.collector_thread = threading.Thread(target=self._collect_loop)
@@ -66,7 +69,7 @@ class MetricsCollector:
             self.metrics.status_codes[str(status_code)] += 1
             self.metrics.requests_per_minute[endpoint] += 1
 
-    def get_current_metrics(self) -> Dict[str, Any]:
+    def get_current_metrics(self) -> dict[str, Any]:
         """Get current metrics"""
         with self._lock:
             uptime = time.time() - self.metrics.start_time
@@ -76,11 +79,10 @@ class MetricsCollector:
                 "active_connections": self.metrics.active_connections,
                 "bytes_transferred": f"{self.metrics.bytes_transferred / 1024 / 1024:.2f} MB",
                 "average_response_times": {
-                    endpoint: f"{time:.2f}ms" 
-                    for endpoint, time in self.metrics.request_times.items()
+                    endpoint: f"{time:.2f}ms" for endpoint, time in self.metrics.request_times.items()
                 },
                 "requests_per_minute": dict(self.metrics.requests_per_minute),
-                "status_codes": dict(self.metrics.status_codes)
+                "status_codes": dict(self.metrics.status_codes),
             }
 
     def increment_connections(self):

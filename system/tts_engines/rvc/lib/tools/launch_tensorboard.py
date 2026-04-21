@@ -1,4 +1,5 @@
 import time
+
 from tensorboard import program
 
 log_path = "logs"

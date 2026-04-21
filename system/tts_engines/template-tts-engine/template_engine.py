@@ -12,31 +12,32 @@ Implementation Notes:
 Note: Text between "↑↑↑ Keep everything above this line ↑↑↑" and "↓↓↓ Keep everything below this line ↓↓↓"
 markers **TYPICALLY** must remain unchanged as it contains critical system integration code.
 
-Note: You can add new functions, just DONT remove the functions that are already there, even if they 
+Note: You can add new functions, just DONT remove the functions that are already there, even if they
 are doing nothing as `tts_server.py` will still look for their existance and fail if they are missing.
 """
 
 ########################################
 # Default imports # Do not change this #
 ########################################
-import os
 import gc
-import sys
-import glob
-import json
-import time
 import inspect
-import torch
-from loguru import logger
+import json
+import os
+import sys
+import time
 from pathlib import Path
-from fastapi import (HTTPException)
+
+import torch
+from fastapi import HTTPException
+
 # Loguru handles logging levels via configuration
 
-# Confguration file management for confignew.json 
+# Confguration file management for confignew.json
 try:
-    from .config import AlltalkConfig, AlltalkTTSEnginesConfig, AlltalkNewEnginesConfig # TGWUI import
+    from .config import AlltalkConfig, AlltalkNewEnginesConfig, AlltalkTTSEnginesConfig  # TGWUI import
 except ImportError:
-    from config import AlltalkConfig, AlltalkTTSEnginesConfig, AlltalkNewEnginesConfig # Standalone import
+    from config import AlltalkConfig, AlltalkNewEnginesConfig, AlltalkTTSEnginesConfig  # Standalone import
+
 
 def initialize_configs():
     """Initialize all configuration instances"""
@@ -44,6 +45,7 @@ def initialize_configs():
     tts_engines_config = AlltalkTTSEnginesConfig.get_instance()
     new_engines_config = AlltalkNewEnginesConfig.get_instance()
     return config, tts_engines_config, new_engines_config
+
 
 # Load in the central config management
 config, tts_engines_config, new_engines_config = initialize_configs()
@@ -78,6 +80,7 @@ model_supports_deepspeed_true_or_false = False
 if model_supports_deepspeed_true_or_false:
     try:
         import deepspeed
+
         deepspeed_available = True
     except ImportError:
         deepspeed_available = False
@@ -124,7 +127,7 @@ except ModuleNotFoundError:
 class tts_class:
     """
     TTS Engine Implementation Class
-    
+
     This class provides the interface between `tts_server.py` and whatever TTS engine you install.
     It handles model loading, voice management, and TTS generation in both streaming
     and non-streaming modes. Streaming will only be supported if the underlying TTS engine
@@ -157,7 +160,7 @@ class tts_class:
         """
         Centralized print function for messages. Use this for print output to console.
         As this is the model Engine, all `component` printouts are set to ENG as default.
-        
+
         Args:
             message (str): The message to print
             message_type (str): Type of message (standard/warning/error/debug_*/debug)
@@ -180,10 +183,10 @@ class tts_class:
         # ANSI color codes
         BLUE = "\033[94m"
         MAGENTA = "\033[95m"
-        YELLOW = "\033[93m"  
+        YELLOW = "\033[93m"
         RED = "\033[91m"
         GREEN = "\033[92m"
-        RESET = "\033[0m" 
+        RESET = "\033[0m"
         prefix = f"[{config.branding}{component}] "
         if message_type.startswith("debug_"):
             debug_flag = getattr(config.debugging, message_type, False)
@@ -191,15 +194,17 @@ class tts_class:
                 return
             if message_type == "debug_func" and "Function entry:" in message:
                 message_parts = message.split("Function entry:", 1)
-                print(f"{prefix}{BLUE}Debug{RESET} {YELLOW}{message_type}{RESET} Function entry:{GREEN}{message_parts[1]}{RESET} in model_engine")
+                print(
+                    f"{prefix}{BLUE}Debug{RESET} {YELLOW}{message_type}{RESET} Function entry:{GREEN}{message_parts[1]}{RESET} in model_engine"
+                )
             else:
                 print(f"{prefix}{BLUE}Debug{RESET} {YELLOW}{message_type}{RESET} {message}")
         elif message_type == "debug":
-            print(f"{prefix}{BLUE}Debug{RESET} {message}")  
+            print(f"{prefix}{BLUE}Debug{RESET} {message}")
         elif message_type == "warning":
-            print(f"{prefix}{YELLOW}Warning{RESET} {message}")  
+            print(f"{prefix}{YELLOW}Warning{RESET} {message}")
         elif message_type == "error":
-            print(f"{prefix}{RED}Error{RESET} {message}")  
+            print(f"{prefix}{RED}Error{RESET} {message}")
         else:
             print(f"{prefix}{message}")
 
@@ -215,10 +220,10 @@ class tts_class:
     def __init__(self):
         """
         Initialize the TTS engine instance.
-        
+
         WARNING: This class requires specific variables to interface with AllTalk's main system (tts_server.py).
         Do not remove or rename any of the predefined variables as they are required for proper system integration.
-        
+
         Required System Interface Variables:
 
         1. Core System Variables (DO NOT MODIFY):
@@ -227,9 +232,9 @@ class tts_class:
            - self.main_dir: AllTalk root directory
            - self.device: Processing device ("cuda" or "cpu")
            - self.cuda_is_available: Whether GPU/CUDA is available
-           
+
            State Tracking:
-           - self.tts_generating_lock: Prevents concurrent generation requests 
+           - self.tts_generating_lock: Prevents concurrent generation requests
            - self.tts_stop_generation: Signals generation stop request
            - self.tts_narrator_generatingtts: Tracks narrator mode for optimization
            - self.model: Active TTS model instance
@@ -237,12 +242,12 @@ class tts_class:
            - self.current_model_loaded: Name of currently loaded model
            - self.available_models: List of models found by scan_models_folder
            - self.setup_has_run: Tracks if setup() has completed
-        
+
         2. Engine Configuration Variables (DO NOT MODIFY):
            - self.engines_available: List of all available TTS engines
            - self.engine_loaded: Currently selected TTS engine
            - self.selected_model: Currently selected model name
-        
+
         3. Model Settings (SET VIA model_settings.json):
            Capability Flags:
            - self.audio_format: Output audio format (wav, mp3, etc.)
@@ -256,7 +261,7 @@ class tts_class:
            - self.temperature_capable: Temperature adjustment support
            - self.multivoice_capable: Multiple voice support
            - self.pitch_capable: Pitch adjustment support
-           
+
            Engine Settings:
            - self.def_character_voice: Default character voice
            - self.def_narrator_voice: Default narrator voice
@@ -267,7 +272,7 @@ class tts_class:
            - self.repetitionpenalty_set: Current repetition penalty
            - self.temperature_set: Current temperature setting
            - self.pitch_set: Current pitch setting
-           
+
            OpenAI Voice Mappings:
            - self.openai_alloy: Alloy voice mapping
            - self.openai_echo: Echo voice mapping
@@ -275,13 +280,13 @@ class tts_class:
            - self.openai_nova: Nova voice mapping
            - self.openai_onyx: Onyx voice mapping
            - self.openai_shimmer: Shimmer voice mapping
-        
+
         Integration Requirements:
         - All variables must be present even if unused by your engine
         - Capability flags should accurately reflect engine features
         - Settings should have sensible defaults even if not used
         - OpenAI mappings should be set even if not supporting OpenAI compatibility
-        
+
         Note: Variables marked (DO NOT MODIFY) are critical system integration points.
         Other variables should be configured through their respective JSON files or
         you can add new central variables in the section provided down below.
@@ -304,17 +309,17 @@ class tts_class:
         self.selected_model = tts_engines_config.selected_model
 
         # DO NOT MODIFY - Load in the current TTS Engines model_settings.json file
-        with open(os.path.join(self.this_dir, "model_settings.json"), "r") as f:
+        with open(os.path.join(self.this_dir, "model_settings.json")) as f:
             model_settings_file = json.load(f)
-    
+
         # DO NOT MODIFY - Model details from model_settings.json
         self.manufacturer_name = model_settings_file["model_details"]["manufacturer_name"]
         self.manufacturer_website = model_settings_file["model_details"]["manufacturer_website"]
-        
+
         # DO NOT MODIFY - Model capabilities from model_settings.json
         self.audio_format = model_settings_file["model_capabilties"]["audio_format"]
         self.deepspeed_capable = model_settings_file["model_capabilties"]["deepspeed_capable"]
-        self.deepspeed_available = 'deepspeed' in globals()
+        self.deepspeed_available = "deepspeed" in globals()
         self.generationspeed_capable = model_settings_file["model_capabilties"]["generationspeed_capable"]
         self.languages_capable = model_settings_file["model_capabilties"]["languages_capable"]
         self.lowvram_capable = model_settings_file["model_capabilties"]["lowvram_capable"]
@@ -324,7 +329,7 @@ class tts_class:
         self.temperature_capable = model_settings_file["model_capabilties"]["temperature_capable"]
         self.multivoice_capable = model_settings_file["model_capabilties"]["multivoice_capable"]
         self.pitch_capable = model_settings_file["model_capabilties"]["pitch_capable"]
-        
+
         # DO NOT MODIFY - Engine settings from model_settings.json
         self.def_character_voice = model_settings_file["settings"]["def_character_voice"]
         self.def_narrator_voice = model_settings_file["settings"]["def_narrator_voice"]
@@ -336,14 +341,14 @@ class tts_class:
         self.repetitionpenalty_set = model_settings_file["settings"]["repetitionpenalty_set"]
         self.temperature_set = model_settings_file["settings"]["temperature_set"]
         self.pitch_set = model_settings_file["settings"]["pitch_set"]
-        
+
         # DO NOT MODIFY - OpenAI voice mappings from model_settings.json
         self.openai_alloy = model_settings_file["openai_voices"]["alloy"]
         self.openai_echo = model_settings_file["openai_voices"]["echo"]
         self.openai_fable = model_settings_file["openai_voices"]["fable"]
         self.openai_nova = model_settings_file["openai_voices"]["nova"]
         self.openai_onyx = model_settings_file["openai_voices"]["onyx"]
-        self.openai_shimmer = model_settings_file["openai_voices"]["shimmer"]        
+        self.openai_shimmer = model_settings_file["openai_voices"]["shimmer"]
 
         """
         Below is the name of the folder that will be created-used under `/models/{folder}`
@@ -356,7 +361,7 @@ class tts_class:
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
 
         self.model_folder_name = "MYNEWTTSENGINE"
-         
+
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
         # ↑↑↑ MODIFY THIS LINE ↑↑↑
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
@@ -374,7 +379,7 @@ class tts_class:
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
         # DO NOT MODIFY - log the function call to this function
-        self.debug_func_entry() 
+        self.debug_func_entry()
 
     #####################################################
     # Printout engine loading bits # Do not change this #
@@ -382,16 +387,22 @@ class tts_class:
     def printout_versions(self):
         """
         Print Python, DeepSpeed, Pytorch and CUDA version on start-up.
-        
+
         WARNING: This is a core system function. Do not modify its implementation
         as it provides standardized version reporting across all engines.
         """
         self.debug_func_entry()
         if not model_supports_deepspeed_true_or_false:
-            self.print_message(f"\033[92mDeepSpeed version :\033[93m Not supported on {self.model_folder_name}\033[0m", message_type="standard")
+            self.print_message(
+                f"\033[92mDeepSpeed version :\033[93m Not supported on {self.model_folder_name}\033[0m",
+                message_type="standard",
+            )
         else:
             if deepspeed_available:
-                self.print_message("\033[92mDeepSpeed version :\033[93m " + str(deepspeed.__version__) + "\033[0m", message_type="standard")
+                self.print_message(
+                    "\033[92mDeepSpeed version :\033[93m " + str(deepspeed.__version__) + "\033[0m",
+                    message_type="standard",
+                )
             else:
                 self.print_message("\033[92mDeepSpeed version :\033[93m Not available\033[0m", message_type="standard")
         self.print_message(f"\033[92mPython Version    :\033[93m {python_version}\033[0m", message_type="standard")
@@ -400,7 +411,7 @@ class tts_class:
             self.print_message("\033[92mCUDA Version      :\033[91m Not available\033[0m", message_type="standard")
         else:
             self.print_message(f"\033[92mCUDA Version      :\033[93m {cuda_version}\033[0m", message_type="standard")
-            
+
         self.print_message("", message_type="standard")
         return
 
@@ -410,39 +421,39 @@ class tts_class:
     async def handle_lowvram_change(self):
         """
         Manage model location between CPU and GPU memory for low VRAM operation.
-        
+
         This function handles the movement of models between CPU and GPU memory
         to support systems with limited VRAM. It's called automatically during
         generation when low VRAM mode is enabled.
-        
+
         Operation:
         1. Checks CUDA availability
         2. Moves model between devices based on current location:
            - GPU (cuda) -> CPU
            - CPU -> GPU (cuda)
         3. Manages CUDA cache to optimize memory usage
-        
+
         States Affected:
         - self.device: Updated to reflect current processing device
         - self.model.device: Model's current memory location
-        
+
         Requirements:
         - CUDA must be available for GPU operations
         - Model must be loaded (self.model is not None)
         - lowvram_enabled must be `True` in the `model_settings.json` file
-        
+
         Note: This function is only called when self.lowvram_enabled is True
         meaning the engine does or doesnt support the call, hence if its not
         True, then this function would never be called anyway, so doesnt need
         changing.
         """
         self.debug_func_entry()
-        
+
         # Initial validation
         if not self.is_tts_model_loaded:
             self.print_message("No model is currently loaded. Please select a model to load.", message_type="error")
             raise HTTPException(status_code=400, detail="No model is currently loaded. Please select a model to load.")
-                       
+
         if torch.cuda.is_available():
             if self.device == "cuda":
                 self.print_message("Moving model to CPU", message_type="debug_tts")
@@ -462,36 +473,36 @@ class tts_class:
     async def handle_deepspeed_change(self, value):
         """
         Handle enabling/disabling of DeepSpeed acceleration.
-        
-        This function manages the process of reloading the model with or without 
-        DeepSpeed acceleration. DeepSpeed can significantly improve performance on 
+
+        This function manages the process of reloading the model with or without
+        DeepSpeed acceleration. DeepSpeed can significantly improve performance on
         supported hardware.
-        
+
         Args:
             value (bool): True to enable DeepSpeed, False to disable
-            
+
         Operation:
         1. Unloads current model
         2. Updates DeepSpeed settings
         3. Reloads model with new configuration
-        
+
         States Affected:
         - self.deepspeed_enabled: Updated to reflect new state
         - self.model: Reloaded with new configuration
-        
+
         Returns:
             bool: The new DeepSpeed state (same as input value)
-        
-        Note: DeepSpeed must be installed and available in the system for 
+
+        Note: DeepSpeed must be installed and available in the system for
         this functionality to work. `deepspeed_capable` must be set `True`
         in the `model_settings.json` file
         """
         self.debug_func_entry()
-        # Initial validation        
+        # Initial validation
         if not self.is_tts_model_loaded:
             self.print_message("No model is currently loaded. Please select a model to load.", message_type="error")
             raise HTTPException(status_code=400, detail="No model is currently loaded. Please select a model to load.")
-        
+
         if value:
             self.print_message("\033[93mDeepSpeed Activating\033[0m", message_type="standard")
             await self.unload_model()
@@ -504,36 +515,35 @@ class tts_class:
             await self.setup()
         return value
 
-
     ################################################################
     # Unload models from VRAM/RAM if possible # Do not change this #
     ################################################################
     async def unload_model(self):
         """
         Unload the current model and free associated resources.
-        
+
         This function handles the cleanup of model resources, including:
         1. Setting model loaded flag to False
         2. Deleting the model instance
         3. Clearing CUDA cache if available
-        
+
         Operation:
         1. Updates model loading status
         2. Logs unloading process if a model is loaded
         3. Removes model from memory
         4. Cleans up CUDA cache if using GPU
-        
+
         States Affected:
         - self.is_tts_model_loaded: Set to False
         - self.model: Set to None after unloading
         """
         self.debug_func_entry()
-        
+
         self.is_tts_model_loaded = False
-        if not self.current_model_loaded == None:
+        if self.current_model_loaded != None:
             self.print_message("Unloading model", message_type="debug_tts")
-        if hasattr(self, 'model'):
-            del self.model            
+        if hasattr(self, "model"):
+            del self.model
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         return None
@@ -544,26 +554,26 @@ class tts_class:
     async def setup(self):
         """
         Initialize the TTS engine and load initial model configuration.
-        
+
         This function is called during system startup and handles:
         1. Version information display
         2. Model scanning and availability check
         3. Initial model loading if specified
-        
+
         The setup sequence ensures:
         - Proper version reporting
         - Model availability verification
         - Graceful handling of missing models
         - Correct initial model loading state
-        
+
         States Set:
         - self.available_models: Updated with found models
         - self.current_model_loaded: Set to loaded model name or None
         - self.setup_has_run: Set True when complete
-        
+
         Returns:
             None
-            
+
         Note: Custom initialization code should be placed between the marked sections.
         """
         self.debug_func_entry()
@@ -580,16 +590,17 @@ class tts_class:
                 self.print_message(f"Loading selected model: {tts_model}", message_type="debug_tts")
                 await self.handle_tts_method_change(tts_model)
                 self.current_model_loaded = tts_model
-                
-        # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-        # ↓↓↓ Keep everything below this line ↓↓↓
-        # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓                  
+
+            # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+            # ↓↓↓ Keep everything below this line ↓↓↓
+            # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
             else:
                 self.current_model_loaded = "No Models Available"
-                self.print_message(f"Selected model '{self.selected_model}' not found in models folder.", message_type="error")
-                self.print_message(f"Please download a model or select a different model file.", message_type="error")
+                self.print_message(
+                    f"Selected model '{self.selected_model}' not found in models folder.", message_type="error"
+                )
+                self.print_message("Please download a model or select a different model file.", message_type="error")
         self.setup_has_run = True
-
 
     ###########################################################################
     # Scan your models folder for models OR voice files # Change as necessary #
@@ -597,39 +608,38 @@ class tts_class:
     def scan_models_folder(self):
         """
         Scan for available TTS models in the models directory.
-        
+
         This function searches the models directory for valid TTS model installations.
         Each model must contain all required files to be considered valid.
-        
+
         Required Files for Each Model:
         - Whatever your TTS engine needs/supports
-        
+
         Operation:
         1. Scans the models/{folder} directory
         2. Checks each subfolder for required files
         3. Registers valid models
-        
+
         States Affected:
         - self.available_models: Updated with found models
-        
+
         Returns:
             dict: Dictionary of available models in format:
                  {model_identifier: engine_type}
-        
+
         Note: If no valid models are found, returns {"No Models Available": "TTS Engine Name"}
         """
         self.debug_func_entry()
-        
+
         models_folder = self.main_dir / "models" / self.model_folder_name
         self.available_models = {}
-        
+
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
         # ↑↑↑ Keep everything above this line ↑↑↑
-        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑  
-            
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+
         required_files = ["config.json", "model.pth"]
         model_name = "DO SOMETHING HERE"
-
 
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
         # ↓↓↓ Keep everything below this line ↓↓↓
@@ -643,66 +653,64 @@ class tts_class:
     def voices_file_list(self):
         """
         Scan and compile a list of available voices
-        
+
         This function scans multiple directories to find voice models/samples in different formats:
         1. Individual WAV/MP3 etc files in the main voices directory
-        
+
         Directory Structure:
         - voices/: Individual audio files
-               
+
         Returns:
             list: Available voices with appropriate prefixes:
                  - Standard WAV: filename.wav
-        
+
         Note: Returns ["No Voices Found"] if no valid voices are detected
         """
         self.debug_func_entry()
-        
+
         try:
-            voices = [] # An empy variable for the list of voices to be put into.
-            directory = self.main_dir / "voices" # Base directory that voices are stored in.
+            voices = []  # An empy variable for the list of voices to be put into.
+            directory = self.main_dir / "voices"  # Base directory that voices are stored in.
             # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
             # ↑↑↑ Keep everything above this line ↑↑↑
-            # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑ 
+            # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
-
-            
             # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
             # ↓↓↓ Keep everything below this line ↓↓↓
-            # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓  
+            # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
             # Sort voices by type alphabetically
             voices.sort(key=lambda x: (x.startswith("voiceset:"), x.startswith("latent:"), x))
             if not voices:
                 return ["No Voices Found"]
             return voices
-            
+
         except Exception as e:
-            self.print_message(f"Error scanning for voices: {str(e)}", message_type="error")
+            self.print_message(f"Error scanning for voices: {e!s}", message_type="error")
             return ["No Voices Found"]
-        
+
     ############################################
     # Load in your model # Change as necessary #
     ############################################
     async def load_model(self, model_name):
         """
         Load a model using the your TTS API interface.
-               
+
         Args:
             model_name (str): Name of the model to load
-            
+
         Operation:
         1. Validates model availability
         2. Constructs model and config paths
         3. Initializes model using TTS API
         4. Moves model to appropriate device (CPU/GPU)
-        
+
         States Affected:
         - self.model: Updated with loaded model
         - self.is_tts_model_loaded: Set to True on success
-        
+
         Returns:
             The loaded model instance
-            
+
         Raises:
             HTTPException: If no models are available to load
         """
@@ -710,18 +718,19 @@ class tts_class:
         if "No Models Available" in self.available_models:
             self.print_message("No models for this TTS engine were found to load", message_type="error")
             return
-        model_path = self.main_dir / "models" / self.model_folder_name / model_name # You may need to edit/modfy depending on how your TTS engine works with models
+        model_path = (
+            self.main_dir / "models" / self.model_folder_name / model_name
+        )  # You may need to edit/modfy depending on how your TTS engine works with models
         self.print_message(f"Loading model from: {model_path}", message_type="debug_tts")
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
         # ↑↑↑ Keep everything above this line ↑↑↑
-        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑        
-        
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+
         self.model = TTS(
             model_path=model_path,
             config_path=model_path / "config.json",
         ).to(self.device)
-        
-      
+
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
         # ↓↓↓ Keep everything below this line ↓↓↓
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
@@ -731,34 +740,34 @@ class tts_class:
     async def handle_tts_method_change(self, tts_method):
         """
         Handle switching between different TTS models/voices.
-        
+
         This function manages actual model loading process.
-        
+
         Args:
             tts_method (str): Format "type - modelname" where type is either
-        
+
         Operation:
         1. Validates model availability
         2. Unloads current model if any
         3. Parses method string to determine loader type
         4. Calls appropriate model loader
         5. Updates current model tracking
-        
+
         States Affected:
         - self.current_model_loaded: Updated to new model identifier
         - self.model: Updated with newly loaded model
-        
+
         Returns:
             bool: True if model loaded successfully, False otherwise
-        
+
         Timing:
             Records and reports model loading time
         """
         self.debug_func_entry()
-        
+
         # Track loading time
         generate_start_time = time.time()
-        
+
         # Validate model availability
         if "No Models Available" in self.available_models:
             self.print_message("No models for this TTS engine were found to load", message_type="error")
@@ -766,12 +775,10 @@ class tts_class:
 
         # Unload current model
         await self.unload_model()
-        
+
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
         # ↑↑↑ Keep everything above this line ↑↑↑
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
-
-
 
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
         # ↓↓↓ Keep everything below this line ↓↓↓
@@ -784,7 +791,9 @@ class tts_class:
         self.print_message(f"\033[94mModel Loadtime: \033[93m{generate_elapsed_time:.2f}\033[94m seconds\033[0m")
         return True
 
-    async def generate_tts(self, text, voice, language, temperature, repetition_penalty, speed, pitch, output_file, streaming):
+    async def generate_tts(
+        self, text, voice, language, temperature, repetition_penalty, speed, pitch, output_file, streaming
+    ):
         """
         Generate speech from text using the TTS model.
 
@@ -799,7 +808,7 @@ class tts_class:
             temperature (float): Generation temperature (0.0-1.0)
             repetition_penalty (float): Penalty for repetitive generation
             speed (float): Speech speed multiplier
-            pitch (float): Voice pitch adjustment 
+            pitch (float): Voice pitch adjustment
             output_file (str): Path for output audio file
             streaming (bool): Whether to stream audio chunks
 
@@ -812,25 +821,27 @@ class tts_class:
             - self.device: Current processing device
             - self.lowvram_enabled: Low VRAM mode status
             - self.current_model_loaded: Current model type
-        """        
+        """
         self.debug_func_entry()
-        
+
         # Initial validation
         if not self.is_tts_model_loaded:
             self.print_message("No TTS model loaded", message_type="error")
             raise HTTPException(status_code=400, detail="You currently have no TTS model loaded.")
-        
+
         # Lock generation and track start time
         self.tts_generating_lock = True
         self.print_message("Starting TTS generation process", message_type="debug_tts")
-        self.print_message(f"Generation parameters: temperature={temperature}, speed={speed}, streaming={streaming}", 
-                        message_type="debug_tts_variables")
-        
+        self.print_message(
+            f"Generation parameters: temperature={temperature}, speed={speed}, streaming={streaming}",
+            message_type="debug_tts_variables",
+        )
+
         # Handle low VRAM mode if needed
         if self.lowvram_enabled and self.device == "cpu":
             self.print_message("Low VRAM mode: Moving model to GPU", message_type="debug_tts")
             await self.handle_lowvram_change()
-        
+
         generate_start_time = time.time()
 
         try:
@@ -855,7 +866,6 @@ class tts_class:
 
                 self.print_message(f"Saved audio to: {output_file}", message_type="debug_tts")
 
-
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
         # ↓↓↓ Keep everything below this line ↓↓↓
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
@@ -864,16 +874,16 @@ class tts_class:
             # Generation complete
             generate_end_time = time.time()
             generate_elapsed_time = generate_end_time - generate_start_time
-            
+
             # Standard output message (not debug)
             self.print_message(
                 f"\033[94mTTS Generate: \033[93m{generate_elapsed_time:.2f} seconds. \033[94mLowVRAM: \033[33m{self.lowvram_enabled} \033[94mDeepSpeed: \033[33m{self.deepspeed_enabled}\033[0m",
-                message_type="standard"
+                message_type="standard",
             )
-            
+
             # Handle low VRAM cleanup
             if self.lowvram_enabled and self.device == "cuda" and not self.tts_narrator_generatingtts:
                 self.print_message("Low VRAM mode: Moving model back to CPU", message_type="debug_tts")
                 await self.handle_lowvram_change()
-                
+
             self.tts_generating_lock = False

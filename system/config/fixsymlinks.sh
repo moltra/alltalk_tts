@@ -40,7 +40,7 @@ fix_broken_symlinks() {
 
             # Find all possible target files
             target_files=($(find "$env_path" -name "${symlinks[$link]}*"))
-            
+
             if [ ${#target_files[@]} -gt 0 ]; then
                 echo "Select a target file for $link:"
                 for i in "${!target_files[@]}"; do
@@ -89,4 +89,3 @@ while true; do
             ;;
     esac
 done
-

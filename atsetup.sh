@@ -42,20 +42,20 @@ if [ "$containsSpace" = true ]; then
     echo
     echo -e "    You are trying to install AllTalk in a folder that has a space in the"
     echo -e "    folder path e.g."
-    echo 
+    echo
     echo -e "       /home/${L_RED}program files${NC}/alltalk_tts"
-    echo 
+    echo
     echo -e "    This causes errors with Conda and Python scripts. Please follow this"
     echo -e "    link for reference:"
-    echo 
-    echo -e "      ${L_CYAN}https://docs.anaconda.com/free/working-with-conda/reference/faq/#installing-anaconda${NC}"
-    echo 
-    echo -e "    Please use a folder path that has no spaces in it e.g." 
-    echo 
-    echo -e "       /home/myfiles/alltalk_tts/"
-    echo 
     echo
-    read -p "Press Enter to continue..." 
+    echo -e "      ${L_CYAN}https://docs.anaconda.com/free/working-with-conda/reference/faq/#installing-anaconda${NC}"
+    echo
+    echo -e "    Please use a folder path that has no spaces in it e.g."
+    echo
+    echo -e "       /home/myfiles/alltalk_tts/"
+    echo
+    echo
+    read -p "Press Enter to continue..."
     exit 1
 else
     # Continue with the main menu
@@ -139,7 +139,7 @@ install_nvidia_textgen() {
     fi
     echo
     echo "    Requirements installed successfully."
-    
+
     echo "    Installing additional requirements..."
     if ! pip install -r system/requirements/requirements_textgen2.txt; then
         echo
@@ -279,7 +279,7 @@ standalone_menu() {
         echo "    4) Delete AllTalk's custom Python environment"
         echo "    5) Purge the PIP cache"
         echo
-        echo "    OTHER"        
+        echo "    OTHER"
         echo "    8) Generate a diagnostics file"
         echo
         echo -e "    9)${L_RED} Exit/Quit${NC}"
@@ -556,7 +556,7 @@ reapply_standalone() {
 # Check for "-silent" install command-line argument
 if [[ $1 == "-silent" ]]; then
 	install_custom_standalone
-else 
+else
 	# Start the main menu
 	main_menu
 fi

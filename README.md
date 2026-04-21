@@ -7,7 +7,7 @@
 
 **Feature Requests:** View current feature requests on the [Feature Requests page here](https://github.com/erew123/alltalk_tts/discussions/74).
 
-**Community Discussions:** Join discussions on AllTalk V2 in the [Discussion Board here](https://github.com/erew123/alltalk_tts/discussions/245). 
+**Community Discussions:** Join discussions on AllTalk V2 in the [Discussion Board here](https://github.com/erew123/alltalk_tts/discussions/245).
 
 **Please note, my available time has become VERY limited due to unexpected family commitments [Please read here for details](https://github.com/erew123/alltalk_tts/issues/377). So please DYOR, look at the [Wiki here ](https://github.com/erew123/alltalk_tts/wiki) and refer to the TTS manufacturer (Links in the Gradio interface) for issues specific to THEIR TTS engines.**
 
@@ -47,7 +47,7 @@ I would also like to say a big thank you to anyone whom has contributed to this 
 
 #### Performance and Optimization (Depending on TTS engine used)
 - DeepSpeed integration for 2-3x performance boost (Depending on TTS engine)
-- Low VRAM mode for systems with limited GPU memory 
+- Low VRAM mode for systems with limited GPU memory
 
 #### Voice Customization and Enhancement
 - Model Finetuning for improved voice reproduction
@@ -143,7 +143,7 @@ It is recommended you use `atsetup` to re-apply the settings file for any necess
 
 ### 🟨 Diagnostics Help with Issues/Start-up problems etc.
 
-If you are having issues with starting AllTalk, it may well be because some of the 3rd Party packages versions have changed, or something is not right in your Python environment. 
+If you are having issues with starting AllTalk, it may well be because some of the 3rd Party packages versions have changed, or something is not right in your Python environment.
 
 - **Known Errors List:** [Wiki page is here](https://github.com/erew123/alltalk_tts/wiki/Error-Messages-List)
 - **Diagnostics tool Instructions:** [Wiki page is here](https://github.com/erew123/alltalk_tts/wiki/AllTalk-Diagnostics-Tool)

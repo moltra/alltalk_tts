@@ -1,11 +1,12 @@
-import os
+import argparse
 import glob
 import json
-import torch
-import argparse
-import numpy as np
-from scipy.io.wavfile import read
+import os
 from collections import OrderedDict
+
+import numpy as np
+import torch
+from scipy.io.wavfile import read
 
 
 def replace_keys_in_dict(d, old_key_part, new_key_part):
@@ -34,9 +35,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):
 
     torch.save(
         replace_keys_in_dict(
-            replace_keys_in_dict(
-                checkpoint_old_dict, ".weight_v", ".parametrizations.weight.original1"
-            ),
+            replace_keys_in_dict(checkpoint_old_dict, ".weight_v", ".parametrizations.weight.original1"),
             ".weight_g",
             ".parametrizations.weight.original0",
         ),
@@ -102,9 +101,7 @@ def save_checkpoint(model, optimizer, learning_rate, iteration, checkpoint_path)
     checkpoint = torch.load(checkpoint_path, map_location=torch.device("cpu"))
     torch.save(
         replace_keys_in_dict(
-            replace_keys_in_dict(
-                checkpoint, ".parametrizations.weight.original1", ".weight_v"
-            ),
+            replace_keys_in_dict(checkpoint, ".parametrizations.weight.original1", ".weight_v"),
             ".parametrizations.weight.original0",
             ".weight_g",
         ),
@@ -178,25 +175,13 @@ def get_hparams():
         required=True,
         help="checkpoint save frequency (epoch)",
     )
-    parser.add_argument(
-        "-te", "--total_epoch", type=int, required=True, help="total_epoch"
-    )
-    parser.add_argument(
-        "-pg", "--pretrainG", type=str, default="", help="Pretrained Discriminator path"
-    )
-    parser.add_argument(
-        "-pd", "--pretrainD", type=str, default="", help="Pretrained Generator path"
-    )
+    parser.add_argument("-te", "--total_epoch", type=int, required=True, help="total_epoch")
+    parser.add_argument("-pg", "--pretrainG", type=str, default="", help="Pretrained Discriminator path")
+    parser.add_argument("-pd", "--pretrainD", type=str, default="", help="Pretrained Generator path")
     parser.add_argument("-g", "--gpus", type=str, default="0", help="split by -")
-    parser.add_argument(
-        "-bs", "--batch_size", type=int, required=True, help="batch size"
-    )
-    parser.add_argument(
-        "-e", "--experiment_dir", type=str, required=True, help="experiment dir"
-    )
-    parser.add_argument(
-        "-sr", "--sample_rate", type=str, required=True, help="sample rate, 32k/40k/48k"
-    )
+    parser.add_argument("-bs", "--batch_size", type=int, required=True, help="batch size")
+    parser.add_argument("-e", "--experiment_dir", type=str, required=True, help="experiment dir")
+    parser.add_argument("-sr", "--sample_rate", type=str, required=True, help="sample rate, 32k/40k/48k")
     parser.add_argument(
         "-sw",
         "--save_every_weights",
@@ -204,9 +189,7 @@ def get_hparams():
         default="0",
         help="save the extracted model in weights directory when saving checkpoints",
     )
-    parser.add_argument(
-        "-v", "--version", type=str, required=True, help="model version"
-    )
+    parser.add_argument("-v", "--version", type=str, required=True, help="model version")
     parser.add_argument(
         "-f0",
         "--if_f0",
@@ -255,7 +238,7 @@ def get_hparams():
     name = args.experiment_dir
     experiment_dir = os.path.join("./logs", args.experiment_dir)
     config_save_path = os.path.join(experiment_dir, "config.json")
-    with open(config_save_path, "r") as f:
+    with open(config_save_path) as f:
         config = json.load(f)
     hparams = HParams(**config)
     hparams.model_dir = hparams.experiment_dir = experiment_dir

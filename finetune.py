@@ -1,13 +1,13 @@
 """
-XTTS finetune module for training and customizing text-to-speech models. 
+XTTS finetune module for training and customizing text-to-speech models.
 Provides functionality for dataset creation, model training, and inference.
 """
+
 # Standard Library Imports
 import argparse
 import datetime
 import gc
 import glob
-from loguru import logger
 import math
 import os
 import re
@@ -18,53 +18,52 @@ import subprocess
 import sys
 import tempfile
 import traceback
-from pathlib import Path
 
 # Third-Party Imports
 import warnings
 from importlib import metadata
+from pathlib import Path
+
 import gradio as gr
 import pandas as pd
 import psutil
+import torch
 import torchaudio
 import torchaudio.transforms as T
-import torch
+from loguru import logger
 from packaging import version
-from tqdm import tqdm
+from pynvml import nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo, nvmlInit
 from tokenizers import ByteLevelBPETokenizer
 from tokenizers.pre_tokenizers import Whitespace
-from word2number import w2n
-from pynvml import nvmlInit, nvmlDeviceGetHandleByIndex, nvmlDeviceGetMemoryInfo
+from tqdm import tqdm
 
 # TTS Package Imports
 from TTS.config.shared_configs import BaseDatasetConfig
 from TTS.tts.configs.xtts_config import XttsConfig
 from TTS.tts.datasets import load_tts_samples
-from TTS.tts.models.xtts import Xtts
 from TTS.tts.layers.xtts.trainer.gpt_trainer import (
     GPTArgs,
     GPTTrainer,
     GPTTrainerConfig,
     XttsAudioConfig,
 )
+from TTS.tts.models.xtts import Xtts
+from word2number import w2n
 
-# Trainer Imports
-from trainer_alltalk.trainer import TrainerArgs, Trainer
-
-# Local Module Imports
-from trainer_alltalk.metrics_logger import MetricsLogger
 from system.ft_tokenizer.tokenizer import multilingual_cleaners
 
 # Help documentation
 from trainer_alltalk.finetune_content import FinetuneContent
 
+# Local Module Imports
+from trainer_alltalk.metrics_logger import MetricsLogger
+
+# Trainer Imports
+from trainer_alltalk.trainer import Trainer, TrainerArgs
+
 # Suppress Warnings
-warnings.filterwarnings(
-    "ignore",
-    message="1Torch was not compiled with flash attention")
-warnings.filterwarnings(
-    "ignore",
-    message="Failed to launch Triton kernels, likely due to missing CUDA toolkit")
+warnings.filterwarnings("ignore", message="1Torch was not compiled with flash attention")
+warnings.filterwarnings("ignore", message="Failed to launch Triton kernels, likely due to missing CUDA toolkit")
 
 # Disable Gradio Analytics
 os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
@@ -73,18 +72,16 @@ os.environ["GRADIO_ANALYTICS_ENABLED"] = "False"
 try:
     import whisper
 except ImportError:
-    print("[FINETUNE] OpenAI Whisper not found. Attempting to install...")
+    logger.info("[FINETUNE] OpenAI Whisper not found. Attempting to install...")
     try:
-        subprocess.check_call(
-            [sys.executable, "-m", "pip", "install", "openai-whisper"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "openai-whisper"])
         import whisper
 
-        print("[FINETUNE] Successfully installed OpenAI Whisper! Continuing.")
+        logger.info("[FINETUNE] Successfully installed OpenAI Whisper! Continuing.")
     except Exception as e:
-        print("[FINETUNE] Failed to install OpenAI Whisper:")
-        print(f"[FINETUNE] Error: {str(e)}")
-        print(
-            "[FINETUNE] Please try manually installing with: pip install openai-whisper")
+        logger.error("[FINETUNE] Failed to install OpenAI Whisper:")
+        logger.error(f"[FINETUNE] Error: {e!s}")
+        logger.error("[FINETUNE] Please try manually installing with: pip install openai-whisper")
         sys.exit(1)
 
 # STARTUP VARIABLES
@@ -124,8 +121,9 @@ class Logger:
     """
     Singleton class to handle logging output to both the terminal and a log file.
     """
+
     _instance = None
-    
+
     def __new__(cls, *args, **kwargs):
         """
         Ensure a single instance of the Logger class is created.
@@ -136,20 +134,20 @@ class Logger:
             cls._instance.log_file = "finetune.log"
             cls._instance.terminal = sys.stdout
             cls._instance.current_model_path = None  # To store current training path
-            
+
             # Open in append mode
             cls._instance.log = open(cls._instance.log_file, "a", encoding="utf-8")
         return cls._instance
 
     def __init__(self, *args, **kwargs):
-        """Initialize logger instance."""        
+        """Initialize logger instance."""
         pass
 
     def set_model_path(self, path):
         """
         Set the current model training path for logging context.
         :param path: Path to the current model directory.
-        """        
+        """
         self.current_model_path = path
 
     def write(self, message):
@@ -157,9 +155,8 @@ class Logger:
         Write a message to both the terminal and the log file.
         Filters out non-printable characters.
         :param message: The message to be logged.
-        """        
-        filtered_message = ''.join(char for char in message 
-                                 if char.isprintable() or char in '\n\r\t')
+        """
+        filtered_message = "".join(char for char in message if char.isprintable() or char in "\n\r\t")
         self.terminal.write(filtered_message)
         try:
             self.log.write(filtered_message)
@@ -170,7 +167,7 @@ class Logger:
     def flush(self):
         """
         Flush any buffered log content to the log file and terminal.
-        """        
+        """
         self.terminal.flush()
         try:
             self.log.flush()
@@ -181,9 +178,9 @@ class Logger:
         """
         Mimic the isatty method to comply with terminal-like behavior.
         :return: Always returns False.
-        """        
+        """
         return False
-    
+
     def clear_log(self):
         """
         Delete the existing log file and recreate it to clear its contents.
@@ -196,38 +193,46 @@ class Logger:
             # Reopen the file in append mode for further logging
             self.log = open(self.log_file, "a", encoding="utf-8")
         except Exception as e:
-            print(f"Failed to delete and recreate log file: {e}")
+            logger.error(f"Failed to delete and recreate log file: {e}")
+
 
 _logging_setup_done = False
+
 
 def setup_logging():
     global _logging_setup_done
     if _logging_setup_done:
         return
-        
+
     # redirect stdout and stderr to a file
     sys.stdout = Logger()
     sys.stderr = sys.stdout
 
     # Loguru handles logging configuration via system/logging_config.py
-    
+
     _logging_setup_done = True
+
 
 # Call setup at module level
 setup_logging()
 
 c_logger = MetricsLogger()
 
+
 def load_metrics():
-    return c_logger.plot_metrics(), f"Running Time: {c_logger.format_duration(c_logger.total_duration)} - Estimated Completion: {c_logger.format_duration(c_logger.estimated_duration)}"
+    return (
+        c_logger.plot_metrics(),
+        f"Running Time: {c_logger.format_duration(c_logger.total_duration)} - Estimated Completion: {c_logger.format_duration(c_logger.estimated_duration)}",
+    )
+
 
 def read_logs():
     sys.stdout.flush()
-    with open(sys.stdout.log_file, "r", encoding="utf-8") as f:
+    with open(sys.stdout.log_file, encoding="utf-8") as f:
         content = f.read()
         # Additional filtering when reading the file
-        return ''.join(char for char in content 
-                      if char.isprintable() or char in '\n\r\t')
+        return "".join(char for char in content if char.isprintable() or char in "\n\r\t")
+
 
 ##############################
 #### Debugging management ####
@@ -252,12 +257,7 @@ class DebugLevels:
     VALIDATION = False  # DataSet validation handling
 
 
-def debug_print(
-        message,
-        level,
-        is_error=False,
-        is_warning=False,
-        is_info=False):
+def debug_print(message, level, is_error=False, is_warning=False, is_info=False):
     """Enhanced debug printing with categorization and formatting"""
     prefix = "[FINETUNE]"
     if is_error:
@@ -268,21 +268,21 @@ def debug_print(
         prefix += ""
 
     if level == "GPU_MEMORY" and DebugLevels.GPU_MEMORY:
-        print(f"{prefix} [GPU] {message}")
+        logger.debug(f"{prefix} [GPU] {message}")
     elif level == "MODEL_OPS" and DebugLevels.MODEL_OPS:
-        print(f"{prefix} [MODEL] {message}")
+        logger.debug(f"{prefix} [MODEL] {message}")
     elif level == "DATA_PROCESS" and DebugLevels.DATA_PROCESS:
-        print(f"{prefix} [DATA] {message}")
+        logger.debug(f"{prefix} [DATA] {message}")
     elif level == "GENERAL" and DebugLevels.GENERAL:
-        print(f"{prefix} [INFO] {message}")
+        logger.debug(f"{prefix} [INFO] {message}")
     elif level == "AUDIO" and DebugLevels.AUDIO:
-        print(f"{prefix} [AUDIO] {message}")
+        logger.debug(f"{prefix} [AUDIO] {message}")
     elif level == "SEGMENTS" and DebugLevels.SEGMENTS:
-        print(f"{prefix} [SEG] {message}")
+        logger.debug(f"{prefix} [SEG] {message}")
     elif level == "DUPLICATES" and DebugLevels.DUPLICATES:
-        print(f"{prefix} [DUP] {message}")
+        logger.debug(f"{prefix} [DUP] {message}")
     elif level == "VALIDATION" and DebugLevels.VALIDATION:
-        print(f"{prefix} [VAL] {message}")        
+        logger.debug(f"{prefix} [VAL] {message}")
 
 
 class AudioStats:
@@ -319,12 +319,8 @@ class AudioStats:
         debug_print("Audio Processing Statistics:", "AUDIO")
         debug_print(f"Total segments: {self.total_segments}", "AUDIO")
         debug_print(f"Average duration: {avg_duration:.2f}s", "AUDIO")
-        debug_print(
-            f"Segments under minimum: {self.segments_under_min}",
-            "AUDIO")
-        debug_print(
-            f"Segments over maximum: {self.segments_over_max}",
-            "AUDIO")
+        debug_print(f"Segments under minimum: {self.segments_under_min}", "AUDIO")
+        debug_print(f"Segments over maximum: {self.segments_over_max}", "AUDIO")
 
         if self.segments_under_min > 0:
             debug_print(
@@ -347,15 +343,9 @@ def get_gpu_memory():
             debug_print(f"Free:  {info.free / 1024**2:.2f} MB", "GPU_MEMORY")
             # Add warning if memory is low
             if info.free / info.total < 0.1:  # Less than 10% free
-                debug_print(
-                    "Low GPU memory available!",
-                    "GPU_MEMORY",
-                    is_warning=True)
+                debug_print("Low GPU memory available!", "GPU_MEMORY", is_warning=True)
         except Exception as e:
-            debug_print(
-                f"NVML not available: {e}",
-                "GPU_MEMORY",
-                is_error=True)
+            debug_print(f"NVML not available: {e}", "GPU_MEMORY", is_error=True)
 
 
 ########################
@@ -399,35 +389,25 @@ def scan_models_folder():
         for subfolder in models_folder.iterdir():
             if subfolder.is_dir():
                 model_name = subfolder.name
-                if all(subfolder.joinpath(file).exists()
-                       for file in scan_required_files):
+                if all(subfolder.joinpath(file).exists() for file in scan_required_files):
                     scan_available_models[model_name] = True
                     BASE_MODEL_DETECTED = True
                 else:
                     debug_print(
-                        f"Model folder '{model_name}' is missing required files",
-                        level="GENERAL",
-                        is_warning=True)
+                        f"Model folder '{model_name}' is missing required files", level="GENERAL", is_warning=True
+                    )
         if not scan_available_models:
             scan_available_models["No Model Available"] = False
             BASE_MODEL_DETECTED = False
     except FileNotFoundError:
         debug_print(
-            "No XTTS models folder found. You have not yet downloaded any models or no XTTS",
-            "GENERAL",
-            is_error=True)
+            "No XTTS models folder found. You have not yet downloaded any models or no XTTS", "GENERAL", is_error=True
+        )
         debug_print(
-            "models can be found. Please run AllTalk and download an XTTS model that can be",
-            "GENERAL",
-            is_error=True)
-        debug_print(
-            "used for training. Or place a full model in the following location",
-            "GENERAL",
-            is_error=True)
-        debug_print(
-            "\\models\\xtts\\{modelfolderhere}",
-            "GENERAL",
-            is_error=True)
+            "models can be found. Please run AllTalk and download an XTTS model that can be", "GENERAL", is_error=True
+        )
+        debug_print("used for training. Or place a full model in the following location", "GENERAL", is_error=True)
+        debug_print("\\models\\xtts\\{modelfolderhere}", "GENERAL", is_error=True)
         sys.exit(1)  # Exit the script with an error status
     return scan_available_models
 
@@ -493,8 +473,7 @@ class SystemChecks:
             if torch.cuda.is_available():
                 gpu_id = torch.cuda.current_device()
                 gpu_name = torch.cuda.get_device_name(gpu_id)
-                total_gpu_mem = torch.cuda.get_device_properties(
-                    gpu_id).total_memory / (1024**3)
+                total_gpu_mem = torch.cuda.get_device_properties(gpu_id).total_memory / (1024**3)
                 used_gpu_mem = torch.cuda.memory_reserved(gpu_id) / (1024**3)
                 available_gpu_mem = total_gpu_mem - used_gpu_mem
 
@@ -518,10 +497,7 @@ class SystemChecks:
             self.results["memory"] = {
                 "ram_status": "✅ Pass" if ram_status else "❌ Fail",
                 "ram_details": f"{available_ram_gb:.2f}GB available of {total_ram_gb:.2f}GB",
-                "gpu_status": {
-                    "pass": "✅ Pass",
-                    "warning": "⚠️ Warning",
-                    "fail": "❌ Fail"}[gpu_status],
+                "gpu_status": {"pass": "✅ Pass", "warning": "⚠️ Warning", "fail": "❌ Fail"}[gpu_status],
                 "gpu_details": f"{gpu_name}: {available_gpu_mem:.2f}GB available of {total_gpu_mem:.2f}GB",
             }
         except Exception as e:
@@ -569,8 +545,7 @@ class SystemChecks:
         """Check TTS version"""
         try:
             installed_version = metadata.version("coqui-tts")
-            status = version.parse(
-                installed_version) >= version.parse(required_version)
+            status = version.parse(installed_version) >= version.parse(required_version)
 
             self.status["tts"] = status
             self.results["tts"] = {
@@ -584,8 +559,7 @@ class SystemChecks:
     def check_base_model(self):
         """Check XTTS base model"""
         try:
-            BASE_MODEL_DETECTED = any(
-                available_models.values()) if available_models else False
+            BASE_MODEL_DETECTED = any(available_models.values()) if available_models else False
 
             self.status["base_model"] = BASE_MODEL_DETECTED
             self.results["base_model"] = {
@@ -599,9 +573,7 @@ class SystemChecks:
         """Handle errors in checks"""
         self.status[check_name] = False
         self.status["overall"] = False
-        self.results[check_name] = {
-            "status": "❌ Error",
-            "details": f"Check failed: {error_msg}"}
+        self.results[check_name] = {"status": "❌ Error", "details": f"Check failed: {error_msg}"}
 
     def run_all_checks(self):
         """Run all system checks"""
@@ -631,12 +603,8 @@ class SystemChecks:
 
         if "memory" in self.results:
             report.append("### Memory")
-            report.append(
-                f"- RAM: {self.results['memory']['ram_status']} {self.results['memory']['ram_details']}"
-            )
-            report.append(
-                f"- GPU: {self.results['memory']['gpu_status']} {self.results['memory']['gpu_details']}\n"
-            )
+            report.append(f"- RAM: {self.results['memory']['ram_status']} {self.results['memory']['ram_details']}")
+            report.append(f"- GPU: {self.results['memory']['gpu_status']} {self.results['memory']['gpu_details']}\n")
 
         if "cuda_pytorch" in self.results:
             report.append(
@@ -644,9 +612,7 @@ class SystemChecks:
             )
 
         if "tts" in self.results:
-            report.append(
-                f"### TTS\n{self.results['tts']['status']} {self.results['tts']['details']}\n"
-            )
+            report.append(f"### TTS\n{self.results['tts']['status']} {self.results['tts']['details']}\n")
 
         if "base_model" in self.results:
             report.append(
@@ -832,10 +798,7 @@ class PFCComponents:
         """Create a status box for a specific check"""
         check_info = CHECK_REQUIREMENTS[check_id]
         with gr.Group():
-            status = gr.Label(
-                label=check_info["label"],
-                value="Ready to Check",
-                elem_classes="status-indicator")
+            status = gr.Label(label=check_info["label"], value="Ready to Check", elem_classes="status-indicator")
             gr.Markdown(f"*Required: {check_info['requirement']}*")
             self.status_boxes[check_id] = status
             return status
@@ -905,42 +868,27 @@ def create_pfc_interface():
                 updates = []
 
                 # Overall status
-                updates.append(
-                    "✅ All Systems Go!"
-                    if system_checks.status["overall"]
-                    else "⚠️ Some Checks Failed"
-                )
+                updates.append("✅ All Systems Go!" if system_checks.status["overall"] else "⚠️ Some Checks Failed")
 
                 # Add updates for each category's checks
                 for category in CHECK_CATEGORIES.values():
                     for check_id in category["checks"]:
                         if check_id == "ram":
-                            updates.append(
-                                system_checks.results["memory"]["ram_status"])
+                            updates.append(system_checks.results["memory"]["ram_status"])
                         elif check_id == "vram":
-                            updates.append(
-                                system_checks.results["memory"]["gpu_status"])
+                            updates.append(system_checks.results["memory"]["gpu_status"])
                         elif check_id == "cuda":
-                            updates.append(
-                                system_checks.results["cuda"]["status"])
+                            updates.append(system_checks.results["cuda"]["status"])
                         elif check_id == "pytorch":
-                            updates.append(
-                                system_checks.results["pytorch"]["status"])
+                            updates.append(system_checks.results["pytorch"]["status"])
                         else:
-                            updates.append(
-                                system_checks.results.get(check_id, {}).get(
-                                    "status", "❌ Check not run"
-                                )
-                            )
+                            updates.append(system_checks.results.get(check_id, {}).get("status", "❌ Check not run"))
 
                 return updates
 
             refresh_btn.click(
                 fn=run_checks,
-                outputs=[
-                    components.overall_status] +
-                list(
-                    components.status_boxes.values()),
+                outputs=[components.overall_status] + list(components.status_boxes.values()),
             )
 
     return components
@@ -950,18 +898,19 @@ def create_pfc_interface():
 #### STEP 1 Dataset Creation Functions ####
 ###########################################
 
+
 def format_audio_list(
-        fal_target_language,
-        fal_whisper_model,
-        fal_max_sample_length,
-        fal_min_sample_length,
-        fal_eval_split_number,
-        fal_speaker_name_input,
-        fal_create_bpe_tokenizer,
-        fal_gradio_progress=gr.Progress(),
-        fal_use_vad=True,
-        fal_precision="mixed",
-        ):
+    fal_target_language,
+    fal_whisper_model,
+    fal_max_sample_length,
+    fal_min_sample_length,
+    fal_eval_split_number,
+    fal_speaker_name_input,
+    fal_create_bpe_tokenizer,
+    fal_gradio_progress=gr.Progress(),
+    fal_use_vad=True,
+    fal_precision="mixed",
+):
     """
     Process and format audio files for XTTS training. Handles audio segmentation, transcription,
     and metadata creation with optional VAD and precision settings.
@@ -969,8 +918,8 @@ def format_audio_list(
     Returns:
         tuple: (train_metadata_path, eval_metadata_path, audio_total_size)
     """
-    global validate_train_metadata_path, validate_eval_metadata_path, validate_audio_folder 
-    global validate_whisper_model, validate_target_language, out_path, torch, whisper # pylint: disable=no-member
+    global validate_train_metadata_path, validate_eval_metadata_path, validate_audio_folder
+    global validate_whisper_model, validate_target_language, out_path, torch, whisper  # pylint: disable=no-member
 
     # Clear down the finetune.log file
     Logger().clear_log()
@@ -989,7 +938,7 @@ def format_audio_list(
     too_long_files = []
 
     # Initialize directories
-    if speaker_name and speaker_name != 'personsname':
+    if speaker_name and speaker_name != "personsname":
         out_path = this_dir / "finetune" / speaker_name
     else:
         out_path = default_path
@@ -1001,8 +950,7 @@ def format_audio_list(
     os.makedirs(temp_folder, exist_ok=True)
     audio_folder = os.path.join(out_path, "wavs")
     os.makedirs(audio_folder, exist_ok=True)
-    original_samples_folder = os.path.join(
-        out_path, "..", "put-voice-samples-in-here")
+    original_samples_folder = os.path.join(out_path, "..", "put-voice-samples-in-here")
 
     # Load Whisper model with specified precision
     fal_gradio_progress((1, 10), desc="Loading Whisper Model")
@@ -1028,9 +976,7 @@ def format_audio_list(
     if fal_use_vad:
         fal_gradio_progress((2, 10), desc="Loading VAD Model")
         debug_print("Initializing Silero VAD", "MODEL_OPS")
-        model, utils = torch.hub.load(repo_or_dir='snakers4/silero-vad',
-                                      model='silero_vad',
-                                      force_reload=False)
+        model, utils = torch.hub.load(repo_or_dir="snakers4/silero-vad", model="silero_vad", force_reload=False)
         vad_model = model.to(device)
         get_speech_timestamps, collect_chunks = utils[0], utils[4]
 
@@ -1041,99 +987,80 @@ def format_audio_list(
     fal_gradio_progress((3, 10), desc="Checking for Existing Metadata")
     train_metadata_path = os.path.join(out_path, "metadata_train.csv")
     eval_metadata_path = os.path.join(out_path, "metadata_eval.csv")
-    existing_metadata = {'train': None, 'eval': None}
+    existing_metadata = {"train": None, "eval": None}
 
     # Handle language file
     lang_file_path = os.path.join(out_path, "lang.txt")
     current_language = None
 
     if os.path.exists(train_metadata_path):
-        existing_metadata['train'] = pd.read_csv(train_metadata_path, sep="|")
+        existing_metadata["train"] = pd.read_csv(train_metadata_path, sep="|")
         debug_print("Loaded existing training metadata", "DATA_PROCESS")
 
     if os.path.exists(eval_metadata_path):
-        existing_metadata['eval'] = pd.read_csv(eval_metadata_path, sep="|")
+        existing_metadata["eval"] = pd.read_csv(eval_metadata_path, sep="|")
         debug_print("Loaded existing evaluation metadata", "DATA_PROCESS")
-    
+
     if os.path.exists(train_metadata_path) and os.path.exists(eval_metadata_path):
         # If dataset exists, read but don't modify the language
         if os.path.exists(lang_file_path):
-            with open(lang_file_path, 'r', encoding='utf-8') as existing_lang_file:
+            with open(lang_file_path, encoding="utf-8") as existing_lang_file:
                 current_language = existing_lang_file.read().strip()
             debug_print(f"Using existing dataset language: {current_language}", "GENERAL")
             fal_target_language = current_language  # Update our target language to match existing
     else:
         # Only create/update language file for new datasets
         if os.path.exists(lang_file_path):
-            with open(lang_file_path, 'r', encoding='utf-8') as existing_lang_file:
+            with open(lang_file_path, encoding="utf-8") as existing_lang_file:
                 current_language = existing_lang_file.read().strip()
 
         if current_language != fal_target_language:
-            with open(lang_file_path, 'w', encoding='utf-8') as lang_file:
-                lang_file.write(fal_target_language + '\n')
+            with open(lang_file_path, "w", encoding="utf-8") as lang_file:
+                lang_file.write(fal_target_language + "\n")
             debug_print(f"Updated language to: {fal_target_language}", "GENERAL")
         else:
             debug_print("Using existing language setting", "GENERAL")
-        
+
     # Get audio files list
-    original_audio_files = [os.path.join(original_samples_folder, file)
-                            for file in os.listdir(original_samples_folder)
-                            if file.endswith(('.mp3', '.flac', '.wav'))]
+    original_audio_files = [
+        os.path.join(original_samples_folder, file)
+        for file in os.listdir(original_samples_folder)
+        if file.endswith((".mp3", ".flac", ".wav"))
+    ]
 
     fal_gradio_progress((4, 10), desc="Scanning for Audio Files")
     if not original_audio_files:
-        debug_print(
-            f"No audio files found in {original_samples_folder}",
-            "AUDIO",
-            is_error=True)
+        debug_print(f"No audio files found in {original_samples_folder}", "AUDIO", is_error=True)
         return None, None, 0
 
-    debug_print(
-        f"Found {len(original_audio_files)} audio files to process",
-        "AUDIO")
+    debug_print(f"Found {len(original_audio_files)} audio files to process", "AUDIO")
     # Initialize processing
     whisper_words = []
     audio_steps = (0, len(original_audio_files))
     gradio_progress_duration = 0
-    fal_gradio_progress(
-        audio_steps,
-        desc="Processing Audio Files",
-        unit="files")
+    fal_gradio_progress(audio_steps, desc="Processing Audio Files", unit="files")
 
     for audio_path in original_audio_files:
         start = datetime.datetime.now()
-        audio_file_name_without_ext, _ = os.path.splitext(
-            os.path.basename(audio_path))
-        temp_audio_path = os.path.join(
-            temp_folder, f"{audio_file_name_without_ext}.wav")
+        audio_file_name_without_ext, _ = os.path.splitext(os.path.basename(audio_path))
+        temp_audio_path = os.path.join(temp_folder, f"{audio_file_name_without_ext}.wav")
 
         try:
             shutil.copy2(audio_path, temp_audio_path)
-            fal_gradio_progress(
-                audio_steps,
-                desc=f"Processing {audio_file_name_without_ext}",
-                unit="files")
-            debug_print(
-                f"Processing: {audio_file_name_without_ext}",
-                "GENERAL")
+            fal_gradio_progress(audio_steps, desc=f"Processing {audio_file_name_without_ext}", unit="files")
+            debug_print(f"Processing: {audio_file_name_without_ext}", "GENERAL")
         except Exception as e:
-            debug_print(
-                f"Error copying file {audio_path}: {str(e)}",
-                "GENERAL",
-                is_error=True)
+            debug_print(f"Error copying file {audio_path}: {e!s}", "GENERAL", is_error=True)
             continue
 
         # Check if already processed
         prefix_check = f"wavs/{audio_file_name_without_ext}_"
         skip_processing = False
-        for key in ['train', 'eval']:
+        for key in ["train", "eval"]:
             if existing_metadata[key] is not None:
-                mask = existing_metadata[key]['audio_file'].str.startswith(
-                    prefix_check)
+                mask = existing_metadata[key]["audio_file"].str.startswith(prefix_check)
                 if mask.any():
-                    debug_print(
-                        f"Skipping previously processed file: {audio_file_name_without_ext}",
-                        "GENERAL")
+                    debug_print(f"Skipping previously processed file: {audio_file_name_without_ext}", "GENERAL")
                     skip_processing = True
                     audio_total_size = 121
                     break
@@ -1146,40 +1073,32 @@ def format_audio_list(
         if wav.size(0) != 1:
             wav = torch.mean(wav, dim=0, keepdim=True)
         wav = wav.squeeze()
-        audio_total_size += (wav.size(-1) / sr)
+        audio_total_size += wav.size(-1) / sr
 
         original_duration = wav.size(-1) / sr
-        debug_print(
-            f"Original audio duration: {original_duration:.2f}s",
-            "AUDIO")
+        debug_print(f"Original audio duration: {original_duration:.2f}s", "AUDIO")
 
         # Process with VAD if enabled
         if fal_use_vad and vad_model is not None:
             debug_print("Processing with VAD", "AUDIO")
             # Get VAD segments with resampling
-            vad_segments = process_audio_with_vad(
-                wav, sr, vad_model, get_speech_timestamps)
+            vad_segments = process_audio_with_vad(wav, sr, vad_model, get_speech_timestamps)
 
             # Group short segments that are close together
-            merged_segments = merge_short_segments(
-                vad_segments, min_duration, max_gap=0.3)
-            debug_print(
-                f"Merged {len(vad_segments)-len(merged_segments)} short segments",
-                "SEGMENTS")
+            merged_segments = merge_short_segments(vad_segments, min_duration, max_gap=0.3)
+            debug_print(f"Merged {len(vad_segments)-len(merged_segments)} short segments", "SEGMENTS")
 
             # Convert VAD segments to audio chunks
             speech_chunks = []
             for segment in merged_segments:
-                chunk = wav[segment['start']:segment['end']]
+                chunk = wav[segment["start"] : segment["end"]]
                 duration = chunk.size(-1) / sr
                 if duration < min_duration:
                     debug_print(
-                        f"Segment too short ({duration:.2f}s), attempting to extend",
-                        "SEGMENTS",
-                        is_warning=True)
+                        f"Segment too short ({duration:.2f}s), attempting to extend", "SEGMENTS", is_warning=True
+                    )
                     # Try to extend segment if possible
-                    chunk = extend_segment(
-                        wav, segment['start'], segment['end'], sr, min_duration)
+                    chunk = extend_segment(wav, segment["start"], segment["end"], sr, min_duration)
                     duration = chunk.size(-1) / sr
 
                 if chunk.numel() > 0:
@@ -1190,19 +1109,12 @@ def format_audio_list(
             for chunk_idx, (chunk, duration) in enumerate(speech_chunks):
                 if duration < min_duration:
                     stats.segments_under_min += 1
-                    debug_print(
-                        f"Short segment: {duration:.2f}s",
-                        "SEGMENTS",
-                        is_warning=True)
+                    debug_print(f"Short segment: {duration:.2f}s", "SEGMENTS", is_warning=True)
                 elif duration > max_duration:
                     stats.segments_over_max += 1
-                    debug_print(
-                        f"Long segment: {duration:.2f}s",
-                        "SEGMENTS",
-                        is_warning=True)
+                    debug_print(f"Long segment: {duration:.2f}s", "SEGMENTS", is_warning=True)
 
-                chunk_path = os.path.join(
-                    temp_folder, f"{audio_file_name_without_ext}_chunk_{chunk_idx}.wav")
+                chunk_path = os.path.join(temp_folder, f"{audio_file_name_without_ext}_chunk_{chunk_idx}.wav")
                 torchaudio.save(str(chunk_path), chunk.unsqueeze(0), sr)
 
                 # Transcribe with appropriate precision
@@ -1210,25 +1122,16 @@ def format_audio_list(
                     with torch.cuda.amp.autocast():
                         fal_gradio_progress((5, 10), desc="Transcribing Audio")
                         result = asr_model.transcribe(
-                            chunk_path,
-                            language=fal_target_language,
-                            word_timestamps=True,
-                            verbose=None
+                            chunk_path, language=fal_target_language, word_timestamps=True, verbose=None
                         )
                 else:
                     fal_gradio_progress((5, 10), desc="Transcribing Audio")
                     result = asr_model.transcribe(
-                        chunk_path,
-                        language=fal_target_language,
-                        word_timestamps=True,
-                        verbose=None
+                        chunk_path, language=fal_target_language, word_timestamps=True, verbose=None
                     )
 
                 if not result.get("text", "").strip():
-                    debug_print(
-                        f"Empty transcription for chunk {chunk_idx}",
-                        "DATA_PROCESS",
-                        is_warning=True)
+                    debug_print(f"Empty transcription for chunk {chunk_idx}", "DATA_PROCESS", is_warning=True)
                     continue
 
                 # Process transcription result
@@ -1246,12 +1149,11 @@ def format_audio_list(
                     audio_folder,
                     too_long_files,
                     fal_create_bpe_tokenizer,
-                    fal_target_language)
+                    fal_target_language,
+                )
 
                 os.remove(chunk_path)
-                debug_print(
-                    f"Processed chunk {chunk_idx} ({duration:.2f}s)",
-                    "SEGMENTS")
+                debug_print(f"Processed chunk {chunk_idx} ({duration:.2f}s)", "SEGMENTS")
 
         else:
             # Regular processing without VAD
@@ -1259,17 +1161,11 @@ def format_audio_list(
             if fal_precision == "mixed" and device == "cuda":
                 with torch.cuda.amp.autocast():
                     result = asr_model.transcribe(
-                        audio_path,
-                        language=fal_target_language,
-                        word_timestamps=True,
-                        verbose=None
+                        audio_path, language=fal_target_language, word_timestamps=True, verbose=None
                     )
             else:
                 result = asr_model.transcribe(
-                    audio_path,
-                    language=fal_target_language,
-                    word_timestamps=True,
-                    verbose=None
+                    audio_path, language=fal_target_language, word_timestamps=True, verbose=None
                 )
 
             # Process transcription result
@@ -1287,7 +1183,8 @@ def format_audio_list(
                 audio_folder,
                 too_long_files,
                 fal_create_bpe_tokenizer,
-                fal_target_language)
+                fal_target_language,
+            )
 
         os.remove(temp_audio_path)
 
@@ -1297,19 +1194,18 @@ def format_audio_list(
         audio_steps = (audio_steps[0] + 1, audio_steps[1])
         additional_data_points_needed = audio_steps[1] - audio_steps[0]
         avg_duration = gradio_progress_duration / audio_steps[0]
-        gradio_estimated_duration = (
-            avg_duration * additional_data_points_needed)
+        gradio_estimated_duration = avg_duration * additional_data_points_needed
         fal_gradio_progress(
             audio_steps,
             desc=f"Processing. Estimated Completion: {c_logger.format_duration(gradio_estimated_duration)}",
-            unit="files")
+            unit="files",
+        )
 
     # Print final statistics
     stats.print_stats()
 
     # Verify processed files exist
-    audio_files = [os.path.join(audio_folder, file) for file in os.listdir(
-        audio_folder) if file.endswith('.wav')]
+    audio_files = [os.path.join(audio_folder, file) for file in os.listdir(audio_folder) if file.endswith(".wav")]
     if not audio_files:
         debug_print("No processed audio files found", "AUDIO", is_error=True)
         return None, None, 0
@@ -1318,25 +1214,19 @@ def format_audio_list(
     stats.print_stats()
 
     # Handle existing metadata case
-    if os.path.exists(train_metadata_path) and os.path.exists(
-            eval_metadata_path):
+    if os.path.exists(train_metadata_path) and os.path.exists(eval_metadata_path):
         debug_print("Using existing metadata files", "DATA_PROCESS")
         _set_validation_paths(
-            train_metadata_path, eval_metadata_path, audio_folder,
-            fal_whisper_model, fal_target_language
+            train_metadata_path, eval_metadata_path, audio_folder, fal_whisper_model, fal_target_language
         )
         _cleanup_resources(asr_model, existing_metadata)
         return train_metadata_path, eval_metadata_path, audio_total_size
 
     # Check for new metadata
     if not metadata["audio_file"]:
-        debug_print(
-            "No new audio files to process",
-            "DATA_PROCESS",
-            is_warning=True)
+        debug_print("No new audio files to process", "DATA_PROCESS", is_warning=True)
         _set_validation_paths(
-            train_metadata_path, eval_metadata_path, audio_folder,
-            fal_whisper_model, fal_target_language
+            train_metadata_path, eval_metadata_path, audio_folder, fal_whisper_model, fal_target_language
         )
         _cleanup_resources(asr_model, existing_metadata)
         return train_metadata_path, eval_metadata_path, audio_total_size
@@ -1346,35 +1236,27 @@ def format_audio_list(
     new_data_df = pd.DataFrame(metadata)
 
     # Duplicate detection and handling
-    duplicate_files = new_data_df['audio_file'].value_counts()
+    duplicate_files = new_data_df["audio_file"].value_counts()
     duplicates_found = duplicate_files[duplicate_files > 1]
 
     fal_gradio_progress((6, 10), desc="Handling Duplicate Transcriptions")
     if not duplicates_found.empty:
-        debug_print(
-            f"Found {len(duplicates_found)} files with multiple transcriptions",
-            "DUPLICATES")
+        debug_print(f"Found {len(duplicates_found)} files with multiple transcriptions", "DUPLICATES")
         for file, count in duplicates_found.items():
             debug_print(f"{file}: {count} occurrences", "DUPLICATES")
 
         # Re-transcribe duplicates
         best_transcriptions = handle_duplicates(
-            duplicates_found.index,
-            audio_folder,
-            fal_target_language,
-            fal_whisper_model)
+            duplicates_found.index, audio_folder, fal_target_language, fal_whisper_model
+        )
 
         # Update transcriptions and remove duplicates
         for file_path, trans_info in best_transcriptions.items():
-            new_data_df.loc[new_data_df['audio_file'] ==
-                            file_path, 'text'] = trans_info['text']
+            new_data_df.loc[new_data_df["audio_file"] == file_path, "text"] = trans_info["text"]
             debug_print(f"Updated transcription for {file_path}", "DUPLICATES")
 
-        new_data_df = new_data_df.drop_duplicates(
-            subset='audio_file', keep='first')
-        debug_print(
-            f"Cleaned up {len(duplicates_found)} duplicate entries",
-            "DUPLICATES")
+        new_data_df = new_data_df.drop_duplicates(subset="audio_file", keep="first")
+        debug_print(f"Cleaned up {len(duplicates_found)} duplicate entries", "DUPLICATES")
 
     # Handle evaluation split
     debug_print("Creating train/eval split", "DATA_PROCESS")
@@ -1382,36 +1264,21 @@ def format_audio_list(
 
     # Create and validate splits
     fal_gradio_progress((7, 10), desc="Creating Train/Eval Split")
-    train_eval_split = create_dataset_splits(
-        new_data_df,
-        eval_percentage,
-        random_seed=42
-    )
+    train_eval_split = create_dataset_splits(new_data_df, eval_percentage, random_seed=42)
 
     if train_eval_split is None:
-        debug_print(
-            "Failed to create valid dataset splits",
-            "DATA_PROCESS",
-            is_error=True)
+        debug_print("Failed to create valid dataset splits", "DATA_PROCESS", is_error=True)
         return None, None, 0
 
     final_training_set, final_eval_set = train_eval_split
 
     # Write metadata files
-    debug_print(
-        f"Writing {len(final_training_set)} training and {len(final_eval_set)} eval samples",
-        "DATA_PROCESS")
+    debug_print(f"Writing {len(final_training_set)} training and {len(final_eval_set)} eval samples", "DATA_PROCESS")
     try:
         fal_gradio_progress((8, 10), desc="Saving Metadata Files")
-        _write_metadata_files(
-            final_training_set, final_eval_set,
-            train_metadata_path, eval_metadata_path
-        )
+        _write_metadata_files(final_training_set, final_eval_set, train_metadata_path, eval_metadata_path)
     except Exception as e:
-        debug_print(
-            f"Error writing metadata: {str(e)}",
-            "DATA_PROCESS",
-            is_error=True)
+        debug_print(f"Error writing metadata: {e!s}", "DATA_PROCESS", is_error=True)
         raise
 
     # Handle BPE tokenizer
@@ -1424,16 +1291,8 @@ def format_audio_list(
     fal_gradio_progress((10, 10), desc="Finalizing Process")
 
     # Cleanup and set validation paths
-    _cleanup_resources(
-        asr_model,
-        final_eval_set,
-        final_training_set,
-        new_data_df,
-        existing_metadata)
-    _set_validation_paths(
-        train_metadata_path, eval_metadata_path, audio_folder,
-        fal_whisper_model, fal_target_language
-    )
+    _cleanup_resources(asr_model, final_eval_set, final_training_set, new_data_df, existing_metadata)
+    _set_validation_paths(train_metadata_path, eval_metadata_path, audio_folder, fal_whisper_model, fal_target_language)
 
     # Log final statistics
     if too_long_files:
@@ -1463,10 +1322,7 @@ def _create_bpe_tokenizer(bpe_whisper_words, bpe_out_path, bpe_base_path):
             "GENERAL",
             is_warning=True,
         )
-        debug_print(
-            "Dataset creation will continue without the BPE tokenizer.",
-            "GENERAL",
-            is_warning=True)
+        debug_print("Dataset creation will continue without the BPE tokenizer.", "GENERAL", is_warning=True)
         raise FileNotFoundError(f"Missing required file: {vocab_path}")
 
     try:
@@ -1475,19 +1331,10 @@ def _create_bpe_tokenizer(bpe_whisper_words, bpe_out_path, bpe_base_path):
         tokenizer.pre_tokenizer = Whitespace()
 
         # Add special tokens
-        special_tokens = [
-            "[PAD]",
-            "[UNK]",
-            "[CLS]",
-            "[SEP]",
-            "[MASK]",
-            "[STOP]",
-            "[SPACE]"]
+        special_tokens = ["[PAD]", "[UNK]", "[CLS]", "[SEP]", "[MASK]", "[STOP]", "[SPACE]"]
         tokenizer.add_tokens(special_tokens)
 
-        debug_print(
-            f"Training tokenizer on {len(bpe_whisper_words)} words",
-            "MODEL_OPS")
+        debug_print(f"Training tokenizer on {len(bpe_whisper_words)} words", "MODEL_OPS")
         tokenizer.train_from_iterator(
             bpe_whisper_words,
             vocab_size=30000,
@@ -1502,10 +1349,7 @@ def _create_bpe_tokenizer(bpe_whisper_words, bpe_out_path, bpe_base_path):
         debug_print(f"Saved BPE tokenizer to {tokenizer_path}", "MODEL_OPS")
 
     except Exception as e:
-        debug_print(
-            f"Failed to create BPE tokenizer: {str(e)}",
-            "MODEL_OPS",
-            is_error=True)
+        debug_print(f"Failed to create BPE tokenizer: {e!s}", "MODEL_OPS", is_error=True)
         raise
 
 
@@ -1524,8 +1368,7 @@ def merge_short_segments(segments, min_duration, max_gap=0.5):
     target_duration = (min_duration + 10.0) / 2  # Target middle of range
 
     for i, segment in enumerate(segments):
-        current_duration = sum(s["end"] - s["start"] 
-                             for s in current_group) if current_group else 0
+        current_duration = sum(s["end"] - s["start"] for s in current_group) if current_group else 0
 
         # If this is a continuation of current group
         if current_group and (segment["start"] - current_group[-1]["end"]) <= max_gap:
@@ -1535,33 +1378,24 @@ def merge_short_segments(segments, min_duration, max_gap=0.5):
                 current_group.append(segment)
             else:
                 # Save current group and start new one
-                merged_segment = {
-                    "start": current_group[0]["start"],
-                    "end": current_group[-1]["end"]
-                }
+                merged_segment = {"start": current_group[0]["start"], "end": current_group[-1]["end"]}
                 merged.append(merged_segment)
                 current_group = [segment]
         else:
             # Save previous group if it exists
             if current_group:
-                merged_segment = {
-                    "start": current_group[0]["start"],
-                    "end": current_group[-1]["end"]
-                }
+                merged_segment = {"start": current_group[0]["start"], "end": current_group[-1]["end"]}
                 merged.append(merged_segment)
             current_group = [segment]
 
     # Handle last group
     if current_group:
-        merged_segment = {
-            "start": current_group[0]["start"],
-            "end": current_group[-1]["end"]
-        }
+        merged_segment = {"start": current_group[0]["start"], "end": current_group[-1]["end"]}
         merged.append(merged_segment)
 
     debug_print(
         f"Merged {len(segments) - len(merged)} segments into {len(merged)} segments with mid-range preference",
-        "SEGMENTS"
+        "SEGMENTS",
     )
     return merged
 
@@ -1605,6 +1439,7 @@ def extend_segment(wav, start, end, sr, min_duration, context_window=1.0):
 
 # Helper functions for better organization
 
+
 def _adjust_eval_percentage(aep_eval_split_number):
     """Adjust evaluation percentage to be within acceptable bounds"""
     eval_percentage = aep_eval_split_number / 100.0
@@ -1627,11 +1462,10 @@ def _adjust_eval_percentage(aep_eval_split_number):
     return eval_percentage
 
 
-def _set_validation_paths(vp_train_path, vp_eval_path, vp_audio_folder,
-                          vp_whisper_model, vp_target_language):
+def _set_validation_paths(vp_train_path, vp_eval_path, vp_audio_folder, vp_whisper_model, vp_target_language):
     """Set global validation paths"""
-    global VALIDATE_TRAIN_METADATA_PATH, VALIDATE_EVAL_METADATA_PATH, VALIDATE_AUDIO_FOLDER # pylint: disable=no-member
-    global VALIDATE_WHISPER_MODEL, VALIDATE_TARGET_LANGUAGE # pylint: disable=no-member
+    global VALIDATE_TRAIN_METADATA_PATH, VALIDATE_EVAL_METADATA_PATH, VALIDATE_AUDIO_FOLDER  # pylint: disable=no-member
+    global VALIDATE_WHISPER_MODEL, VALIDATE_TARGET_LANGUAGE  # pylint: disable=no-member
 
     VALIDATE_TRAIN_METADATA_PATH = vp_train_path
     VALIDATE_EVAL_METADATA_PATH = vp_eval_path
@@ -1649,47 +1483,31 @@ def _cleanup_resources(*resources):
         torch.cuda.empty_cache()
 
 
-def _write_metadata_files(
-        wm_train_set,
-        wm_eval_set,
-        wm_train_path,
-        wm_eval_path):
+def _write_metadata_files(wm_train_set, wm_eval_set, wm_train_path, wm_eval_path):
     """Write metadata files with error handling"""
     try:
-        wm_train_set.sort_values("audio_file").to_csv(
-            wm_train_path, sep="|", index=False)
-        wm_eval_set.sort_values("audio_file").to_csv(
-            wm_eval_path, sep="|", index=False)
+        wm_train_set.sort_values("audio_file").to_csv(wm_train_path, sep="|", index=False)
+        wm_eval_set.sort_values("audio_file").to_csv(wm_eval_path, sep="|", index=False)
         debug_print("Successfully wrote metadata files", "DATA_PROCESS")
     except Exception as e:
-        debug_print(
-            f"Failed to write metadata files: {str(e)}",
-            "DATA_PROCESS",
-            is_error=True)
+        debug_print(f"Failed to write metadata files: {e!s}", "DATA_PROCESS", is_error=True)
         raise
 
 
 def create_dataset_splits(df, eval_percentage, random_seed=42):
     """Create training and evaluation splits with validation"""
     if df.empty:
-        debug_print(
-            "No data available for splitting",
-            "DATA_PROCESS",
-            is_error=True)
+        debug_print("No data available for splitting", "DATA_PROCESS", is_error=True)
         return None
 
     shuffled_df = df.sample(frac=1, random_state=random_seed)
     num_val_samples = max(1, int(len(shuffled_df) * eval_percentage))
 
     if num_val_samples >= len(shuffled_df):
-        debug_print(
-            "Not enough samples for valid split",
-            "DATA_PROCESS",
-            is_error=True)
+        debug_print("Not enough samples for valid split", "DATA_PROCESS", is_error=True)
         return None
 
-    return (shuffled_df[num_val_samples:],
-            shuffled_df[:num_val_samples])  # training  # eval
+    return (shuffled_df[num_val_samples:], shuffled_df[:num_val_samples])  # training  # eval
 
 
 def save_audio_segment(
@@ -1723,26 +1541,19 @@ def save_audio_segment(
 
     # Handle long audio segments
     if sas_audio_segment.size(-1) > sas_max_duration * sas_sr:
-        sas_too_long_files.append(
-            (sas_audio_file_name, sas_audio_segment.size(-1) / sas_sr))
+        sas_too_long_files.append((sas_audio_file_name, sas_audio_segment.size(-1) / sas_sr))
 
         while sas_audio_segment.size(-1) > sas_max_duration * sas_sr:
-            sas_split_audio = sas_audio_segment[:, : int(
-                sas_max_duration * sas_sr)]
-            sas_audio_segment = sas_audio_segment[:, int(
-                sas_max_duration * sas_sr):]
+            sas_split_audio = sas_audio_segment[:, : int(sas_max_duration * sas_sr)]
+            sas_audio_segment = sas_audio_segment[:, int(sas_max_duration * sas_sr) :]
             sas_split_file_name = f"{sas_audio_file_name_without_ext}_{str(sas_segment_idx).zfill(8)}.wav"
             sas_split_relative_path = os.path.join(sas_split_file_name)
-            sas_split_absolute_path = os.path.normpath(
-                os.path.join(sas_audio_folder, sas_split_relative_path))
+            sas_split_absolute_path = os.path.normpath(os.path.join(sas_audio_folder, sas_split_relative_path))
 
-            os.makedirs(
-                os.path.dirname(sas_split_absolute_path),
-                exist_ok=True)
+            os.makedirs(os.path.dirname(sas_split_absolute_path), exist_ok=True)
             torchaudio.save(str(sas_split_absolute_path), sas_split_audio, sas_sr)
 
-            sas_metadata["audio_file"].append(
-                f"wavs/{sas_split_relative_path}")
+            sas_metadata["audio_file"].append(f"wavs/{sas_split_relative_path}")
             sas_metadata["text"].append(sas_sentence)
             sas_metadata["speaker_name"].append(sas_speaker_name)
             sas_segment_idx += 1
@@ -1796,25 +1607,19 @@ def process_transcription_result(
             if ptr_first_word:
                 ptr_sentence_start = ptr_start_time
                 if len(ptr_current_words) == 0:
-                    ptr_sentence_start = max(
-                        ptr_sentence_start - ptr_buffer, 0)
+                    ptr_sentence_start = max(ptr_sentence_start - ptr_buffer, 0)
                 else:
-                    ptr_previous_end = ptr_current_words[-1].get(
-                        "end", 0) if ptr_current_words else 0
-                    ptr_sentence_start = max(
-                        ptr_sentence_start - ptr_buffer,
-                        (ptr_previous_end + ptr_start_time) / 2)
+                    ptr_previous_end = ptr_current_words[-1].get("end", 0) if ptr_current_words else 0
+                    ptr_sentence_start = max(ptr_sentence_start - ptr_buffer, (ptr_previous_end + ptr_start_time) / 2)
                 ptr_sentence = ptr_word
                 ptr_first_word = False
             else:
                 ptr_sentence += " " + ptr_word
 
-            ptr_current_words.append(
-                {"word": ptr_word, "start": ptr_start_time, "end": ptr_end_time})
+            ptr_current_words.append({"word": ptr_word, "start": ptr_start_time, "end": ptr_end_time})
 
             # Handle sentence splitting and audio saving
-            if ptr_word[-1] in ["!", ".",
-                                "?"] or (ptr_end_time - ptr_sentence_start) > ptr_max_duration:
+            if ptr_word[-1] in ["!", ".", "?"] or (ptr_end_time - ptr_sentence_start) > ptr_max_duration:
                 save_audio_segment(
                     ptr_audio,
                     ptr_sr,
@@ -1865,11 +1670,9 @@ def process_audio_with_vad(wav, sr, vad_model, get_speech_timestamps):
     for segment in vad_segments:
         segment["start"] = int(segment["start"] * scale_factor)
         # Add extra padding at the end
-        segment["end"] = int(segment["end"] * scale_factor) + \
-            int(0.2 * sr)  # Add 200ms padding
+        segment["end"] = int(segment["end"] * scale_factor) + int(0.2 * sr)  # Add 200ms padding
 
-    merged_segments = merge_short_segments(
-        vad_segments, min_duration=6.0, max_gap=0.5)
+    merged_segments = merge_short_segments(vad_segments, min_duration=6.0, max_gap=0.5)
 
     debug_print(
         f"VAD processing: {len(vad_segments)} original segments, {len(merged_segments)} after merging",
@@ -1878,15 +1681,9 @@ def process_audio_with_vad(wav, sr, vad_model, get_speech_timestamps):
     return merged_segments
 
 
-def handle_duplicates(
-        duplicate_files,
-        dup_audio_folder,
-        dup_target_language,
-        dup_whisper_model):
+def handle_duplicates(duplicate_files, dup_audio_folder, dup_target_language, dup_whisper_model):
     """Re-transcribe duplicate files to get best transcription"""
-    debug_print(
-        "Re-transcribing duplicate files to get best transcription",
-        "DUPLICATES")
+    debug_print("Re-transcribing duplicate files to get best transcription", "DUPLICATES")
 
     best_transcriptions = {}
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -1896,26 +1693,19 @@ def handle_duplicates(
         debug_print(f"Re-transcribing {file_path}", "DUPLICATES")
 
         # Get full path
-        full_path = os.path.join(
-            dup_audio_folder, os.path.basename(
-                file_path.replace(
-                    "wavs/", "")))
+        full_path = os.path.join(dup_audio_folder, os.path.basename(file_path.replace("wavs/", "")))
 
         # Re-transcribe with highest quality settings
-        result = asr_model.transcribe(
-            full_path,
-            language=dup_target_language,
-            word_timestamps=True,
-            verbose=None)
+        result = asr_model.transcribe(full_path, language=dup_target_language, word_timestamps=True, verbose=None)
 
         # Store the new transcription
         best_transcriptions[file_path] = {
             "text": result["text"].strip(),
-            "confidence": sum(s.get("confidence", 0) for s in result["segments"])
-            / len(result["segments"]),
+            "confidence": sum(s.get("confidence", 0) for s in result["segments"]) / len(result["segments"]),
         }
 
     return best_transcriptions
+
 
 #############################################
 #### STEP 1 Dataset Validation Functions ####
@@ -1931,20 +1721,20 @@ def normalize_text(text):
     text = text.lower()
     # Remove punctuation
     text = text.translate(str.maketrans("", "", string.punctuation))
-    # Replace multiple spaces with a single space  
+    # Replace multiple spaces with a single space
     text = re.sub(r"\s+", " ", text)
     # Convert written numbers to digits
     words = text.split()
     normalized_words = []
     for word in words:
         try:
-            # Try to convert word to a number  
+            # Try to convert word to a number
             normalized_word = str(w2n.word_to_num(word))
         except ValueError:
             # If it fails, keep the original word
             normalized_word = word
         normalized_words.append(normalized_word)
-    
+
     return " ".join(normalized_words)
 
 
@@ -1952,7 +1742,7 @@ def get_audio_file_list(mismatches):
     """Gets list of audio file paths from mismatched transcriptions DataFrame."""
     if mismatches.empty:
         return ["No bad transcriptions"]
-    
+
     return mismatches["Audio Path"].tolist()
 
 
@@ -1970,11 +1760,8 @@ def load_and_display_mismatches():
     """
 
     def validate_audio_transcriptions(
-            vat_csv_paths,
-            vat_audio_folder,
-            vat_whisper_model,
-            vat_target_language,
-            vat_progress=None):
+        vat_csv_paths, vat_audio_folder, vat_whisper_model, vat_target_language, vat_progress=None
+    ):
         # Load and combine metadata from CSV files
         metadata_dfs = []
         for csv_path in vat_csv_paths:
@@ -2001,32 +1788,23 @@ def load_and_display_mismatches():
         if vat_progress is not None:
             vat_progress((0, total_files), desc="Processing files")
 
-        for index, row in tqdm(metadata_df.iterrows(
-        ), total=total_files, unit="file", disable=False, leave=True):
+        for index, row in tqdm(metadata_df.iterrows(), total=total_files, unit="file", disable=False, leave=True):
             audio_file = row["audio_file"]
             expected_text = row["text"]
             debug_print(f"Processing file {index + 1}/{total_files}: {audio_file}", "VALIDATION", is_info=True)
-            debug_print(f"Expected text length: {len(expected_text)}", "VALIDATION", is_info=True)                
+            debug_print(f"Expected text length: {len(expected_text)}", "VALIDATION", is_info=True)
             audio_file_name = audio_file.replace("wavs/", "")
-            audio_path = os.path.normpath(
-                os.path.join(
-                    vat_audio_folder,
-                    audio_file_name))
+            audio_path = os.path.normpath(os.path.join(vat_audio_folder, audio_file_name))
 
             if not os.path.exists(audio_path):
                 missing_files.append(audio_file_name)
-                debug_print(f"File not found: {audio_path}", "GENERAL", is_warning=True)                
+                debug_print(f"File not found: {audio_path}", "GENERAL", is_warning=True)
                 if vat_progress is not None:
-                    vat_progress((index + 1, total_files),
-                                 desc="Processing files")
+                    vat_progress((index + 1, total_files), desc="Processing files")
                 continue
 
             # Transcribe with OpenAI Whisper
-            result = asr_model.transcribe(
-                audio_path,
-                language=vat_target_language,
-                word_timestamps=True,
-                verbose=None)
+            result = asr_model.transcribe(audio_path, language=vat_target_language, word_timestamps=True, verbose=None)
 
             # Get the full transcription from the result
             transcribed_text = result["text"].strip()
@@ -2036,7 +1814,9 @@ def load_and_display_mismatches():
             normalized_expected_text = normalize_text(expected_text)
             normalized_transcribed_text = normalize_text(transcribed_text)
             debug_print(f"Normalized expected text length: {len(normalized_expected_text)}", "VALIDATION", is_info=True)
-            debug_print(f"Normalized transcribed text length: {len(normalized_transcribed_text)}", "VALIDATION", is_info=True)
+            debug_print(
+                f"Normalized transcribed text length: {len(normalized_transcribed_text)}", "VALIDATION", is_info=True
+            )
 
             if normalized_transcribed_text != normalized_expected_text:
                 debug_print("Mismatch found! Adding to mismatches list", "VALIDATION", is_info=True)
@@ -2050,7 +1830,7 @@ def load_and_display_mismatches():
                 }
                 debug_print(f"Mismatch entry keys: {mismatch_entry.keys()}", "VALIDATION", is_info=True)
                 mismatches.append(mismatch_entry)
-                
+
             if vat_progress is not None:
                 vat_progress((index + 1, total_files), desc="Processing files")
 
@@ -2066,9 +1846,7 @@ def load_and_display_mismatches():
 
         if missing_files:
             debug_print("", "GENERAL")
-            debug_print(
-                "The following files are missing and should be removed from the CSV files:",
-                "GENERAL")
+            debug_print("The following files are missing and should be removed from the CSV files:", "GENERAL")
             for file_name in missing_files:
                 debug_print(f"- {file_name}", "GENERAL")
         return mismatches
@@ -2092,8 +1870,9 @@ def load_and_display_mismatches():
 
         if not mismatches:
             debug_print("No transcription mismatches found!", "GENERAL", is_info=True)
-            empty_df = pd.DataFrame(columns=["expected_text", "transcribed_text", "filename", 
-                                           "full_path", "row_index", "source_csv"])
+            empty_df = pd.DataFrame(
+                columns=["expected_text", "transcribed_text", "filename", "full_path", "row_index", "source_csv"]
+            )
             display_df = pd.DataFrame(columns=["expected_text", "transcribed_text", "filename"])
             display_df.loc[0] = ["No bad transcriptions", "No bad transcriptions", "N/A"]
             return empty_df, display_df, "No transcription mismatches found - all transcriptions match!"
@@ -2104,29 +1883,19 @@ def load_and_display_mismatches():
         # Ensure all fields are single values, not series
         for col in df.columns:
             if isinstance(df[col].iloc[0], pd.Series):
-                df[col] = df[col].apply(
-                    lambda x: x.iloc[0] if isinstance(
-                        x, pd.Series) else x)
+                df[col] = df[col].apply(lambda x: x.iloc[0] if isinstance(x, pd.Series) else x)
 
         # Clean all text columns
-        df["expected_text"] = df["expected_text"].astype(
-            str).apply(lambda x: x.strip())
-        df["transcribed_text"] = df["transcribed_text"].astype(
-            str).apply(lambda x: x.strip())
-        df["full_path"] = df["full_path"].astype(
-            str).apply(lambda x: x.strip())
+        df["expected_text"] = df["expected_text"].astype(str).apply(lambda x: x.strip())
+        df["transcribed_text"] = df["transcribed_text"].astype(str).apply(lambda x: x.strip())
+        df["full_path"] = df["full_path"].astype(str).apply(lambda x: x.strip())
 
         # Create display version with only visible columns
-        display_df = df[["expected_text",
-                         "transcribed_text", "filename"]].copy()
+        display_df = df[["expected_text", "transcribed_text", "filename"]].copy()
 
         return df, display_df, ""
     else:
-        empty_df = pd.DataFrame(
-            columns=[
-                "Expected Text",
-                "Transcribed Text",
-                "Filename"])
+        empty_df = pd.DataFrame(columns=["Expected Text", "Transcribed Text", "Filename"])
         return empty_df, empty_df, "Please generate your dataset first"
 
 
@@ -2160,32 +1929,22 @@ def save_correction_to_csv(csv_path, row_index, new_text):
 
         # Verify the save
         df_check = pd.read_csv(csv_path, sep="|")
-        if not df_check.loc[row_index, "text"] == new_text:
-            debug_print(
-                "Save verification failed. Text mismatch.",
-                "GENERAL",
-                is_error=True)
+        if df_check.loc[row_index, "text"] != new_text:
+            debug_print("Save verification failed. Text mismatch.", "GENERAL", is_error=True)
             return "Error: Save verification failed"
 
         return f"Successfully updated transcription in {os.path.basename(csv_path)}"
 
     except Exception as e:
-        debug_print(
-            f"Error saving correction: {str(e)}",
-            "GENERAL",
-            is_error=True)
+        debug_print(f"Error saving correction: {e!s}", "GENERAL", is_error=True)
         debug_print(f"CSV path: {csv_path}", "GENERAL", is_error=True)
         debug_print(f"Row index: {row_index}", "GENERAL", is_error=True)
         debug_print("Full error traceback:", "GENERAL", is_error=True)
         traceback.print_exc()
-        return f"Error updating CSV: {str(e)}"
+        return f"Error updating CSV: {e!s}"
 
-def save_audio_and_correction(
-        choice,
-        manual_text,
-        audio_data,
-        df,
-        current_idx):
+
+def save_audio_and_correction(choice, manual_text, audio_data, df, current_idx):
     """Handle both audio and transcription saves"""
     if current_idx is None:
         return {
@@ -2207,25 +1966,17 @@ def save_audio_and_correction(
         save_status_msg = []
 
         # Handle audio save if audio was edited
-        if audio_data is not None and isinstance(
-                audio_data, tuple) and len(audio_data) == 2:
+        if audio_data is not None and isinstance(audio_data, tuple) and len(audio_data) == 2:
             try:
                 sr, audio = audio_data
-                debug_print(
-                    f"Saving edited audio: {sr}Hz, length: {len(audio)}",
-                    "DATA_PROCESS")
+                debug_print(f"Saving edited audio: {sr}Hz, length: {len(audio)}", "DATA_PROCESS")
                 audio_tensor = torch.tensor(audio).unsqueeze(0)
                 torchaudio.save(str(audio_path), audio_tensor, sr)
                 save_status_msg.append("Audio saved successfully")
-                debug_print(
-                    f"Saved edited audio to {audio_path}",
-                    "DATA_PROCESS")
+                debug_print(f"Saved edited audio to {audio_path}", "DATA_PROCESS")
             except Exception as e:
-                save_status_msg.append(f"Error saving audio: {str(e)}")
-                debug_print(
-                    f"Error saving audio: {str(e)}",
-                    "DATA_PROCESS",
-                    is_error=True)
+                save_status_msg.append(f"Error saving audio: {e!s}")
+                debug_print(f"Error saving audio: {e!s}", "DATA_PROCESS", is_error=True)
 
         # Handle text correction
         if choice == "Use Original":
@@ -2236,21 +1987,17 @@ def save_audio_and_correction(
             new_text = str(manual_text)
 
         # Save text correction to CSV
-        result = save_correction_to_csv(
-            str(row["source_csv"]), int(row["row_index"]), new_text)
+        result = save_correction_to_csv(str(row["source_csv"]), int(row["row_index"]), new_text)
         save_status_msg.append(result)
 
         # Update both text and expected_text in DataFrame
         if "Successfully" in result:
             df.loc[current_idx, "text"] = new_text
             df.loc[current_idx, "expected_text"] = new_text
-            debug_print(
-                f"Updated DataFrame with new text: {new_text}",
-                "DATA_PROCESS")
+            debug_print(f"Updated DataFrame with new text: {new_text}", "DATA_PROCESS")
 
         # Create updated display DataFrame
-        display_df = df[["expected_text",
-                         "transcribed_text", "filename"]].copy()
+        display_df = df[["expected_text", "transcribed_text", "filename"]].copy()
 
         return {
             mismatch_table: display_df,
@@ -2260,7 +2007,7 @@ def save_audio_and_correction(
         }
 
     except Exception as e:
-        error_msg = f"Error saving correction: {str(e)}"
+        error_msg = f"Error saving correction: {e!s}"
         debug_print(error_msg, "DATA_PROCESS", is_error=True)
         traceback.print_exc()
         return {
@@ -2282,6 +2029,7 @@ def basemodel_or_finetunedmodel_choice(value):
     elif value == "Existing finetuned model":
         basemodel_or_finetunedmodel = False
 
+
 def check_model_requirements(model_folder):
     """Check if all required files exist in the model folder"""
     required_files = {
@@ -2290,39 +2038,44 @@ def check_model_requirements(model_folder):
         "vocab.json": False,
         "dvae.pth": False,
         "mel_stats.pth": False,
-        "speakers_xtts.pth": False
+        "speakers_xtts.pth": False,
     }
-    
+
     if model_folder.exists():
         for file in required_files:
             required_files[file] = (model_folder / file).exists()
-    
+
     return required_files
 
+
 def train_gpt(
-        language,
-        num_epochs,
-        batch_size,
-        grad_acumm,
-        train_csv,
-        eval_csv,
-        learning_rate,
-        model_to_train,
-        continue_run,
-        disable_shared_memory,
-        learning_rate_scheduler,
-        optimizer,
-        num_workers,
-        warm_up,
-        max_audio_length=255995,
-        progress=gr.Progress()):
-    
+    language,
+    num_epochs,
+    batch_size,
+    grad_acumm,
+    train_csv,
+    eval_csv,
+    learning_rate,
+    model_to_train,
+    continue_run,
+    disable_shared_memory,
+    learning_rate_scheduler,
+    optimizer,
+    num_workers,
+    warm_up,
+    max_audio_length=255995,
+    progress=gr.Progress(),
+):
     # First check if a model was selected
     if "No Models Available" in model_to_train:
         debug_print("No XTTS model selected for training.", "MODEL_OPS", is_error=True)
-        debug_print("Please download a model using AllTalk's main interface > TTS Engine Settings > XTTS > Model/Voices Download", "MODEL_OPS", is_info=True)
+        debug_print(
+            "Please download a model using AllTalk's main interface > TTS Engine Settings > XTTS > Model/Voices Download",
+            "MODEL_OPS",
+            is_info=True,
+        )
         return
-    
+
     # Check if selected model exists and has required files
     model_path = this_dir / "models" / "xtts" / model_to_train
     if not model_path.exists():
@@ -2333,14 +2086,14 @@ def train_gpt(
     # Check for required files
     files = check_model_requirements(model_path)
     missing_files = [file for file, exists in files.items() if not exists]
-    
+
     if missing_files:
         debug_print(f"Missing required files in {model_to_train}:", "MODEL_OPS", is_error=True)
         for file in missing_files:
             debug_print(f"❌ {file}", "MODEL_OPS", is_error=True)
         debug_print("\nPlease redownload the model using AllTalk's interface", "MODEL_OPS", is_info=True)
         return
-    
+
     # Confirm all model files found and continue with training
     debug_print(f"✓ All required files found for model: {model_to_train}", "MODEL_OPS", is_info=True)
 
@@ -2378,7 +2131,7 @@ def train_gpt(
         free_memory = total_memory - (torch.cuda.memory_allocated(gpu_id) / (1024**3))
         debug_print(f"- Total VRAM: {total_memory:.2f}GB", "GPU_MEMORY", is_info=True)
         debug_print(f"- Free VRAM: {free_memory:.2f}GB", "GPU_MEMORY", is_info=True)
-        
+
         # Memory warnings
         if free_memory < 3:
             debug_print("WARNING: Very low available VRAM!", "GPU_MEMORY", is_warning=True)
@@ -2390,69 +2143,38 @@ def train_gpt(
         torch.cuda.empty_cache()
         # Get the current device ID
         gpu_device_id = torch.cuda.current_device()
-        gpu_available_mem_gb = (torch.cuda.get_device_properties(
-            gpu_device_id).total_memory - torch.cuda.memory_allocated(gpu_device_id)) / (1024 ** 3)
+        gpu_available_mem_gb = (
+            torch.cuda.get_device_properties(gpu_device_id).total_memory - torch.cuda.memory_allocated(gpu_device_id)
+        ) / (1024**3)
         if gpu_available_mem_gb < 12:
+            debug_print("******************************", level="GPU_MEMORY", is_warning=True)
+            debug_print("IMPORTANT MEMORY CONSIDERATION", level="GPU_MEMORY", is_warning=True)
+            debug_print("******************************", level="GPU_MEMORY", is_warning=True)
             debug_print(
-                "******************************",
-                level="GPU_MEMORY",
-                is_warning=True)            
+                "Your available VRAM is below the recommended 12GB threshold.", level="GPU_MEMORY", is_warning=True
+            )
+            # Empty line for formatting
+            debug_print("", level="GPU_MEMORY", is_warning=True)
+            debug_print("System-Specific Considerations:", level="GPU_MEMORY", is_warning=True)
+            debug_print("- Windows: Will utilize system RAM as extended VRAM", level="GPU_MEMORY", is_warning=True)
+            debug_print("  * Ensure sufficient system RAM is available", level="GPU_MEMORY", is_warning=True)
+            debug_print("  * Recommended minimum: 24GB system RAM", level="GPU_MEMORY", is_warning=True)
+            debug_print("- Linux: Limited to physical VRAM only", level="GPU_MEMORY", is_warning=True)
+            debug_print("  * Training may fail with insufficient VRAM", level="GPU_MEMORY", is_warning=True)
             debug_print(
-                "IMPORTANT MEMORY CONSIDERATION",
-                level="GPU_MEMORY",
-                is_warning=True)
-            debug_print(
-                "******************************",
-                level="GPU_MEMORY",
-                is_warning=True)            
-            debug_print(
-                "Your available VRAM is below the recommended 12GB threshold.",
-                level="GPU_MEMORY",
-                is_warning=True)
+                "  * Consider reducing batch size or using gradient accumulation", level="GPU_MEMORY", is_warning=True
+            )
             # Empty line for formatting
             debug_print("", level="GPU_MEMORY", is_warning=True)
             debug_print(
-                "System-Specific Considerations:",
-                level="GPU_MEMORY",
-                is_warning=True)
+                "For detailed memory management strategies and optimization tips:", level="GPU_MEMORY", is_warning=True
+            )
             debug_print(
-                "- Windows: Will utilize system RAM as extended VRAM",
-                level="GPU_MEMORY",
-                is_warning=True)
+                "1. Refer to the 'Memory Management' section in the Training Guide", level="GPU_MEMORY", is_warning=True
+            )
             debug_print(
-                "  * Ensure sufficient system RAM is available",
-                level="GPU_MEMORY",
-                is_warning=True)
-            debug_print(
-                "  * Recommended minimum: 24GB system RAM",
-                level="GPU_MEMORY",
-                is_warning=True)
-            debug_print(
-                "- Linux: Limited to physical VRAM only",
-                level="GPU_MEMORY",
-                is_warning=True)
-            debug_print(
-                "  * Training may fail with insufficient VRAM",
-                level="GPU_MEMORY",
-                is_warning=True)
-            debug_print(
-                "  * Consider reducing batch size or using gradient accumulation",
-                level="GPU_MEMORY",
-                is_warning=True)
-            # Empty line for formatting
-            debug_print("", level="GPU_MEMORY", is_warning=True)
-            debug_print(
-                "For detailed memory management strategies and optimization tips:",
-                level="GPU_MEMORY",
-                is_warning=True)
-            debug_print(
-                "1. Refer to the 'Memory Management' section in the Training Guide",
-                level="GPU_MEMORY",
-                is_warning=True)
-            debug_print(
-                "2. Review the Pre-flight Check tab for system requirements",
-                level="GPU_MEMORY",
-                is_warning=True)
+                "2. Review the Pre-flight Check tab for system requirements", level="GPU_MEMORY", is_warning=True
+            )
 
     # Dataset statistics
     try:
@@ -2464,20 +2186,15 @@ def train_gpt(
         debug_print(f"- Training samples: {len(train_df)}", "DATA_PROCESS", is_info=True)
         debug_print(f"- Evaluation samples: {len(eval_df)}", "DATA_PROCESS", is_info=True)
         if (out_path / "bpe_tokenizer-vocab.json").exists():
-            debug_print(
-                "- Using custom BPE tokenizer",
-                level="DATA_PROCESS",
-                is_info=True)
-            training_assets = {
-                'Tokenizer': str(out_path / "bpe_tokenizer-vocab.json")
-            }        
+            debug_print("- Using custom BPE tokenizer", level="DATA_PROCESS", is_info=True)
+            training_assets = {"Tokenizer": str(out_path / "bpe_tokenizer-vocab.json")}
         # Check for potential issues
         if len(train_df) < 100:
             debug_print("Very small training dataset", "DATA_PROCESS", is_warning=True)
         if len(eval_df) < 10:
             debug_print("Very small evaluation dataset", "DATA_PROCESS", is_warning=True)
     except Exception as e:
-        debug_print(f"Error reading dataset files: {str(e)}", "DATA_PROCESS", is_error=True)
+        debug_print(f"Error reading dataset files: {e!s}", "DATA_PROCESS", is_error=True)
         return
 
     #  Logging parameters
@@ -2489,7 +2206,7 @@ def train_gpt(
     # Check for lang.txt in the same directory as train_csv
     dataset_dir = os.path.dirname(train_csv)
     lang_file = os.path.join(dataset_dir, "lang.txt")
-    
+
     # Set here the path that the checkpoints will be saved. Default:
     # ./training/
     project_path = os.path.join(out_path, "training")
@@ -2500,32 +2217,23 @@ def train_gpt(
     debug_print(f"- Project Path: {project_path}", "GENERAL", is_info=True)
     debug_print(f"- Model Path: {model_path}", "GENERAL", is_info=True)
     debug_print(f"- Training Data: {train_csv}", level="GENERAL", is_info=True)
-    debug_print(
-        f"- Evaluation Data: {eval_csv}",
-        level="GENERAL",
-        is_info=True)  
+    debug_print(f"- Evaluation Data: {eval_csv}", level="GENERAL", is_info=True)
     debug_print(f"- Language: {language}", level="GENERAL", is_info=True)
     if os.path.exists(lang_file):
         try:
-            with open(lang_file, 'r', encoding='utf-8') as f:
+            with open(lang_file, encoding="utf-8") as f:
                 dataset_language = f.read().strip()
             debug_print(f"- Found language file, using language: {dataset_language}", "GENERAL", is_info=True)
             # Override the input language with the one from lang.txt
             language = dataset_language
         except Exception as e:
-            debug_print(f"- Error reading lang.txt: {str(e)}", "GENERAL", is_warning=True)
+            debug_print(f"- Error reading lang.txt: {e!s}", "GENERAL", is_warning=True)
             debug_print(f"- Falling back to provided language: {language}", "GENERAL", is_warning=True)
     else:
-        debug_print("- No lang.txt found, using provided language setting", "GENERAL", is_warning=True)    
+        debug_print("- No lang.txt found, using provided language setting", "GENERAL", is_warning=True)
     debug_print(f"- Batch Size: {batch_size}", level="GENERAL", is_info=True)
-    debug_print(
-        f"- Grad Steps: {grad_acumm}",
-        level="GENERAL",
-        is_info=True)        
-    debug_print(
-        f"- Training Epochs: {num_epochs}",
-        level="GENERAL",
-        is_info=True)
+    debug_print(f"- Grad Steps: {grad_acumm}", level="GENERAL", is_info=True)
+    debug_print(f"- Training Epochs: {num_epochs}", level="GENERAL", is_info=True)
 
     # Create the directory
     os.makedirs(project_path, exist_ok=True)
@@ -2535,7 +2243,7 @@ def train_gpt(
     param_optimizer_wd_only_on_weights = True
     # If True, it will start with evaluation
     param_start_with_eval = False
-    param_batch_size = batch_size           # Set the batch size here
+    param_batch_size = batch_size  # Set the batch size here
     # Set the gradient accumulation steps here
     param_grad_acumm_steps = grad_acumm
 
@@ -2562,37 +2270,24 @@ def train_gpt(
 
     continue_path = None
     if continue_run:
-        folders = glob.glob(os.path.join(project_path, '*/'))
+        folders = glob.glob(os.path.join(project_path, "*/"))
         if folders:
             last_run = max(folders, key=os.path.getmtime)
             if last_run:
-                checkpoints = glob.glob(
-                    os.path.join(
-                        last_run,
-                        "best_model_*.pth"))
+                checkpoints = glob.glob(os.path.join(last_run, "best_model_*.pth"))
                 if checkpoints:
                     latest_checkpoint = max(checkpoints, key=os.path.getmtime)
                     if latest_checkpoint:
                         dataset_xtts_checkpoint = None
                         continue_path = last_run
-                        print(
-                            f"[FINETUNE] - Continuing previous fine tuning {latest_checkpoint}")
+                        logger.info(f"[FINETUNE] - Continuing previous fine tuning {latest_checkpoint}")
 
     # Copy the supporting files
     destination_dir = out_path / "chkptandnorm"
     destination_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(
-        dataset_dvae_checkpoint,
-        destination_dir /
-        dataset_dvae_checkpoint.name)
-    shutil.copy2(
-        dataset_mel_norm_file,
-        destination_dir /
-        dataset_mel_norm_file.name)
-    shutil.copy2(
-        dataset_speakers_file,
-        destination_dir /
-        dataset_speakers_file.name)
+    shutil.copy2(dataset_dvae_checkpoint, destination_dir / dataset_dvae_checkpoint.name)
+    shutil.copy2(dataset_mel_norm_file, destination_dir / dataset_mel_norm_file.name)
+    shutil.copy2(dataset_speakers_file, destination_dir / dataset_speakers_file.name)
 
     # init args and config
     model_args = GPTArgs(
@@ -2613,10 +2308,7 @@ def train_gpt(
         gpt_use_perceiver_resampler=True,
     )
     # define audio config
-    audio_config = XttsAudioConfig(
-        sample_rate=22050,
-        dvae_sample_rate=22050,
-        output_sample_rate=24000)
+    audio_config = XttsAudioConfig(sample_rate=22050, dvae_sample_rate=22050, output_sample_rate=24000)
 
     # Resolve Japanese threading issue
     number_of_workers = int(num_workers)
@@ -2627,137 +2319,89 @@ def train_gpt(
     lr_scheduler_params = {}
 
     if learning_rate_scheduler and learning_rate_scheduler != "None":
-        lr_gamma_mapping = {
-            1e-6: 0.9,
-            5e-6: 0.8,
-            1e-5: 0.3,
-            5e-5: 0.3,
-            1e-4: 0.3,
-            5e-4: 0.1,
-            1e-3: 0.1
-        }
+        lr_gamma_mapping = {1e-6: 0.9, 5e-6: 0.8, 1e-5: 0.3, 5e-5: 0.3, 1e-4: 0.3, 5e-4: 0.1, 1e-3: 0.1}
         lr_scheduler = learning_rate_scheduler
         if lr_scheduler == "StepLR":
-            lr_scheduler_params = {
-                'step_size': 30,
-                'gamma': 0.1,
-                'last_epoch': -1}
+            lr_scheduler_params = {"step_size": 30, "gamma": 0.1, "last_epoch": -1}
         elif lr_scheduler == "MultiStepLR":
             exponent = 3 - int(math.log2(num_epochs) / 2)
             base = 2
             num_milestones = min(num_epochs, int(math.pow(base, exponent)))
             milestone_interval = num_epochs // (num_milestones + 1)
-            milestones = [milestone_interval *
-                          (i + 1) for i in range(num_milestones)]
-            lr_scheduler_params = {
-                'milestones': milestones,
-                'gamma': lr_gamma_mapping[learning_rate],
-                'last_epoch': -1}
+            milestones = [milestone_interval * (i + 1) for i in range(num_milestones)]
+            lr_scheduler_params = {"milestones": milestones, "gamma": lr_gamma_mapping[learning_rate], "last_epoch": -1}
         elif lr_scheduler == "ExponentialLR":
-            lr_scheduler_params = {'gamma': 0.5, 'last_epoch': -1}
+            lr_scheduler_params = {"gamma": 0.5, "last_epoch": -1}
         elif lr_scheduler == "CosineAnnealingLR":
-            lr_scheduler_params = {
-                'T_max': num_epochs,
-                'eta_min': 1e-6,
-                'last_epoch': -1}
+            lr_scheduler_params = {"T_max": num_epochs, "eta_min": 1e-6, "last_epoch": -1}
         elif lr_scheduler == "ReduceLROnPlateau":
             lr_scheduler_params = {
-                'mode': 'min',
-                'factor': 0.8,
-                'patience': 1,
-                'threshold': 0.0001,
-                'threshold_mode': 'rel',
-                'cooldown': 0,
-                'min_lr': 1e-8,
-                'eps': 1e-08,
+                "mode": "min",
+                "factor": 0.8,
+                "patience": 1,
+                "threshold": 0.0001,
+                "threshold_mode": "rel",
+                "cooldown": 0,
+                "min_lr": 1e-8,
+                "eps": 1e-08,
             }
         elif lr_scheduler == "CyclicLR":
             lr_scheduler_params = {
-                'base_lr': learning_rate,
-                'max_lr': 0.1,
-                'step_size_up': 2000,
-                'step_size_down': None,
-                'mode': 'triangular',
-                'gamma': 1.0,
-                'scale_fn': None,
-                'scale_mode': 'cycle',
-                'cycle_momentum': True,
-                'base_momentum': 0.8,
-                'max_momentum': 0.9,
-                'last_epoch': -1}
+                "base_lr": learning_rate,
+                "max_lr": 0.1,
+                "step_size_up": 2000,
+                "step_size_down": None,
+                "mode": "triangular",
+                "gamma": 1.0,
+                "scale_fn": None,
+                "scale_mode": "cycle",
+                "cycle_momentum": True,
+                "base_momentum": 0.8,
+                "max_momentum": 0.9,
+                "last_epoch": -1,
+            }
         elif lr_scheduler == "OneCycleLR":
             lr_scheduler_params = {
-                'max_lr': learning_rate,
-                'total_steps': None,
-                'epochs_up': None,
-                'steps_per_epoch': None,
-                'anneal_strategy': 'cos',
-                'cycle_momentum': True,
-                'base_momentum': 0.85,
-                'max_momentum': 0.95,
-                'div_factor': 25.0,
-                'final_div_factor': 10000.0,
-                'last_epoch': -1}
+                "max_lr": learning_rate,
+                "total_steps": None,
+                "epochs_up": None,
+                "steps_per_epoch": None,
+                "anneal_strategy": "cos",
+                "cycle_momentum": True,
+                "base_momentum": 0.85,
+                "max_momentum": 0.95,
+                "div_factor": 25.0,
+                "final_div_factor": 10000.0,
+                "last_epoch": -1,
+            }
         elif lr_scheduler == "CosineAnnealingWarmRestarts":
             if num_epochs < 4:
-                error_message = "For Cosine Annealing Warm Restarts, epochs must be at least 4. Please set a minimum of 4 epochs."
+                error_message = (
+                    "For Cosine Annealing Warm Restarts, epochs must be at least 4. Please set a minimum of 4 epochs."
+                )
                 progress(1.0, desc=f"Error: {error_message}")
                 raise ValueError(error_message)
             # Set 4 learning rate restarts
-            lr_scheduler_params = {
-                'T_0': int(
-                    num_epochs / 4),
-                'T_mult': 1,
-                'eta_min': 1e-6,
-                'last_epoch': -1}
+            lr_scheduler_params = {"T_0": int(num_epochs / 4), "T_mult": 1, "eta_min": 1e-6, "last_epoch": -1}
 
     optimizer_params = None
 
     OPTIMIZER_PARAMS = {
-        "AdamW": {
-            "betas": [0.9, 0.96],
-            "eps": 1e-8,
-            "weight_decay": 1e-2
-        },
-        "RMSprop": {
-            "alpha": 0.99,
-            "eps": 1e-8,
-            "weight_decay": 1e-4
-        },
-        "SGD": {
-            "momentum": 0.9,
-            "weight_decay": 1e-4
-        },
-        "Adam": {
-            "betas": [0.9, 0.999],
-            "eps": 1e-8,
-            "weight_decay": 1e-4
-        },
-        "Adagrad": {
-            "lr_decay": 0,
-            "weight_decay": 1e-4,
-            "eps": 1e-10
-        },
-        "RAdam": {
-            "betas": [0.9, 0.999],
-            "eps": 1e-8,
-            "weight_decay": 1e-2
-        },
+        "AdamW": {"betas": [0.9, 0.96], "eps": 1e-8, "weight_decay": 1e-2},
+        "RMSprop": {"alpha": 0.99, "eps": 1e-8, "weight_decay": 1e-4},
+        "SGD": {"momentum": 0.9, "weight_decay": 1e-4},
+        "Adam": {"betas": [0.9, 0.999], "eps": 1e-8, "weight_decay": 1e-4},
+        "Adagrad": {"lr_decay": 0, "weight_decay": 1e-4, "eps": 1e-10},
+        "RAdam": {"betas": [0.9, 0.999], "eps": 1e-8, "weight_decay": 1e-2},
         "stepwisegraduallr": {},
-        "noamlr": {}
+        "noamlr": {},
     }
 
     optimizer_params = OPTIMIZER_PARAMS.get(optimizer, {})
 
-    debug_print(
-        f"- Learning Scheduler {lr_scheduler} Parameters",
-        level="GENERAL",
-        is_info=True)
-    debug_print(
-        f"- {lr_scheduler_params}",
-        level="GENERAL",
-        is_info=True)
-    
+    debug_print(f"- Learning Scheduler {lr_scheduler} Parameters", level="GENERAL", is_info=True)
+    debug_print(f"- {lr_scheduler_params}", level="GENERAL", is_info=True)
+
     # training parameters config
     config = GPTTrainerConfig(
         epochs=num_epochs,
@@ -2804,7 +2448,9 @@ def train_gpt(
         eval_split_max_size=config.eval_split_max_size,
         eval_split_size=config.eval_split_size,
     )
-    debug_print(f"Loaded {len(train_samples)} training and {len(eval_samples)} eval samples\n", "MODEL_OPS", is_info=True)
+    debug_print(
+        f"Loaded {len(train_samples)} training and {len(eval_samples)} eval samples\n", "MODEL_OPS", is_info=True
+    )
 
     global c_logger
     c_logger = MetricsLogger()
@@ -2834,13 +2480,13 @@ def train_gpt(
         # Limit training to GPU memory instead of shared memory
         debug_print("Limiting GPU memory to 95%", "GPU_MEMORY", is_info=True)
         torch.cuda.set_per_process_memory_fraction(0.95)
-    
-    print("\n")
+
+    logger.info("")
     debug_print("********************************", "MODEL_OPS", is_info=True)
     debug_print("Starting training the XTTS model", "MODEL_OPS", is_info=True)
     debug_print("********************************\n", "MODEL_OPS", is_info=True)
     trainer.fit()
-    print("\n")
+    logger.info("")
     debug_print("********************************", "MODEL_OPS", is_info=True)
     debug_print("Training completed successfully", "MODEL_OPS", is_info=True)
     debug_print("********************************", "MODEL_OPS", is_info=True)
@@ -2868,9 +2514,10 @@ def train_gpt(
     try:
         return dataset_xtts_config_file, dataset_xtts_checkpoint, dataset_tokenizer_file, trainer_out_path, speaker_ref
     except Exception as e:
-        debug_print(f"Error during training: {str(e)}", "MODEL_OPS", is_error=True)
+        debug_print(f"Error during training: {e!s}", "MODEL_OPS", is_error=True)
         debug_print(traceback.format_exc(), "MODEL_OPS", is_error=True)
         return
+
 
 ##########################
 #### STEP 3 AND OTHER ####
@@ -2905,7 +2552,7 @@ def load_model(xtts_checkpoint, xtts_config, xtts_vocab):
     config.load_json(xtts_config)
     XTTS_MODEL = Xtts.init_from_config(config)
     debug_print("Starting Step 3 - Loading XTTS model!", level="GENERAL", is_info=True)
-    
+
     XTTS_MODEL.load_checkpoint(
         config,
         checkpoint_path=xtts_checkpoint,
@@ -2924,10 +2571,10 @@ def run_tts(lang, tts_text, speaker_audio_file):
     """Generate the TTS for testing"""
     if XTTS_MODEL is None or not speaker_audio_file:
         return "You need to run the previous step to load the model !!", None, None
-        
+
     speaker_audio_file = str(speaker_audio_file)
     wavs_files = [speaker_audio_file]
-    
+
     if os.path.isdir(speaker_audio_file):
         wavs_files = glob.glob(os.path.join(speaker_audio_file, "*.wav"))
         speaker_audio_file = wavs_files[0]
@@ -2961,7 +2608,7 @@ def run_tts(lang, tts_text, speaker_audio_file):
 def get_available_voices(min_duration_seconds=6, speaker_name=None):
     """Get available voice files based on minimum duration."""
     directory = this_dir / "finetune" / speaker_name if (speaker_name and speaker_name != "personsname") else out_path
-    
+
     valid_files = []
     wav_files = Path(f"{directory}/wavs").glob("*.wav")
 
@@ -2969,11 +2616,11 @@ def get_available_voices(min_duration_seconds=6, speaker_name=None):
         try:
             waveform, sample_rate = torchaudio.load(str(voice_file))
             duration = waveform.size(1) / sample_rate
-            
+
             if duration >= float(min_duration_seconds):
                 valid_files.append(str(voice_file))
         except Exception as e:
-            debug_print(f"Error processing {voice_file}: {str(e)}", level="GENERAL", is_error=True)
+            debug_print(f"Error processing {voice_file}: {e!s}", level="GENERAL", is_error=True)
 
     return sorted(valid_files)
 
@@ -3023,10 +2670,7 @@ xtts_vocab_files = find_jsons(out_path, "vocab.json")
 ##########################
 
 
-def compact_custom_model(
-        xtts_checkpoint_copy,
-        folder_path,
-        overwrite_existing):
+def compact_custom_model(xtts_checkpoint_copy, folder_path, overwrite_existing):
     """Compact and move all the files for the correct project name and last training run"""
     this_dir = Path(__file__).parent.resolve()
     # Early validation checks
@@ -3035,7 +2679,7 @@ def compact_custom_model(
         debug_print(error_message, level="GENERAL", is_error=True)
         return error_message
 
-    target_dir = this_dir / "models" / "xtts" / folder_path    
+    target_dir = this_dir / "models" / "xtts" / folder_path
     if overwrite_existing == "Do not overwrite existing files" and target_dir.exists():
         error_message = "The target folder already exists. Please change folder name or allow overwrites."
         debug_print(error_message, level="GENERAL", is_error=True)
@@ -3044,27 +2688,13 @@ def compact_custom_model(
     xtts_checkpoint_copy = Path(xtts_checkpoint_copy)
     # Get the source directory (either tmp-trn or custom named directory)
     source_dir = xtts_checkpoint_copy.parent.parent.parent  # Go up to the base directory
-    debug_print(
-        "=== File Copy Operations ===",
-        level="DATA_PROCESS",
-        is_info=True)
-    debug_print(
-        f"Source base directory: {source_dir}",
-        level="DATA_PROCESS",
-        is_info=True)
-    debug_print(
-        f"Target directory: {target_dir}",
-        level="DATA_PROCESS",
-        is_info=True)
+    debug_print("=== File Copy Operations ===", level="DATA_PROCESS", is_info=True)
+    debug_print(f"Source base directory: {source_dir}", level="DATA_PROCESS", is_info=True)
+    debug_print(f"Target directory: {target_dir}", level="DATA_PROCESS", is_info=True)
     try:
-        checkpoint = torch.load(
-            xtts_checkpoint_copy,
-            map_location=torch.device("cpu"))
+        checkpoint = torch.load(xtts_checkpoint_copy, map_location=torch.device("cpu"))
     except Exception as e:
-        debug_print(
-            f"Error loading checkpoint: {e}",
-            level="GENERAL",
-            is_error=True)
+        debug_print(f"Error loading checkpoint: {e}", level="GENERAL", is_error=True)
         raise
 
     del checkpoint["optimizer"]
@@ -3076,14 +2706,8 @@ def compact_custom_model(
             del checkpoint["model"][key]
 
     debug_print("Processing model.pth:", level="DATA_PROCESS", is_info=True)
-    debug_print(
-        f"  From: {xtts_checkpoint_copy}",
-        level="DATA_PROCESS",
-        is_info=True)
-    debug_print(
-        f"  To: {target_dir / 'model.pth'}",
-        level="DATA_PROCESS",
-        is_info=True)
+    debug_print(f"  From: {xtts_checkpoint_copy}", level="DATA_PROCESS", is_info=True)
+    debug_print(f"  To: {target_dir / 'model.pth'}", level="DATA_PROCESS", is_info=True)
     torch.save(checkpoint, target_dir / "model.pth")
 
     # Copy first set of files
@@ -3095,19 +2719,10 @@ def compact_custom_model(
         if src_path.exists():
             shutil.copy2(src_path, dest_path)
             debug_print(f"  {file_name}:", level="DATA_PROCESS", is_info=True)
-            debug_print(
-                f"    From: {src_path}",
-                level="DATA_PROCESS",
-                is_info=True)
-            debug_print(
-                f"    To: {dest_path}",
-                level="DATA_PROCESS",
-                is_info=True)
+            debug_print(f"    From: {src_path}", level="DATA_PROCESS", is_info=True)
+            debug_print(f"    To: {dest_path}", level="DATA_PROCESS", is_info=True)
         else:
-            debug_print(
-                f"Warning: {src_path} not found",
-                level="DATA_PROCESS",
-                is_warning=True)
+            debug_print(f"Warning: {src_path} not found", level="DATA_PROCESS", is_warning=True)
 
     # Copy second set of files from chkptandnorm directory
     chkptandnorm_path = source_dir / "chkptandnorm"
@@ -3118,19 +2733,10 @@ def compact_custom_model(
         if src_path.exists():
             shutil.copy2(src_path, dest_path)
             debug_print(f"  {file_name}:", level="DATA_PROCESS", is_info=True)
-            debug_print(
-                f"    From: {src_path}",
-                level="DATA_PROCESS",
-                is_info=True)
-            debug_print(
-                f"    To: {dest_path}",
-                level="DATA_PROCESS",
-                is_info=True)
+            debug_print(f"    From: {src_path}", level="DATA_PROCESS", is_info=True)
+            debug_print(f"    To: {dest_path}", level="DATA_PROCESS", is_info=True)
         else:
-            debug_print(
-                f"Warning: {src_path} not found",
-                level="DATA_PROCESS",
-                is_warning=True)
+            debug_print(f"Warning: {src_path} not found", level="DATA_PROCESS", is_warning=True)
 
     # Create directories for different categories of WAV files
     target_wavs_dir = target_dir / "wavs"
@@ -3146,19 +2752,15 @@ def compact_custom_model(
     # Process WAV files
     source_wavs_dir = source_dir / "wavs"
     debug_print("Processing WAV files:", level="DATA_PROCESS", is_info=True)
-    debug_print(
-        f"  From: {source_wavs_dir}",
-        level="DATA_PROCESS",
-        is_info=True)
+    debug_print(f"  From: {source_wavs_dir}", level="DATA_PROCESS", is_info=True)
     debug_print(f"  To: {target_wavs_dir}", level="DATA_PROCESS", is_info=True)
 
     file_stats = {"too_short": [], "too_long": [], "suitable": []}
 
     if not source_wavs_dir.exists():
         debug_print(
-            f"Warning: Source WAV directory {source_wavs_dir} does not exist",
-            level="DATA_PROCESS",
-            is_warning=True)
+            f"Warning: Source WAV directory {source_wavs_dir} does not exist", level="DATA_PROCESS", is_warning=True
+        )
         return f"Model files copied to '/models/xtts/{folder_path}/' but no WAV files were found to process"
 
     for file_path in source_wavs_dir.iterdir():
@@ -3166,8 +2768,7 @@ def compact_custom_model(
             try:
                 # Load audio file and get duration
                 waveform, sample_rate = torchaudio.load(str(file_path))
-                duration = waveform.size(
-                    1) / sample_rate  # Duration in seconds
+                duration = waveform.size(1) / sample_rate  # Duration in seconds
 
                 # Determine category and target directory
                 if duration < 6:
@@ -3184,31 +2785,16 @@ def compact_custom_model(
                 shutil.copy2(file_path, target_subdir / file_path.name)
 
                 # Store file info
-                file_stats[category].append(
-                    {"name": file_path.name, "duration": round(duration, 2)}
-                )
+                file_stats[category].append({"name": file_path.name, "duration": round(duration, 2)})
 
             except Exception as e:
-                print(
-                    f"[FINETUNE] Error processing {file_path.name}: {str(e)}")
+                logger.error(f"[FINETUNE] Error processing {file_path.name}: {e!s}")
 
     debug_print("WAV File Statistics:", level="DATA_PROCESS", is_info=True)
-    debug_print(
-        f"  Suitable files (6-30s): {len(file_stats['suitable'])}",
-        level="DATA_PROCESS",
-        is_info=True)
-    debug_print(
-        f"  Too short files (<6s): {len(file_stats['too_short'])}",
-        level="DATA_PROCESS",
-        is_info=True)
-    debug_print(
-        f"  Too long files (>30s): {len(file_stats['too_long'])}",
-        level="DATA_PROCESS",
-        is_info=True)
-    debug_print(
-        "=== File Copy Operations Complete ===",
-        level="DATA_PROCESS",
-        is_info=True)
+    debug_print(f"  Suitable files (6-30s): {len(file_stats['suitable'])}", level="DATA_PROCESS", is_info=True)
+    debug_print(f"  Too short files (<6s): {len(file_stats['too_short'])}", level="DATA_PROCESS", is_info=True)
+    debug_print(f"  Too long files (>30s): {len(file_stats['too_long'])}", level="DATA_PROCESS", is_info=True)
+    debug_print("=== File Copy Operations Complete ===", level="DATA_PROCESS", is_info=True)
 
     # Create report file
     report_content = FinetuneContent.report_content  # pylint: disable=no-member
@@ -3224,9 +2810,8 @@ def compact_custom_model(
         f.write(report_content)
     # Model & WAV processing log
     debug_print(
-        f"Model & WAV samples processed and copied to '/models/xtts/{folder_path}/'",
-        level="DATA_PROCESS",
-        is_info=True)
+        f"Model & WAV samples processed and copied to '/models/xtts/{folder_path}/'", level="DATA_PROCESS", is_info=True
+    )
     return f"Model & WAV samples processed and copied to '/models/xtts/{folder_path}/'"
 
 
@@ -3237,12 +2822,9 @@ def delete_training_data():
 
     # Check if the folder exists before deleting
     if not folder_to_delete.exists():
-        debug_print(
-            f"Project Name folder > {folder_to_delete} < does not exist.",
-            level="GENERAL",
-            is_warning=True)
+        debug_print(f"Project Name folder > {folder_to_delete} < does not exist.", level="GENERAL", is_warning=True)
         return "Specified Project Name folder could not be found."
-        
+
     # Iterate over all files and subdirectories
     for item in folder_to_delete.iterdir():
         # Exclude trainer_0_log.txt from deletion
@@ -3253,25 +2835,16 @@ def delete_training_data():
                 elif item.is_dir():
                     shutil.rmtree(item)
             except PermissionError:
-                debug_print(
-                    f"PermissionError: Could not delete {item}. Skipping.",
-                    level="GENERAL",
-                    is_error=True)
+                debug_print(f"PermissionError: Could not delete {item}. Skipping.", level="GENERAL", is_error=True)
 
-    debug_print(
-        f"Project Name folder > {folder_to_delete} < was deleted successfully.",
-        level="GENERAL",
-        is_info=True)
+    debug_print(f"Project Name folder > {folder_to_delete} < was deleted successfully.", level="GENERAL", is_info=True)
     return "Specified Project Name folder & tmp data was deleted successfully."
 
 
 def clear_folder_contents(folder_path):
     """Deletes the contents of the supplied folder"""
     if not folder_path.exists() or not folder_path.is_dir():
-        debug_print(
-            f"Folder {folder_path} does not exist.",
-            level="GENERAL",
-            is_warning=True)
+        debug_print(f"Folder {folder_path} does not exist.", level="GENERAL", is_warning=True)
         return f"Folder '{folder_path}' does not exist."
 
     # List all files and subdirectories in the folder
@@ -3284,10 +2857,7 @@ def clear_folder_contents(folder_path):
             # If it's a subdirectory, remove it recursively
             shutil.rmtree(item_path)
 
-    debug_print(
-        f"Contents of {folder_path} deleted successfully.",
-        level="GENERAL",
-        is_info=True)
+    debug_print(f"Contents of {folder_path} deleted successfully.", level="GENERAL", is_info=True)
     return f"Contents of '{folder_path}' deleted successfully."
 
 
@@ -3302,35 +2872,31 @@ def delete_voice_sample_contents():
     voice_samples_message = clear_folder_contents(voice_samples_folder)
     return voice_samples_message
 
+
 #######################
 #### OTHER Generic ####
 #######################
 
 
 def cleanup_before_exit(_signum, _frame):
-    """Handle cleanup operations before exiting the program.""" # pylint: disable=no-member
-    debug_print(
-        "Received interrupt signal. Cleaning up and exiting...",
-        level="GENERAL",
-        is_warning=True)
+    """Handle cleanup operations before exiting the program."""  # pylint: disable=no-member
+    debug_print("Received interrupt signal. Cleaning up and exiting...", level="GENERAL", is_warning=True)
     # Perform cleanup operations here if necessary
     sys.exit(0)
 
 
-def create_refresh_button(
-        refresh_components,
-        refresh_methods,
-        elem_class,
-        interactive=True):
+def create_refresh_button(refresh_components, refresh_methods, elem_class, interactive=True):
     """Create a refresh button with specified components and methods."""
+
     def refresh(speaker_name, min_duration_seconds):
         updates = {}
-        for component, method in zip(refresh_components, refresh_methods):
+        for component, method in zip(refresh_components, refresh_methods, strict=False):
             # Pass both speaker_name and min_duration_seconds to the method
             args = (
-                method(
-                    speaker_name=speaker_name,
-                    min_duration_seconds=min_duration_seconds) if callable(method) else method)
+                method(speaker_name=speaker_name, min_duration_seconds=min_duration_seconds)
+                if callable(method)
+                else method
+            )
             if args and "choices" in args:
                 args["value"] = args["choices"][-1] if args["choices"] else ""
             for k, v in args.items():
@@ -3338,9 +2904,7 @@ def create_refresh_button(
             updates[component] = gr.update(**(args or {}))
         return updates
 
-    refresh_button = gr.Button(
-        "Refresh Dropdowns", elem_classes=elem_class, interactive=interactive
-    )
+    refresh_button = gr.Button("Refresh Dropdowns", elem_classes=elem_class, interactive=interactive)
     refresh_button.click(
         fn=refresh,
         inputs=[speaker_name_input_testing, min_audio_length],
@@ -3350,12 +2914,9 @@ def create_refresh_button(
     return refresh_button
 
 
-def create_refresh_button_next(
-        refresh_components,
-        refresh_methods,
-        elem_class,
-        interactive=True):
+def create_refresh_button_next(refresh_components, refresh_methods, elem_class, interactive=True):
     """Create a refresh button with specified components and methods."""
+
     def refresh_export(speaker_name):
         global out_path
         if speaker_name and speaker_name != "personsname":
@@ -3364,9 +2925,8 @@ def create_refresh_button_next(
             out_path = this_dir / "finetune" / "tmp-trn"
 
         updates = {}
-        for component, method in zip(refresh_components, refresh_methods):
-            args = method(speaker_name=speaker_name) if callable(
-                method) else method
+        for component, method in zip(refresh_components, refresh_methods, strict=False):
+            args = method(speaker_name=speaker_name) if callable(method) else method
             if args and "choices" in args:
                 args["value"] = args["choices"][-1] if args["choices"] else ""
             for k, v in args.items():
@@ -3374,13 +2934,8 @@ def create_refresh_button_next(
             updates[component] = gr.update(**(args or {}))
         return updates
 
-    refresh_button = gr.Button(
-        "Refresh Dropdowns", elem_classes=elem_class, interactive=interactive
-    )
-    refresh_button.click(
-        fn=refresh_export,
-        inputs=[speaker_name_input_export],
-        outputs=refresh_components)
+    refresh_button = gr.Button("Refresh Dropdowns", elem_classes=elem_class, interactive=interactive)
+    refresh_button.click(fn=refresh_export, inputs=[speaker_name_input_export], outputs=refresh_components)
     return refresh_button
 
 
@@ -3436,8 +2991,7 @@ if __name__ == "__main__":
             gr.Markdown("## XTTS Models Finetuning")
             gr.Markdown("")
             gr.Markdown("")
-            dark_mode_btn = gr.Button(
-                "Light/Dark Mode", variant="primary", size="sm")
+            dark_mode_btn = gr.Button("Light/Dark Mode", variant="primary", size="sm")
             dark_mode_btn.click(
                 None,
                 None,
@@ -3501,18 +3055,13 @@ if __name__ == "__main__":
 
                 with gr.Row():
                     with gr.Column(scale=1):
-                        audio_files_upload = gr.Files(
-                            label="Upload Audio Files")
+                        audio_files_upload = gr.Files(label="Upload Audio Files")
                     with gr.Column(scale=3):
                         with gr.Row():
                             with gr.Column(scale=1):
-                                audio_upload_button = gr.Button(
-                                    "Upload New Audio Samples")
-                                delete_audio_button = gr.Button(
-                                    "Delete Existing Audio Samples")
-                                delete_dataset_button = gr.Button(
-                                    "Delete Existing Training Dataset"
-                                )
+                                audio_upload_button = gr.Button("Upload New Audio Samples")
+                                delete_audio_button = gr.Button("Delete Existing Audio Samples")
+                                delete_dataset_button = gr.Button("Delete Existing Training Dataset")
                             with gr.Column(scale=2):
                                 gr.Markdown(
                                     """
@@ -3524,26 +3073,16 @@ if __name__ == "__main__":
                                 """
                                 )
                         with gr.Row():
-                            output_text = gr.Textbox(
-                                label="Audio File Management Result", interactive=False)
+                            output_text = gr.Textbox(label="Audio File Management Result", interactive=False)
 
                 # Define actions for buttons
-                audio_upload_button.click(
-                    upload_audio,
-                    inputs=audio_files_upload,
-                    outputs=output_text)
-                delete_audio_button.click(
-                    delete_existing_audio, outputs=output_text)
-                delete_dataset_button.click(
-                    delete_existing_training_data, outputs=output_text)
+                audio_upload_button.click(upload_audio, inputs=audio_files_upload, outputs=output_text)
+                delete_audio_button.click(delete_existing_audio, outputs=output_text)
+                delete_dataset_button.click(delete_existing_training_data, outputs=output_text)
 
                 def update_language_options(model):
                     # English-only models
-                    if model in [
-                        "tiny.en",
-                        "base.en",
-                        "small.en",
-                            "medium.en"]:
+                    if model in ["tiny.en", "base.en", "small.en", "medium.en"]:
                         languages = ["en"]
                     else:
                         # Multilingual models
@@ -3597,8 +3136,11 @@ if __name__ == "__main__":
                         scale=1,
                     )
                     precision = gr.Dropdown(
-                        label="Model Precision", value="mixed", choices=[
-                            ("Mixed", "mixed"), ("FP16", "float16"), ("FP32", "float32")], scale=1)                    
+                        label="Model Precision",
+                        value="mixed",
+                        choices=[("Mixed", "mixed"), ("FP16", "float16"), ("FP32", "float32")],
+                        scale=1,
+                    )
                     lang = gr.Dropdown(
                         label="Dataset Language",
                         value="en",
@@ -3631,7 +3173,7 @@ if __name__ == "__main__":
                         step=1,
                         scale=1,
                     )
-                with gr.Row():                    
+                with gr.Row():
                     create_bpe_tokenizer = gr.Dropdown(
                         label="BPE Tokenizer",
                         value="False",
@@ -3647,24 +3189,23 @@ if __name__ == "__main__":
                         scale=1,
                     )
                     min_sample_length = gr.Dropdown(
-                        label="Min Audio Length (seconds)", 
+                        label="Min Audio Length (seconds)",
                         value="2",
                         choices=["1", "2", "3", "4", "5"],
                         info="Split large audio into a minimum of",
                         scale=1,
-                    )                    
+                    )
                     max_sample_length = gr.Dropdown(
                         label="Max Audio Length (seconds)",
-                        value="10", 
-                        choices=["8","9","10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
+                        value="10",
+                        choices=["8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"],
                         info="Split large audio into a maximum of",
                         scale=1,
-                    )                    
+                    )
 
                 with gr.Accordion("🔍 Dataset Creation Debug Settings", open=False):
 
-                    def update_debug_levels(
-                            gpu, model, data, validation, general, audio, segments, duplicates):
+                    def update_debug_levels(gpu, model, data, validation, general, audio, segments, duplicates):
                         DebugLevels.GPU_MEMORY = gpu
                         DebugLevels.MODEL_OPS = model
                         DebugLevels.DATA_PROCESS = data
@@ -3728,7 +3269,7 @@ if __name__ == "__main__":
                                 label="Dataset Validation",
                                 value=DebugLevels.VALIDATION,
                                 info="Dataset Validation, amount, sentences, files",
-                            )                            
+                            )
 
                         with gr.Column(scale=1):
                             debug_general = gr.Checkbox(
@@ -3821,10 +3362,7 @@ if __name__ == "__main__":
                 )
                 demo.load(read_logs, None, logs, every=1)
                 # Update `lang` options when the `whisper_model` changes
-                whisper_model.change(
-                    fn=update_language_options,
-                    inputs=whisper_model,
-                    outputs=lang)
+                whisper_model.change(fn=update_language_options, inputs=whisper_model, outputs=lang)
                 prompt_compute_btn = gr.Button(value="Step 1 - Create dataset")
 
                 def preprocess_dataset(
@@ -3844,9 +3382,10 @@ if __name__ == "__main__":
 
                     # Check for audio files in the specified folder
                     pd_test_for_audio_files = [
-                        file for file in os.listdir(audio_folder) if any(
-                            file.lower().endswith(ext) for ext in [
-                                '.wav', '.mp3', '.flac'])]
+                        file
+                        for file in os.listdir(audio_folder)
+                        if any(file.lower().endswith(ext) for ext in [".wav", ".mp3", ".flac"])
+                    ]
                     if not pd_test_for_audio_files:
                         return (
                             "I cannot find any mp3, wav or flac files in the folder called 'put-voice-samples-in-here'",
@@ -3864,9 +3403,9 @@ if __name__ == "__main__":
                             fal_min_sample_length=pd_min_sample_length,
                             fal_eval_split_number=pd_eval_split_number,
                             fal_speaker_name_input=pd_speaker_name_input,
-                            fal_create_bpe_tokenizer= True if pd_create_bpe_tokenizer == "True" else False,
+                            fal_create_bpe_tokenizer=True if pd_create_bpe_tokenizer == "True" else False,
                             fal_gradio_progress=pd_progress,
-                            fal_use_vad= True if pd_use_vad == "True" else False,
+                            fal_use_vad=True if pd_use_vad == "True" else False,
                             fal_precision=pd_precision,
                         )
                     except Exception:
@@ -3884,11 +3423,9 @@ if __name__ == "__main__":
                     if pd_audio_total_size < 120:
                         pd_message = (
                             "The total duration of the audio file or files you provided was less than 2 minutes in length. "
-                            "Please add more audio samples.")
-                        debug_print(
-                            pd_message,
-                            level="DATA_PROCESS",
-                            is_warning=True)
+                            "Please add more audio samples."
+                        )
+                        debug_print(pd_message, level="DATA_PROCESS", is_warning=True)
                         return pd_message, "", ""
 
                     # Final GPU cleanup
@@ -3920,26 +3457,19 @@ if __name__ == "__main__":
                 """
                 )
                 with gr.Accordion("🎯 Quick Start Guide", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP1_QUICKSTART, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP1_QUICKSTART, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("📋 Detailed Instructions", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP1_DETAILED_INSTRUCTIONS, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP1_DETAILED_INSTRUCTIONS, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("🔧 Process Overview", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP1_PROCESS_OVERVIEW, elem_classes="custom-markdown") # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP1_PROCESS_OVERVIEW, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("🔍 Whisper Model Selection", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP1_WHISPER_MODEL_SELECTION, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP1_WHISPER_MODEL_SELECTION, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("⚙️ Advanced Settings", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP1_ADVANCED_SETTINGS, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP1_ADVANCED_SETTINGS, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("🔍 Dataset Creation Debug Settings", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP1_DEBUG_SETTINGS, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP1_DEBUG_SETTINGS, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("❗ Troubleshooting", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP1_TROUBLESHOOTING, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP1_TROUBLESHOOTING, elem_classes="custom-markdown")  # pylint: disable=no-member
 
         with gr.TabItem("📊 Dataset Validation"):
             with gr.Row():
@@ -3948,11 +3478,9 @@ if __name__ == "__main__":
                 with gr.Accordion("🎯 Audio Transcription Validation Help", open=False):
                     with gr.Row():
                         with gr.Column():
-                            gr.Markdown(
-                                FinetuneContent.DATASET_VALIDATION_1, elem_classes="custom-markdown")  # pylint: disable=no-member
+                            gr.Markdown(FinetuneContent.DATASET_VALIDATION_1, elem_classes="custom-markdown")  # pylint: disable=no-member
                         with gr.Column():
-                            gr.Markdown(
-                                FinetuneContent.DATASET_VALIDATION_2, elem_classes="custom-markdown")  # pylint: disable=no-member
+                            gr.Markdown(FinetuneContent.DATASET_VALIDATION_2, elem_classes="custom-markdown")  # pylint: disable=no-member
 
             with gr.Row():
                 progress_box = gr.Textbox(label="Progress", interactive=False)
@@ -3971,26 +3499,18 @@ if __name__ == "__main__":
                     )
 
                 with gr.Column(scale=1):
-                    audio_player = gr.Audio(
-                        label="Audio Player (Edit enabled)", interactive=True)
-                    current_expected = gr.Textbox(
-                        label="Original Text", interactive=False)
-                    current_transcribed = gr.Textbox(
-                        label="Whisper Text", interactive=False)
+                    audio_player = gr.Audio(label="Audio Player (Edit enabled)", interactive=True)
+                    current_expected = gr.Textbox(label="Original Text", interactive=False)
+                    current_transcribed = gr.Textbox(label="Whisper Text", interactive=False)
                     text_choice = gr.Radio(
-                        choices=[
-                            "Use Original",
-                            "Use Whisper",
-                            "Edit Manually"],
+                        choices=["Use Original", "Use Whisper", "Edit Manually"],
                         label="Choose Transcription",
                         value="Use Original",
                     )
-                    manual_edit = gr.Textbox(
-                        label="Manual Edit", interactive=True, visible=False)
+                    manual_edit = gr.Textbox(label="Manual Edit", interactive=True, visible=False)
                     current_index = gr.Number(visible=False)
                     save_button = gr.Button("Save Audio and Correction")
-                    save_status = gr.Textbox(
-                        label="Save Status", interactive=False)
+                    save_status = gr.Textbox(label="Save Status", interactive=False)
 
             def update_audio_player(evt: gr.SelectData, df):
                 """Update audio player with selected file"""
@@ -4007,10 +3527,7 @@ if __name__ == "__main__":
 
                     # Check if file exists
                     if not os.path.exists(audio_path):
-                        debug_print(
-                            f"Audio file not found: {audio_path}",
-                            level="DATA_PROCESS",
-                            is_warning=True)
+                        debug_print(f"Audio file not found: {audio_path}", level="DATA_PROCESS", is_warning=True)
                         return {
                             audio_player: None,
                             current_expected: "",
@@ -4040,10 +3557,7 @@ if __name__ == "__main__":
                     }
 
                 except Exception as e:
-                    debug_print(
-                        f"Error in update_audio_player: {str(e)}",
-                        level="GENERAL",
-                        is_error=True)
+                    debug_print(f"Error in update_audio_player: {e!s}", level="GENERAL", is_error=True)
                     debug_print(
                         f"Selected row data: {selected_row if 'selected_row' in locals() else 'Not available'}",
                         level="GENERAL",
@@ -4054,39 +3568,22 @@ if __name__ == "__main__":
                         current_expected: "",
                         current_transcribed: "",
                         current_index: None,
-                        save_status: f"Error: {str(e)}",
+                        save_status: f"Error: {e!s}",
                     }
 
             # Event handlers
-            text_choice.change(
-                lambda x: gr.update(
-                    visible=x == "Edit Manually"),
-                text_choice,
-                manual_edit)
+            text_choice.change(lambda x: gr.update(visible=x == "Edit Manually"), text_choice, manual_edit)
 
             mismatch_table.select(
                 update_audio_player,
                 [state],  # Use full DataFrame from state
-                [audio_player,
-                 current_expected,
-                 current_transcribed,
-                 current_index,
-                 save_status],
+                [audio_player, current_expected, current_transcribed, current_index, save_status],
             )
 
             save_button.click(
                 save_audio_and_correction,
-                inputs=[
-                    text_choice,
-                    manual_edit,
-                    audio_player,
-                    state,
-                    current_index],
-                outputs=[
-                    mismatch_table,
-                    current_expected,
-                    save_status,
-                    audio_player],
+                inputs=[text_choice, manual_edit, audio_player, state, current_index],
+                outputs=[mismatch_table, current_expected, save_status, audio_player],
             )
 
             # Store both display and full DataFrame
@@ -4167,8 +3664,7 @@ if __name__ == "__main__":
                         choices=[
                             ("None", "None"),
                             ("Cosine Annealing", "CosineAnnealingLR"),
-                            ("Cosine Annealing Warm Restarts",
-                             "CosineAnnealingWarmRestarts"),
+                            ("Cosine Annealing Warm Restarts", "CosineAnnealingWarmRestarts"),
                             ("Cyclic", "CyclicLR"),
                             ("Exponential", "ExponentialLR"),
                             ("Multi Step", "MultiStepLR"),
@@ -4200,18 +3696,7 @@ if __name__ == "__main__":
                     num_workers = gr.Dropdown(
                         value="8",
                         label="Workers/Threads",
-                        choices=[
-                            "0",
-                            "1",
-                            "2",
-                            "3",
-                            "4",
-                            "5",
-                            "6",
-                            "7",
-                            "8",
-                            "9",
-                            "10"],
+                        choices=["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10"],
                         allow_custom_value=False,
                         interactive=True,
                         scale=0,
@@ -4246,7 +3731,6 @@ if __name__ == "__main__":
                         value=args.max_audio_length,
                     )
 
-
                 with gr.Accordion("🔍 Training Debug Settings", open=False):
                     gr.Markdown("""
                         Enable or disable different types of debug messages during model training.
@@ -4265,7 +3749,7 @@ if __name__ == "__main__":
                                 value=DebugLevels.MODEL_OPS,
                                 info="Model loading, training operations, cleanup",
                             )
-                        with gr.Column(scale=1):                            
+                        with gr.Column(scale=1):
                             debug_general = gr.Checkbox(
                                 label="General",
                                 value=DebugLevels.GENERAL,
@@ -4275,7 +3759,7 @@ if __name__ == "__main__":
                                 label="Data Processing",
                                 value=DebugLevels.DATA_PROCESS,
                                 info="Data processing, files, folders",
-                            )                         
+                            )
 
                     with gr.Row():
                         debug_select_all = gr.Button("Select All")
@@ -4324,47 +3808,43 @@ if __name__ == "__main__":
                         inputs=[],
                         outputs=[debug_gpu, debug_model, debug_general, debug_data],
                     )
-                
+
                 progress_train = gr.Label(label="Progress:")
 
                 with gr.Row():
-                    train_time = gr.Label(
-                        "Estimated Total Training Time", show_label=False, scale=2)
-                    train_btn = gr.Button(
-                        value="Step 2 - Run the training", scale=1)
+                    train_time = gr.Label("Estimated Total Training Time", show_label=False, scale=2)
+                    train_btn = gr.Button(value="Step 2 - Run the training", scale=1)
 
                 with gr.Row():
-                    model_data = gr.Image(
-                        c_logger.plot_metrics(), show_label=False)
+                    model_data = gr.Image(c_logger.plot_metrics(), show_label=False)
 
                 logs_tts_train = gr.Textbox(
                     label="Logs:",
                     interactive=False,
                     lines=10,
                 )
-                demo.load(
-                    load_metrics, None, [
-                        model_data, train_time], every=1)
+                demo.load(load_metrics, None, [model_data, train_time], every=1)
                 demo.load(read_logs, None, logs_tts_train, every=1)
 
                 def train_model(
-                        language,
-                        train_csv,
-                        eval_csv,
-                        learning_rates,
-                        model_to_train,
-                        num_epochs,
-                        batch_size,
-                        grad_acumm,
-                        max_audio_length,
-                        speaker_name_input_training,
-                        continue_run,
-                        disable_shared_memory,
-                        learning_rate_scheduler,
-                        optimizer,
-                        num_workers,
-                        warm_up,
-                        progress=gr.Progress()):
+                    language,
+                    train_csv,
+                    eval_csv,
+                    learning_rates,
+                    model_to_train,
+                    num_epochs,
+                    batch_size,
+                    grad_acumm,
+                    max_audio_length,
+                    speaker_name_input_training,
+                    continue_run,
+                    disable_shared_memory,
+                    learning_rate_scheduler,
+                    optimizer,
+                    num_workers,
+                    warm_up,
+                    progress=gr.Progress(),
+                ):
                     """
                     Trains XTTS model with specified parameters and returns model artifacts.
 
@@ -4373,21 +3853,16 @@ if __name__ == "__main__":
                     """
                     clear_gpu_cache()
                     global out_path
-                    if speaker_name_input_training and speaker_name_input_training != 'personsname':
+                    if speaker_name_input_training and speaker_name_input_training != "personsname":
                         out_path = this_dir / "finetune" / speaker_name_input_training
                     else:
                         out_path = default_path
 
                     if not train_csv or not eval_csv:
-                        if (out_path /
-                            "metadata_eval.csv").exists() and (out_path /
-                                                               "metadata_train.csv").exists():
+                        if (out_path / "metadata_eval.csv").exists() and (out_path / "metadata_train.csv").exists():
                             train_csv = out_path / "metadata_train.csv"
                             eval_csv = out_path / "metadata_eval.csv"
-                            debug_print(
-                                "Using existing metadata and training csv.",
-                                level="GENERAL",
-                                is_info=True)
+                            debug_print("Using existing metadata and training csv.", level="GENERAL", is_info=True)
                         else:
                             return (
                                 "You need to run the data processing step or manually set `Train CSV` and `Eval CSV` fields !",
@@ -4403,19 +3878,31 @@ if __name__ == "__main__":
                         learning_rate = float(learning_rates)
                         progress(0, "Initializing training...")
                         config_path, return_xtts_checkpoint, vocab_file, exp_path, speaker_wav = train_gpt(
-                            language, num_epochs, batch_size, grad_acumm, train_csv, eval_csv, learning_rate, model_to_train, continue_run, disable_shared_memory, learning_rate_scheduler, optimizer, num_workers, warm_up, max_audio_length=max_audio_length, progress=gr.Progress())
+                            language,
+                            num_epochs,
+                            batch_size,
+                            grad_acumm,
+                            train_csv,
+                            eval_csv,
+                            learning_rate,
+                            model_to_train,
+                            continue_run,
+                            disable_shared_memory,
+                            learning_rate_scheduler,
+                            optimizer,
+                            num_workers,
+                            warm_up,
+                            max_audio_length=max_audio_length,
+                            progress=gr.Progress(),
+                        )
 
                         # copy original files to avoid parameters changes
                         # issues
                         shutil.copy(config_path, exp_path)
                         shutil.copy(vocab_file, exp_path)
-                        ft_xtts_checkpoint=return_xtts_checkpoint
-                        ft_xtts_checkpoint = os.path.join(
-                            exp_path, "best_model.pth")
-                        debug_print(
-                            "Model training done. Move to Step 3",
-                            level="GENERAL",
-                            is_info=True)
+                        ft_xtts_checkpoint = return_xtts_checkpoint
+                        ft_xtts_checkpoint = os.path.join(exp_path, "best_model.pth")
+                        debug_print("Model training done. Move to Step 3", level="GENERAL", is_info=True)
                         clear_gpu_cache()
                         return (
                             "Model training done. Move to Step 3",
@@ -4428,18 +3915,12 @@ if __name__ == "__main__":
 
                     except ValueError as ve:
                         error_message = str(ve)
-                        debug_print(
-                            f"{error_message}",
-                            level="GENERAL",
-                            is_error=True)
+                        debug_print(f"{error_message}", level="GENERAL", is_error=True)
                         return f"Training error: {error_message}", "", "", "", "", ""
                     except Exception as e:
                         # This will catch any other unexpected errors
-                        error_message = f"An unexpected error occurred: {str(e)}"
-                        debug_print(
-                            f"{error_message}",
-                            level="GENERAL",
-                            is_error=True)
+                        error_message = f"An unexpected error occurred: {e!s}"
+                        debug_print(f"{error_message}", level="GENERAL", is_error=True)
                         return f"Training error: {error_message}", "", "", "", "", ""
 
             with gr.Tab("Training Guide"):
@@ -4451,32 +3932,23 @@ if __name__ == "__main__":
                 """
                 )
                 with gr.Accordion("🎯 Quick Start Training Guide", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP2_QUICKSTART, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP2_QUICKSTART, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("📁 Using Your Own Training Dataset", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP2_YOUR_OWN_DATASET, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP2_YOUR_OWN_DATASET, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("📊 Training Metrics and Logs", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP2_TRAINING_METRICS, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP2_TRAINING_METRICS, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("💾 Memory Management", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP2_MEMORY_MANAGEMENT, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP2_MEMORY_MANAGEMENT, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("⚙️ Batch Size & Gradient Accumulation", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP2_BATCH_SIZE, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP2_BATCH_SIZE, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("📊 Learning Rate & Schedulers", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP2_LEARNING_RATE, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP2_LEARNING_RATE, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("🔧 Optimizers", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP2_OPTIMIZERS, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP2_OPTIMIZERS, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("🔄 Training Epochs", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP2_EPOCHS, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP2_EPOCHS, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("📈 Max Audio Length", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP2_AUDIO_LENGTH, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP2_AUDIO_LENGTH, elem_classes="custom-markdown")  # pylint: disable=no-member
 
         #######################
         #### GRADIO STEP 3 ####
@@ -4506,8 +3978,7 @@ if __name__ == "__main__":
                             allow_custom_value=True,
                         )
                         progress_load = gr.Label(label="Progress:")
-                        load_btn = gr.Button(
-                            value="Step 3 - Load Fine-tuned XTTS model")
+                        load_btn = gr.Button(value="Step 3 - Load Fine-tuned XTTS model")
 
                     with gr.Column() as col2:
                         with gr.Row():
@@ -4571,21 +4042,15 @@ if __name__ == "__main__":
                                 ],
                                 [
                                     lambda speaker_name, min_duration_seconds: {
-                                        "choices": find_best_models(
-                                            out_path, speaker_name=speaker_name
-                                        ),
+                                        "choices": find_best_models(out_path, speaker_name=speaker_name),
                                         "value": "",
                                     },
                                     lambda speaker_name, min_duration_seconds: {
-                                        "choices": find_jsons(
-                                            out_path, "config.json", speaker_name=speaker_name
-                                        ),
+                                        "choices": find_jsons(out_path, "config.json", speaker_name=speaker_name),
                                         "value": "",
                                     },
                                     lambda speaker_name, min_duration_seconds: {
-                                        "choices": find_jsons(
-                                            out_path, "vocab.json", speaker_name=speaker_name
-                                        ),
+                                        "choices": find_jsons(out_path, "vocab.json", speaker_name=speaker_name),
                                         "value": "",
                                     },
                                     lambda speaker_name, min_duration_seconds: {
@@ -4603,15 +4068,13 @@ if __name__ == "__main__":
                             value="I've just fine tuned a text to speech language model and this is how it sounds. If it doesn't sound right, I will try a different Speaker Reference Audio file.",
                             lines=5,
                         )
-                        tts_btn = gr.Button(
-                            value="Step 4 - Inference (Generate TTS)")
+                        tts_btn = gr.Button(value="Step 4 - Inference (Generate TTS)")
 
                 with gr.Row():
                     progress_gen = gr.Label(label="Progress:")
                 with gr.Row():
                     tts_output_audio = gr.Audio(label="TTS Generated Speech.")
-                    reference_audio = gr.Audio(
-                        label="Speaker Reference Audio Sample.")
+                    reference_audio = gr.Audio(label="Speaker Reference Audio Sample.")
 
             with gr.Tab("Testing Guide"):
                 gr.Markdown(
@@ -4621,31 +4084,23 @@ if __name__ == "__main__":
                 """
                 )
                 with gr.Accordion("🎯 Testing Overview", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP3_TESTING_OVERVIEW, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP3_TESTING_OVERVIEW, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("⚠️ Important Notes", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP3_IMPORTANT, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP3_IMPORTANT, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("📝 Testing Instructions", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP3_INSTRUCTIONS, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP3_INSTRUCTIONS, elem_classes="custom-markdown")  # pylint: disable=no-member
                 with gr.Accordion("🔍 What the Testing Step Does", open=False):
-                    gr.Markdown(
-                        FinetuneContent.STEP3_WHAT_IT_DOES, elem_classes="custom-markdown")  # pylint: disable=no-member
+                    gr.Markdown(FinetuneContent.STEP3_WHAT_IT_DOES, elem_classes="custom-markdown")  # pylint: disable=no-member
 
         with gr.Tab("📦 Model Export"):
             with gr.Accordion("🎯 Export Overview", open=False):
-                gr.Markdown(
-                    FinetuneContent.EXPORT_OVERVIEW, elem_classes="custom-markdown")  # pylint: disable=no-member
+                gr.Markdown(FinetuneContent.EXPORT_OVERVIEW, elem_classes="custom-markdown")  # pylint: disable=no-member
             with gr.Accordion("📊 Voice Sample Organization", open=False):
-                gr.Markdown(
-                    FinetuneContent.EXPORT_VOICE_SAMPLES, elem_classes="custom-markdown")  # pylint: disable=no-member
+                gr.Markdown(FinetuneContent.EXPORT_VOICE_SAMPLES, elem_classes="custom-markdown")  # pylint: disable=no-member
             with gr.Accordion("🔄 Export Options", open=False):
-                gr.Markdown(
-                    FinetuneContent.EXPORT_OPTIONS, elem_classes="custom-markdown")  # pylint: disable=no-member
+                gr.Markdown(FinetuneContent.EXPORT_OPTIONS, elem_classes="custom-markdown")  # pylint: disable=no-member
             with gr.Accordion("💾 Storage Management", open=False):
-                gr.Markdown(
-                    FinetuneContent.EXPORT_STORAGE, elem_classes="custom-markdown")  # pylint: disable=no-member
+                gr.Markdown(FinetuneContent.EXPORT_STORAGE, elem_classes="custom-markdown")  # pylint: disable=no-member
 
             final_progress_data = gr.Label(label="Progress:")
             with gr.Row():
@@ -4676,9 +4131,7 @@ if __name__ == "__main__":
             with gr.Row():
                 overwrite_existing = gr.Dropdown(
                     value="Do not overwrite existing files",
-                    choices=[
-                        "Overwrite existing files",
-                        "Do not overwrite existing files"],
+                    choices=["Overwrite existing files", "Do not overwrite existing files"],
                     label="File Overwrite Options",
                 )
                 folder_path = gr.Textbox(
@@ -4686,8 +4139,7 @@ if __name__ == "__main__":
                     lines=1,
                     value="mycustomfolder",
                 )
-                compact_custom_btn = gr.Button(
-                    value="Compact and move model to a folder name of your choosing")
+                compact_custom_btn = gr.Button(value="Compact and move model to a folder name of your choosing")
             with gr.Row():
                 gr.Textbox(
                     value="This will DELETE your training data and the raw finetuned model from the specified Project Name (above)",
@@ -4695,8 +4147,7 @@ if __name__ == "__main__":
                     show_label=False,
                     interactive=False,
                 )
-                delete_training_btn = gr.Button(
-                    value="Delete generated training data")
+                delete_training_btn = gr.Button(value="Delete generated training data")
             with gr.Row():
                 gr.Textbox(
                     value="This will DELETE your original voice samples from /finetune/put-voice-samples-in-here/.",
@@ -4704,8 +4155,7 @@ if __name__ == "__main__":
                     show_label=False,
                     interactive=False,
                 )
-                delete_voicesamples_btn = gr.Button(
-                    value="Delete original voice samples")
+                delete_voicesamples_btn = gr.Button(value="Delete original voice samples")
 
                 prompt_compute_btn.click(
                     fn=preprocess_dataset,
@@ -4788,10 +4238,7 @@ if __name__ == "__main__":
                 fn=delete_voice_sample_contents,
                 outputs=[final_progress_data],
             )
-            model_to_train.change(
-                basemodel_or_finetunedmodel_choice,
-                model_to_train,
-                None)
+            model_to_train.change(basemodel_or_finetunedmodel_choice, model_to_train, None)
 
     demo.queue().launch(
         show_api=False,

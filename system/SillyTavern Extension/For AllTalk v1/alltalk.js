@@ -453,7 +453,7 @@ class AllTalkTtsProvider {
         const onModelSelectChange = async (event) => {
             console.log("Model select change event triggered"); // Debugging statement
             const selectedModel = event.target.value;
-            console.log(`Selected model: ${selectedModel}`); // Debugging statement 
+            console.log(`Selected model: ${selectedModel}`); // Debugging statement
             // Set status to Processing
             updateStatus('Processing');
             try {
@@ -464,7 +464,7 @@ class AllTalkTtsProvider {
                     throw new Error(`HTTP Error: ${response.status}`);
                 }
                 const data = await response.json();
-                console.log("POST response data:", data); // Debugging statement 
+                console.log("POST response data:", data); // Debugging statement
                 // Set status to Ready if successful
                 updateStatus('Ready');
             } catch (error) {
@@ -739,9 +739,9 @@ class AllTalkTtsProvider {
                 // Construct the streaming URL
                 const streamingUrl = `${this.settings.provider_endpoint}/api/tts-generate-streaming?text=${encodeURIComponent(inputText)}&voice=${encodeURIComponent(voiceId)}.wav&language=${encodeURIComponent(this.settings.language)}&output_file=stream_output.wav`;
                 console.log("Streaming URL:", streamingUrl);
-        
+
                 // Return the streaming URL directly
-                return streamingUrl; 
+                return streamingUrl;
             } else {
                 // For standard method
                 const outputUrl = await this.fetchTtsGeneration(inputText, voiceId);

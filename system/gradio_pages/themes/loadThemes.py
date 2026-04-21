@@ -1,7 +1,7 @@
-import os
-import json
-import sys
 import importlib
+import json
+import os
+import sys
 
 # Hard-coded paths
 this_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -13,8 +13,9 @@ themes_file_path = os.path.join(gradio_pages_folder, "themes.py")
 # Add gradio_pages folder to the system path
 sys.path.append(gradio_pages_folder)
 
+
 def get_class(filename):
-    with open(filename, "r", encoding="utf8") as file:
+    with open(filename, encoding="utf8") as file:
         for line in file:
             if "class " in line:
                 return line.split("class ")[1].split(":")[0].split("(")[0].strip()
@@ -22,13 +23,9 @@ def get_class(filename):
 
 
 def get_list():
-    themes_from_files = [
-        os.path.splitext(name)[0]
-        for name in os.listdir(gradio_pages_folder)
-        if name.endswith(".py")
-    ]
+    themes_from_files = [os.path.splitext(name)[0] for name in os.listdir(gradio_pages_folder) if name.endswith(".py")]
     try:
-        with open(theme_list_file, "r", encoding="utf8") as json_file:
+        with open(theme_list_file, encoding="utf8") as json_file:
             themes_from_url = [item["id"] for item in json.load(json_file)]
     except FileNotFoundError:
         themes_from_url = []
@@ -42,7 +39,7 @@ def select_theme(name):
     full_path = os.path.join(gradio_pages_folder, selected_file)
 
     try:
-        with open(config_file, "r", encoding="utf8") as json_file:
+        with open(config_file, encoding="utf8") as json_file:
             config_data = json.load(json_file)
 
         if not os.path.exists(full_path):
@@ -62,24 +59,23 @@ def select_theme(name):
 
         with open(config_file, "w", encoding="utf8") as json_file:
             json.dump(config_data, json_file, indent=2)
-        
+
         print(message)
         return message
 
     except Exception as e:
-        print(f"[AllTalk TTS] Error selecting theme {name}: {str(e)}")
+        print(f"[AllTalk TTS] Error selecting theme {name}: {e!s}")
         return message
+
 
 def read_json():
     try:
-        with open(config_file, "r", encoding="utf8") as json_file:
+        with open(config_file, encoding="utf8") as json_file:
             data = json.load(json_file)
             selected_file = data["theme"]["file"]
             class_name = data["theme"]["class"]
 
-            if selected_file and class_name:
-                return class_name
-            elif not selected_file and class_name:
+            if selected_file and class_name or not selected_file and class_name:
                 return class_name
             else:
                 return "gradio/base"
@@ -90,7 +86,7 @@ def read_json():
 
 def load_json():
     try:
-        with open(config_file, "r", encoding="utf8") as json_file:
+        with open(config_file, encoding="utf8") as json_file:
             data = json.load(json_file)
             selected_file = data["theme"]["file"]
             class_name = data["theme"]["class"]
@@ -110,5 +106,5 @@ def load_json():
                 print("The theme is incorrect.")
                 return None
     except Exception as e:
-        print(f"Error Loading: {str(e)}")
+        print(f"Error Loading: {e!s}")
         return None

@@ -182,7 +182,7 @@
             <option value="{{ temp/100 }}" {% if data.local_temperature|float == temp/100 %}selected{% endif %}>{{ "{:.2f}".format(temp/100) }}</option>
             {% endfor %}
         </select>
-        
+
         <label for="local_repetition_penalty" style="color: red;">&nbsp; &nbsp; Local Model repetition penalty:</label>
         <select id="local_repetition_penalty" name="local_repetition_penalty" required="">
             {% for repetition in range(10, 210, 10) %}

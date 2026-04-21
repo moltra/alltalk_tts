@@ -1,8 +1,10 @@
 # help_content.py
 # pylint: disable=no-member
 
+
 class AllTalkHelpContent:
     """CSS and help content for help_content.py"""
+
     custom_css = """
     /* Add this to your existing CSS */
     .gradio-container .prose {
@@ -32,7 +34,7 @@ class AllTalkHelpContent:
         max-width: 100% !important;
         box-sizing: border-box !important;
         /* Default text color for all content (grey) */
-        color: rgba(156, 163, 175, 1) !important; /* Adjust this grey value to match your interface */        
+        color: rgba(156, 163, 175, 1) !important; /* Adjust this grey value to match your interface */
     }
 
     /* Make headings white */
@@ -53,7 +55,7 @@ class AllTalkHelpContent:
     .custom-markdown ol {
         color: rgba(156, 163, 175, 1) !important; /* Same grey as the base text */
     }
-   
+
     /* Additional targeting for any wrapping elements */
     .gradio-container .prose > * {
         margin: 0 !important;
@@ -258,10 +260,10 @@ class AllTalkHelpContent:
     - **Generation Speed**
         - Controls the pace of generated speech
         - **Range**: 0.5 to 2.0
-        - 1.0 represents normal speed        
+        - 1.0 represents normal speed
     """
 
-    DEFAULT_SETTINGS2 = """    
+    DEFAULT_SETTINGS2 = """
 
     ## 🗣️ Voice Configuration
 
@@ -291,7 +293,7 @@ class AllTalkHelpContent:
     - Grayed-out options indicate features not supported by the current engine
     - Changes only affect the currently selected TTS engine
     - Settings here act as defaults but can be overridden via API parameters
-    - All changes require clicking "Update Settings" to take effect    
+    - All changes require clicking "Update Settings" to take effect
     - Some settings require an engine reload to take effect
     """
 
@@ -341,7 +343,7 @@ class AllTalkHelpContent:
     - Edit existing voice descriptions
     - Voice settings are stored in `system/tts_engines/parler/parler_voices.json`
     """
-        
+
     HELP_PAGE2 = """
     ## 📝 Important Notes
 
@@ -387,7 +389,7 @@ class AllTalkHelpContent:
 
     The Voice Editor allows you to create, manage, and customize voice descriptions for Parler TTS. Each voice consists of a name and a detailed description that defines its characteristics.
     """
-    
+
     VOICE_EDITOR1 = """
     ## 📝 Creating Voice Descriptions
 

@@ -37,7 +37,7 @@ set SPCHARMESSAGE=
 @rem Check if curl is available
 curl --version >nul 2>&1
 if "%ERRORLEVEL%" NEQ "0" (
-    echo curl is not available on this system. Please install curl then re-run the script https://curl.se/ 
+    echo curl is not available on this system. Please install curl then re-run the script https://curl.se/
 	echo or perform a manual installation of a Conda Python environment.
     goto end
 )
@@ -69,8 +69,8 @@ cls
 echo.
 echo    %L_BLUE%TEXT-GENERATION-WEBUI SETUP%RESET%
 echo.
-echo    Please ensure you have started your Text-generation-webui Python 
-echo    environment. If you have NOT done this, please run %L_GREEN%cmd_windows.bat%RESET% 
+echo    Please ensure you have started your Text-generation-webui Python
+echo    environment. If you have NOT done this, please run %L_GREEN%cmd_windows.bat%RESET%
 echo    in the %L_GREEN%text-generation-webui%RESET% folder and then re-run this script.
 echo.
 echo    BASE REQUIREMENTS
@@ -158,7 +158,7 @@ if %ERRORLEVEL% neq 0 (
 Echo.
 echo.
 Echo    Requirements installed successfully.
-Echo. 
+Echo.
 pause
 goto WebUIMenu
 
@@ -175,7 +175,7 @@ if %ERRORLEVEL% neq 0 (
 Echo.
 echo     AllTalk Updated from Github. Please re-apply
 echo     the latest requirements file. Option 1
-Echo. 
+Echo.
 pause
 goto WebUIMenu
 
@@ -195,7 +195,7 @@ echo DeepSpeed wheel file downloaded successfully.
 echo Installing DeepSpeed...
 pip install deepspeed-0.11.2+cuda118-cp311-cp311-win_amd64.whl
 if %ERRORLEVEL% neq 0 (
-    echo. 
+    echo.
     echo    Failed to install DeepSpeed.
     echo    Please check if the wheel file is compatible with your system.
     echo    Press any key to return to the menu.
@@ -206,7 +206,7 @@ if %ERRORLEVEL% neq 0 (
 Echo.
 echo.
 Echo    DeepSpeed installed successfully.
-Echo. 
+Echo.
 del deepspeed-0.11.2+cuda118-cp311-cp311-win_amd64.whl
 pause
 goto WebUIMenu
@@ -227,7 +227,7 @@ echo    DeepSpeed wheel file downloaded successfully.
 echo    Installing DeepSpeed...
 pip install deepspeed-0.11.2+cuda121-cp311-cp311-win_amd64.whl
 if %ERRORLEVEL% neq 0 (
-    echo. 
+    echo.
     echo    Failed to install DeepSpeed.
     echo    Please check if the wheel file is compatible with your system.
     echo    Press any key to return to the menu.
@@ -238,7 +238,7 @@ if %ERRORLEVEL% neq 0 (
 Echo.
 echo.
 Echo    DeepSpeed installed successfully.
-Echo. 
+Echo.
 del deepspeed-0.11.2+cuda121-cp311-cp311-win_amd64.whl
 pause
 goto WebUIMenu
@@ -259,7 +259,7 @@ echo    DeepSpeed wheel file downloaded successfully.
 echo    Installing DeepSpeed...
 pip install deepspeed-0.14.0+ce78a63-cp311-cp311-win_amd64.whl
 if %ERRORLEVEL% neq 0 (
-    echo. 
+    echo.
     echo    Failed to install DeepSpeed.
     echo    Please check if the wheel file is compatible with your system.
     echo    Press any key to return to the menu.
@@ -270,7 +270,7 @@ if %ERRORLEVEL% neq 0 (
 Echo.
 echo.
 Echo    DeepSpeed installed successfully.
-Echo. 
+Echo.
 del deepspeed-0.14.0+ce78a63-cp311-cp311-win_amd64.whl
 pause
 goto WebUIMenu
@@ -291,7 +291,7 @@ echo    DeepSpeed wheel file downloaded successfully.
 echo    Installing DeepSpeed...
 pip install deepspeed-0.14.0+cu118-cp311-cp311-win_amd64.whl
 if %ERRORLEVEL% neq 0 (
-    echo. 
+    echo.
     echo    Failed to install DeepSpeed.
     echo    Please check if the wheel file is compatible with your system.
     echo    Press any key to return to the menu.
@@ -302,7 +302,7 @@ if %ERRORLEVEL% neq 0 (
 Echo.
 echo.
 Echo    DeepSpeed installed successfully.
-Echo. 
+Echo.
 del deepspeed-0.14.0+cu118-cp311-cp311-win_amd64.whl
 pause
 goto WebUIMenu
@@ -310,7 +310,7 @@ goto WebUIMenu
 :UnInstallDeepSpeed
 pip uninstall deepspeed
 if %ERRORLEVEL% neq 0 (
-    echo. 
+    echo.
     echo    There was an error uninstalling DeepSpeed.
     echo    Press any key to return to the menu.
     echo.
@@ -319,7 +319,7 @@ if %ERRORLEVEL% neq 0 (
 )
 echo.
 Echo    DeepSpeed uninstalled successfully.
-Echo. 
+Echo.
 pause
 goto WebUIMenu
 
@@ -327,7 +327,7 @@ goto WebUIMenu
 Python diagnostics.py
 if %ERRORLEVEL% neq 0 (
     echo.
-    echo    There was an error running diagnostics. Have you correctly started your 
+    echo    There was an error running diagnostics. Have you correctly started your
     echo    Text-generation-webui Python environment with %L_GREEN%cmd_windows.bat%RESET%?
     echo.
     pause
@@ -336,7 +336,7 @@ if %ERRORLEVEL% neq 0 (
 Echo.
 echo.
 Echo    Diagnostics.log generated. Please scroll up to look over the log.
-Echo. 
+Echo.
 pause
 goto WebUIMenu
 
@@ -346,7 +346,7 @@ set PATH=%PATH%;%SystemRoot%\system32
 @rem Check if curl is available
 curl --version >nul 2>&1
 if "%ERRORLEVEL%" NEQ "0" (
-    echo curl is not available on this system. Please install curl then re-run the script https://curl.se/ 
+    echo curl is not available on this system. Please install curl then re-run the script https://curl.se/
 	echo or perform a manual installation of a Conda Python environment.
     goto end
 )
@@ -407,8 +407,8 @@ call "%CONDA_ROOT_PREFIX%\Scripts\conda.exe" install -y pytorch==2.2.1 torchvisi
 echo.
 if errorlevel 1 (
     echo PyTorch installation failed, errorlevel was %errorlevel%. There should be a Conda
-    echo error message above with a code and/or text explanation of the issue. Please note 
-    echo the error code to help with diagnotics. 
+    echo error message above with a code and/or text explanation of the issue. Please note
+    echo the error code to help with diagnotics.
     echo.
     echo Generally speaking though, errors could be caused by:
     echo.
@@ -436,8 +436,8 @@ call "%CONDA_ROOT_PREFIX%\Scripts\conda.exe" install -y pytorch::faiss-cpu
 echo.
 if errorlevel 1 (
     echo Faiss installation failed, errorlevel was %errorlevel%. There should be a Conda
-    echo error message above with a code and/or text explanation of the issue. Please note 
-    echo the error code to help with diagnotics. 
+    echo error message above with a code and/or text explanation of the issue. Please note
+    echo the error code to help with diagnotics.
     echo.
     echo Generally speaking though, errors could be caused by:
     echo.
@@ -467,8 +467,8 @@ call "%CONDA_ROOT_PREFIX%\Scripts\conda.exe" install -y -c conda-forge "ffmpeg=*
 echo.
 if errorlevel 1 (
     echo FFmpeg installation failed, errorlevel was %errorlevel%. There should be a Conda
-    echo error message above with a code and/or text explanation of the issue. Please note 
-    echo the error code to help with diagnotics. 
+    echo error message above with a code and/or text explanation of the issue. Please note
+    echo the error code to help with diagnotics.
     echo.
     echo Generally speaking though, errors could be caused by:
     echo.
@@ -501,8 +501,8 @@ pip install --upgrade gradio==4.44.1
 echo.
 if errorlevel 1 (
     echo Gradio update failed, errorlevel was %errorlevel%. There should be an error
-    echo message above with a code and/or text explanation of the issue. Please note 
-    echo the error code to help with diagnotics. 
+    echo message above with a code and/or text explanation of the issue. Please note
+    echo the error code to help with diagnotics.
     echo.
     echo Generally speaking though, errors could be caused by:
     echo.
@@ -530,8 +530,8 @@ curl -LO https://github.com/erew123/alltalk_tts/releases/download/DeepSpeed-14.0
 echo.
 if errorlevel 1 (
     echo DeepSpeed download failed, errorlevel was %errorlevel%. There should be an error
-    echo message above with a code and/or text explanation of the issue. Please note 
-    echo the error code to help with diagnotics. 
+    echo message above with a code and/or text explanation of the issue. Please note
+    echo the error code to help with diagnotics.
     echo.
     echo Generally speaking though, errors could be caused by:
     echo.
@@ -558,7 +558,7 @@ pip install deepspeed-0.14.0+ce78a63-cp311-cp311-win_amd64.whl
 echo.
 if errorlevel 1 (
     echo DeepSpeed installation failed, errorlevel was %errorlevel%. There should be an error
-    echo message above with a code and/or text explanation of the issue. Please note 
+    echo message above with a code and/or text explanation of the issue. Please note
     echo the error code to help with diagnotics. General issues may be:
     echo.
     echo Generally speaking though, errors could be caused by:
@@ -625,7 +625,7 @@ Echo    Run %L_YELLOW%start_alltalk.bat%RESET% to start AllTalk.
 Echo    Run %L_YELLOW%start_diagnostics.bat%RESET% to start the diagnostics.
 Echo    Run %L_YELLOW%start_finetune.bat%RESET% to start Finetuning.
 Echo    Run %L_YELLOW%start_environment.bat%RESET% to start the AllTalk Python environment.
-Echo. 
+Echo.
 Echo    Documentation is built into the Gradio interface. Please explore the documentation for
 Echo    tips, troubleshooing and explanations as most common questions are answered there.
 Echo.
@@ -677,14 +677,14 @@ if not exist "%INSTALL_ENV_DIR%\python.exe" (
     echo.
     echo    The Conda environment at "%INSTALL_ENV_DIR%" does not exist.
     echo    Please install the environment before proceeding.
-    echo. 
+    echo.
     pause
     goto StandaloneMenu
 )
 @rem Attempt to activate the Conda environment
 call "%CONDA_ROOT_PREFIX%\condabin\conda.bat" activate "%INSTALL_ENV_DIR%"
 if errorlevel 1 (
-    echo. 
+    echo.
     echo    Failed to activate the Conda environment.
     echo    Please check your installation and try again.
     echo.
@@ -717,14 +717,14 @@ if not exist "%INSTALL_ENV_DIR%\python.exe" (
     echo.
     echo    The Conda environment at "%INSTALL_ENV_DIR%" does not exist.
     echo    Please install the environment before proceeding.
-    echo. 
+    echo.
     pause
     goto StandaloneMenu
 )
 @rem Attempt to activate the Conda environment
 call "%CONDA_ROOT_PREFIX%\condabin\conda.bat" activate "%INSTALL_ENV_DIR%"
 if errorlevel 1 (
-    echo. 
+    echo.
     echo    Failed to activate the Conda environment.
     echo    Please check your installation and try again.
     echo.
@@ -733,7 +733,7 @@ if errorlevel 1 (
 )
 @rem Run Reapply requirements
 echo.
-echo  Re-installing requirements. If you have problems after this, it may indicate 
+echo  Re-installing requirements. If you have problems after this, it may indicate
 echo  that the custom Python environment is damaged in some way. As such it may be
 echo  best to delete the custom Python environment and re-run the entire setup
 echo  routine again to rebuild AllTalk's Python environment. Please press a key
@@ -751,14 +751,14 @@ if not exist "%INSTALL_ENV_DIR%\python.exe" (
     echo.
     echo    The Conda environment at "%INSTALL_ENV_DIR%" does not exist.
     echo    Please install the environment before proceeding.
-    echo. 
+    echo.
     pause
     goto StandaloneMenu
 )
 @rem Attempt to activate the Conda environment
 call "%CONDA_ROOT_PREFIX%\condabin\conda.bat" activate "%INSTALL_ENV_DIR%"
 if errorlevel 1 (
-    echo. 
+    echo.
     echo    Failed to activate the Conda environment.
     echo    Please check your installation and try again.
     echo.
@@ -793,14 +793,14 @@ if not exist "%INSTALL_ENV_DIR%\python.exe" (
     echo.
     echo    The Conda environment at "%INSTALL_ENV_DIR%" does not exist.
     echo    Please install the environment before proceeding.
-    echo. 
+    echo.
     pause
     goto StandaloneMenu
 )
 @rem Attempt to activate the Conda environment
 call "%CONDA_ROOT_PREFIX%\condabin\conda.bat" activate "%INSTALL_ENV_DIR%"
 if errorlevel 1 (
-    echo. 
+    echo.
     echo    Failed to activate the Conda environment.
     echo    Please check your installation and try again.
     echo.

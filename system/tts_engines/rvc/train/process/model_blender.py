@@ -1,6 +1,7 @@
 import os
-import torch
 from collections import OrderedDict
+
+import torch
 
 
 def extract(ckpt):
@@ -41,13 +42,10 @@ def model_blender(name, path1, path2, ratio):
             if key == "emb_g.weight" and ckpt1[key].shape != ckpt2[key].shape:
                 min_shape0 = min(ckpt1[key].shape[0], ckpt2[key].shape[0])
                 opt["weight"][key] = (
-                    ratio * (ckpt1[key][:min_shape0].float())
-                    + (1 - ratio) * (ckpt2[key][:min_shape0].float())
+                    ratio * (ckpt1[key][:min_shape0].float()) + (1 - ratio) * (ckpt2[key][:min_shape0].float())
                 ).half()
             else:
-                opt["weight"][key] = (
-                    ratio * (ckpt1[key].float()) + (1 - ratio) * (ckpt2[key].float())
-                ).half()
+                opt["weight"][key] = (ratio * (ckpt1[key].float()) + (1 - ratio) * (ckpt2[key].float())).half()
 
         opt["config"] = cfg
         opt["sr"] = message

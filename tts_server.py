@@ -7,51 +7,66 @@ It supports features like streaming, file format transcoding, and real-time conf
 
 Github: https://github.com/erew123/
 """
-import warnings
-from contextlib import asynccontextmanager
+
 import argparse
 import asyncio
-from asyncio import Lock
+import hashlib
+import html
 import importlib
 import inspect
 import json
-from loguru import logger
 import os
 import re
-import html
-import uuid
-import hashlib
-import sys
-import time
 import shutil
 import subprocess
+import sys
+import time
+import uuid
+import warnings
+from asyncio import Lock
+from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Union, List, Optional, Tuple
+
 import aiofiles
-import uvicorn
-from pydantic import BaseModel, ValidationError, Field, field_validator
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi import FastAPI, Form, Request, Response, Depends, HTTPException, Query
-from fastapi.responses import JSONResponse, HTMLResponse, FileResponse, StreamingResponse
 import ffmpeg
+import librosa
 import numpy as np
 import soundfile as sf
-import librosa
-from langdetect import detect, DetectorFactory
+import uvicorn
+from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from langdetect import DetectorFactory, detect
 from langdetect.lang_detect_exception import LangDetectException
+from loguru import logger
+from pydantic import BaseModel, Field, ValidationError, field_validator
+
 from config import AlltalkConfig, AlltalkTTSEnginesConfig
+
 # Loguru handles logging levels via configuration
 
 DetectorFactory.seed = 0  # Ensure deterministic behavior of language detector
 
 LANG_FALLBACKS = {
-    "en": "en", "es": "es", "fr": "fr", "de": "de", "it": "it",
-    "pt": "pt", "pl": "pl", "tr": "tr", "ru": "ru", "nl": "nl",
-    "cs": "cs", "ar": "ar", "zh": "zh", "zh-cn": "zh-cn", "ja": "ja",
-    "hu": "hu", "ko": "ko",
-
+    "en": "en",
+    "es": "es",
+    "fr": "fr",
+    "de": "de",
+    "it": "it",
+    "pt": "pt",
+    "pl": "pl",
+    "tr": "tr",
+    "ru": "ru",
+    "nl": "nl",
+    "cs": "cs",
+    "ar": "ar",
+    "zh": "zh",
+    "zh-cn": "zh-cn",
+    "ja": "ja",
+    "hu": "hu",
+    "ko": "ko",
     # Additional fallbacks for unsupported languages
     "uk": "ru",  # Ukrainian → Russian
     "bg": "ru",  # Bulgarian → Russian
@@ -76,21 +91,27 @@ infer_pipeline = None
 config: AlltalkConfig | None = None
 tts_engines_config: AlltalkTTSEnginesConfig | None = None
 
-def load_config(force_reload = False):
+
+def load_config(force_reload=False):
     """Initialize all configuration instances"""
-    global config, tts_engines_config # pylint: disable=global-statement
+    global config, tts_engines_config  # pylint: disable=global-statement
     config = AlltalkConfig.get_instance(force_reload)
     tts_engines_config = AlltalkTTSEnginesConfig.get_instance(force_reload)
     after_config_load()
 
+
 def after_config_load():
     """Initialize the infer_pipeline based on RVC settings."""
-    global infer_pipeline # pylint: disable=global-statement
+    global infer_pipeline  # pylint: disable=global-statement
     if config.rvc_settings.rvc_enabled:
-        from system.tts_engines.rvc.infer.infer import infer_pipeline as rvc_pipeline # pylint: disable=import-outside-toplevel
+        from system.tts_engines.rvc.infer.infer import (
+            infer_pipeline as rvc_pipeline,  # pylint: disable=import-outside-toplevel
+        )
+
         infer_pipeline = rvc_pipeline
     else:
         infer_pipeline = None
+
 
 load_config()
 
@@ -104,6 +125,7 @@ YELLOW = "\033[93m"
 RED = "\033[91m"
 GREEN = "\033[92m"
 RESET = "\033[0m"
+
 
 def print_message(message, message_type="standard", component="TTS"):
     """Centralized print function for AllTalk messages
@@ -121,27 +143,29 @@ def print_message(message, message_type="standard", component="TTS"):
 
         if message_type == "debug_func" and "Function entry:" in message:
             message_parts = message.split("Function entry:", 1)
-            print(f"{prefix}{BLUE}Debug{RESET} {YELLOW}{message_type}{RESET} Function entry:{GREEN}{message_parts[1]}{RESET} tts_server.py")
+            logger.debug(f"{prefix}Debug {message_type} Function entry:{message_parts[1]} tts_server.py")
         else:
-            print(f"{prefix}{BLUE}Debug{RESET} {YELLOW}{message_type}{RESET} {message}")
+            logger.debug(f"{prefix}Debug {message_type} {message}")
 
     elif message_type == "debug":
-        print(f"{prefix}{BLUE}Debug{RESET} {message}")
+        logger.debug(f"{prefix}Debug {message}")
 
     elif message_type == "warning":
-        print(f"{prefix}{YELLOW}Warning{RESET} {message}")
+        logger.warning(f"{prefix}Warning {message}")
 
     elif message_type == "error":
-        print(f"{prefix}{RED}Error{RESET} {message}")
+        logger.error(f"{prefix}Error {message}")
 
     else:
-        print(f"{prefix}{message}")
+        logger.info(f"{prefix}{message}")
+
 
 def debug_func_entry():
     """Print debug message for function entry if debug_func is enabled"""
     if config.debugging.debug_func:
         current_func = inspect.currentframe().f_back.f_code.co_name
         print_message(f"Function entry: {current_func}", "debug_func")
+
 
 ####################
 # Check for FFMPEG #
@@ -152,18 +176,19 @@ def check_ffmpeg():
 
     try:
         # Check if ffmpeg is in PATH
-        ffmpeg_path = shutil.which('ffmpeg')
-        ffprobe_path = shutil.which('ffprobe')
+        ffmpeg_path = shutil.which("ffmpeg")
+        ffprobe_path = shutil.which("ffprobe")
 
         if not ffmpeg_path or not ffprobe_path:
             return False, "FFmpeg not found in conda environment"
 
         # Verify FFmpeg works
-        subprocess.run(['ffmpeg', '-version'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
         return True, "FFmpeg found in conda environment"
 
     except (subprocess.CalledProcessError, FileNotFoundError):
         return False, "FFmpeg not functioning correctly"
+
 
 def print_ffmpeg_status(is_ffmpeg_installed, _message):
     """Print FFmpeg installation status and instructions."""
@@ -175,6 +200,7 @@ def print_ffmpeg_status(is_ffmpeg_installed, _message):
     else:
         print_message("\033[92mTranscoding       :\033[93m ffmpeg found\033[0m", component="ENG")
 
+
 # Implementation
 ffmpeg_installed, ffmpeg_message = check_ffmpeg()
 print_ffmpeg_status(ffmpeg_installed, ffmpeg_message)
@@ -184,14 +210,18 @@ print_ffmpeg_status(ffmpeg_installed, ffmpeg_message)
 ################################
 try:
     import sounddevice as sd
-    sounddevice_installed=True
+
+    sounddevice_installed = True
 except OSError:
-    print_message("The PortAudio library is not installed. To enable audio playback for TTS in the terminal or console,", "warning")
+    print_message(
+        "The PortAudio library is not installed. To enable audio playback for TTS in the terminal or console,",
+        "warning",
+    )
     print_message("please install PortAudio. This will not impact other features of Alltalk.", "warning")
     print_message("You can still play audio through web browsers without PortAudio.", "warning")
     print_message("Installing PortAudio is optional and not strictly required.")
-    sounddevice_installed=False
-    if sys.platform.startswith('linux'):
+    sounddevice_installed = False
+    if sys.platform.startswith("linux"):
         print_message("On Linux, you can use the following command to install PortAudio:", "warning")
         print_message("sudo apt-get install portaudio19-dev", "warning")
 
@@ -200,17 +230,18 @@ except OSError:
 #######################################################################
 if tts_engines_config.is_valid_engine(tts_engines_config.engine_loaded):
     loader_module = importlib.import_module(f"system.tts_engines.{tts_engines_config.engine_loaded}.model_engine")
-    tts_class = getattr(loader_module, "tts_class")
+    tts_class = loader_module.tts_class
     # Setup model_engine as the way to call the functions within the Class.
     model_engine = tts_class()
 else:
     raise ValueError(f"Invalid TTS engine: {tts_engines_config.engine_loaded}")
 
+
 ##########################################
 # Run setup function in the model_engine #
 ##########################################
 @asynccontextmanager
-async def startup_shutdown(no_actual_value_it_demanded_something_be_here): # pylint: disable=unused-argument
+async def startup_shutdown(no_actual_value_it_demanded_something_be_here):  # pylint: disable=unused-argument
     """Initialize model engine and handle graceful shutdown. This is a context manager."""
     debug_func_entry()
     try:
@@ -218,6 +249,7 @@ async def startup_shutdown(no_actual_value_it_demanded_something_be_here): # pyl
     except FileNotFoundError as e:
         print_message(f"Error during setup: {e}. Continuing without the TTS model.", "error")
     yield
+
 
 ###############################
 # Setup FastAPI with Lifespan #
@@ -234,6 +266,8 @@ app.add_middleware(
 
 # Global lock
 model_change_lock = Lock()
+
+
 ##############################
 # API Endpoint - /api/reload #
 ##############################
@@ -263,20 +297,24 @@ async def apifunction_reload(request: Request):
         print_message(f"Failed to change model to: {requested_model}", "error", "API")
         return Response(content=json.dumps({"status": "model-failure"}), media_type="application/json")
 
+
 ####################################
 # API Endpoint - /api/enginereload #
 ####################################
-uvicorn_server = None # Global variable to track the server
+uvicorn_server = None  # Global variable to track the server
+
+
 def restart_self():
     """Restart the current Python process."""
     debug_func_entry()
     print_message("Restarting subprocess...", component="ENG")
-    os.execv(sys.executable, ['python'] + sys.argv)
+    os.execv(sys.executable, ["python"] + sys.argv)
+
 
 async def handle_restart():
     """Handle graceful shutdown of uvicorn server before restart."""
     debug_func_entry()
-    global uvicorn_server # pylint: disable=global-statement,disable=global-variable-not-assigned
+    global uvicorn_server  # pylint: disable=global-statement,disable=global-variable-not-assigned
 
     if uvicorn_server:
         print_message("Stopping uvicorn server...", component="ENG")
@@ -287,6 +325,7 @@ async def handle_restart():
             await asyncio.sleep(0.1)
 
     restart_self()
+
 
 @app.post("/api/enginereload")
 async def apifunction_enginereload(request: Request):
@@ -326,6 +365,7 @@ async def apifunction_stop_generation():
         print_message("Stopping TTS generation", "debug_api", "API")
     return {"message": "Cancelling current TTS generation"}
 
+
 #############################
 # API Endpoint - /api/audio #
 #############################
@@ -339,6 +379,7 @@ async def apifunction_get_audio(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(audio_path)
 
+
 ##################################
 # API Endpoint - /api/audiocache #
 ##################################
@@ -351,10 +392,11 @@ async def apifunction_get_audiocache(filename: str):
         print_message(f"Cached audio file not found: {filename}", "error", "API")
         raise HTTPException(status_code=404, detail="File not found")
 
-    response = FileResponse(path=audio_path, media_type='audio/wav', filename=filename)
+    response = FileResponse(path=audio_path, media_type="audio/wav", filename=filename)
     response.headers["Cache-Control"] = "public, max-age=604800"
     response.headers["ETag"] = str(audio_path.stat().st_mtime)
     return response
+
 
 ##############################
 # API Endpoint - /api/voices #
@@ -367,23 +409,30 @@ async def apifunction_get_voices():
     try:
         if not model_engine.multivoice_capable:
             print_message(f"Engine '{model_engine.engine_loaded}' does not support multiple voices", "warning", "API")
-            return {"status": "error", "message": f"The currently loaded TTS engine '{model_engine.engine_loaded}' does not support multiple voices."}
+            return {
+                "status": "error",
+                "message": f"The currently loaded TTS engine '{model_engine.engine_loaded}' does not support multiple voices.",
+            }
 
         available_voices = model_engine.voices_file_list()
         print_message(f"Successfully retrieved {len(available_voices)} available voices", "debug_api", "API")
         return {"status": "success", "voices": available_voices}
     except AttributeError as e:
-        print_message(f"Attribute error in model engine: {str(e)}", "error", "API")
+        print_message(f"Attribute error in model engine: {e!s}", "error", "API")
         return JSONResponse(
             content={"status": "error", "message": "Model engine configuration is invalid. Please check your setup."},
-            status_code=500
+            status_code=500,
         )
     except FileNotFoundError as e:
-        print_message(f"Voices file not found: {str(e)}", "error", "API")
+        print_message(f"Voices file not found: {e!s}", "error", "API")
         return JSONResponse(
-            content={"status": "error", "message": "The voices file could not be located. Please ensure the file exists."},
-            status_code=404
+            content={
+                "status": "error",
+                "message": "The voices file could not be located. Please ensure the file exists.",
+            },
+            status_code=404,
         )
+
 
 #################################
 # API Endpoint - /api/rvcvoices #
@@ -420,22 +469,18 @@ async def apifunction_get_rvcvoices():
 
     except FileNotFoundError:
         print_message("RVC voices directory not found", "error", "API")
-        return JSONResponse(
-            content={"status": "error", "message": "RVC voices directory not found"},
-            status_code=404
-        )
+        return JSONResponse(content={"status": "error", "message": "RVC voices directory not found"}, status_code=404)
     except PermissionError as e:
-        print_message(f"Permission denied accessing RVC directory: {str(e)}", "error", "API")
+        print_message(f"Permission denied accessing RVC directory: {e!s}", "error", "API")
         return JSONResponse(
-            content={"status": "error", "message": "Permission denied accessing RVC directory"},
-            status_code=403
+            content={"status": "error", "message": "Permission denied accessing RVC directory"}, status_code=403
         )
     except OSError as e:
-        print_message(f"OS error processing RVC voices: {str(e)}", "error", "API")
+        print_message(f"OS error processing RVC voices: {e!s}", "error", "API")
         return JSONResponse(
-            content={"status": "error", "message": "System error accessing RVC voices"},
-            status_code=500
+            content={"status": "error", "message": "System error accessing RVC voices"}, status_code=500
         )
+
 
 #####################################
 # API Endpoint - /api/reload_config #
@@ -450,14 +495,15 @@ async def apifunction_reload_config():
         print_message("Configuration reloaded successfully", "debug_api", "API")
         return Response("Config file reloaded successfully")
     except json.JSONDecodeError as e:
-        print_message(f"Invalid JSON in configuration: {str(e)}", "error", "API")
+        print_message(f"Invalid JSON in configuration: {e!s}", "error", "API")
         return JSONResponse(content={"status": "error", "message": "Invalid configuration format"}, status_code=400)
     except (ValueError, TypeError) as e:
-        print_message(f"Invalid configuration value: {str(e)}", "error", "API")
+        print_message(f"Invalid configuration value: {e!s}", "error", "API")
         return JSONResponse(content={"status": "error", "message": "Invalid configuration"}, status_code=400)
     except OSError as e:
-        print_message(f"Error accessing configuration file: {str(e)}", "error", "API")
+        print_message(f"Error accessing configuration file: {e!s}", "error", "API")
         return JSONResponse(content={"status": "error", "message": "Could not access configuration"}, status_code=500)
+
 
 #############################
 # API Endpoint - /api/ready #
@@ -470,10 +516,11 @@ async def apifunction_ready():
     print_message(f"Engine status: {status}", "debug_api", "API")
     return Response(status)
 
+
 #######################################
 # API Endpoint - /api/currentsettings #
 #######################################
-@app.get('/api/currentsettings')
+@app.get("/api/currentsettings")
 def apifunction_get_current_settings():
     """Get comprehensive dictionary of current engine settings and capabilities."""
     debug_func_entry()
@@ -508,23 +555,15 @@ def apifunction_get_current_settings():
         print_message("Current settings retrieved successfully", "debug_api", "API")
         return settings
     except AttributeError as e:
-        print_message(f"Missing required engine attribute: {str(e)}", "error", "API")
-        return JSONResponse(
-            content={"status": "error", "message": "Invalid engine configuration"},
-            status_code=500
-        )
+        print_message(f"Missing required engine attribute: {e!s}", "error", "API")
+        return JSONResponse(content={"status": "error", "message": "Invalid engine configuration"}, status_code=500)
     except KeyError as e:
-        print_message(f"Missing required configuration key: {str(e)}", "error", "API")
-        return JSONResponse(
-            content={"status": "error", "message": "Invalid engine configuration"},
-            status_code=500
-        )
+        print_message(f"Missing required configuration key: {e!s}", "error", "API")
+        return JSONResponse(content={"status": "error", "message": "Invalid engine configuration"}, status_code=500)
     except (ValueError, TypeError) as e:
-        print_message(f"Invalid configuration value: {str(e)}", "error", "API")
-        return JSONResponse(
-            content={"status": "error", "message": "Invalid configuration value"},
-            status_code=500
-        )
+        print_message(f"Invalid configuration value: {e!s}", "error", "API")
+        return JSONResponse(content={"status": "error", "message": "Invalid configuration value"}, status_code=500)
+
 
 ######################################
 # API Endpoint - /api/lowvramsetting #
@@ -560,34 +599,42 @@ async def apifunction_low_vram(_request: Request, new_low_vram_value: bool):
             if model_engine.cuda_is_available:
                 if model_engine.lowvram_enabled:
                     model_engine.device = "cpu"
-                    print_message("\033[94mLowVRAM Enabled.\033[0m Model will move between \033[93mVRAM(cuda) <> System RAM(cpu)\033[0m", component="ENG")
+                    print_message(
+                        "\033[94mLowVRAM Enabled.\033[0m Model will move between \033[93mVRAM(cuda) <> System RAM(cpu)\033[0m",
+                        component="ENG",
+                    )
                 else:
                     model_engine.device = "cuda"
-                    print_message("\033[94mLowVRAM Disabled.\033[0m Model will stay in \033[93mVRAM(cuda)\033[0m", component="ENG")
+                    print_message(
+                        "\033[94mLowVRAM Disabled.\033[0m Model will stay in \033[93mVRAM(cuda)\033[0m", component="ENG"
+                    )
                 await model_engine.setup()
             else:
-                print_message("Nvidia CUDA is not available on this system. Unable to use LowVRAM mode.", "error", "ENG")
+                print_message(
+                    "Nvidia CUDA is not available on this system. Unable to use LowVRAM mode.", "error", "ENG"
+                )
                 model_engine.lowvram_enabled = False
 
             response_content.update({"status": "lowvram-success", "message": ""})
 
     except ValueError as e:
-        print_message(f"Invalid parameter value: {str(e)}", "error", "API")
+        print_message(f"Invalid parameter value: {e!s}", "error", "API")
         response_content["message"] = str(e)
     except AttributeError as e:
-        print_message(f"Model engine configuration error: {str(e)}", "error", "API")
+        print_message(f"Model engine configuration error: {e!s}", "error", "API")
         response_content["message"] = "Invalid model engine configuration"
     except RuntimeError as e:
-        print_message(f"CUDA/Device error: {str(e)}", "error", "API")
+        print_message(f"CUDA/Device error: {e!s}", "error", "API")
         response_content["message"] = "Device allocation error"
     except json.JSONEncodeError as e:
-        print_message(f"JSON encoding error: {str(e)}", "error", "API")
+        print_message(f"JSON encoding error: {e!s}", "error", "API")
         response_content["message"] = "Response encoding error"
     except OSError as e:
-        print_message(f"System resource error: {str(e)}", "error", "API")
+        print_message(f"System resource error: {e!s}", "error", "API")
         response_content["message"] = "System resource error"
 
     return Response(content=json.dumps(response_content))
+
 
 #################################
 # API Endpoint - /api/deepspeed #
@@ -623,38 +670,44 @@ async def deepspeed(_request: Request, new_deepspeed_value: bool):
             response_content = {"status": "deepspeed-success"}
 
     except ValueError as e:
-        print_message(f"Value error: {str(e)}", "error", "API")
-        response_content["message"] = f"Invalid input: {str(e)}"
+        print_message(f"Value error: {e!s}", "error", "API")
+        response_content["message"] = f"Invalid input: {e!s}"
     except AttributeError as e:
-        print_message(f"Attribute error: {str(e)}", "error", "API")
+        print_message(f"Attribute error: {e!s}", "error", "API")
         response_content["message"] = "Unexpected attribute error. Check model engine configuration."
     except RuntimeError as e:
-        print_message(f"Runtime error: {str(e)}", "error", "API")
-        response_content["message"] = f"Runtime error: {str(e)}"
+        print_message(f"Runtime error: {e!s}", "error", "API")
+        response_content["message"] = f"Runtime error: {e!s}"
     except TypeError as e:
-        print_message(f"Type error: {str(e)}", "error", "API")
-        response_content["message"] = f"Type error: {str(e)}"
+        print_message(f"Type error: {e!s}", "error", "API")
+        response_content["message"] = f"Type error: {e!s}"
     except OSError as e:
-        print_message(f"System error: {str(e)}", "error", "API")
+        print_message(f"System error: {e!s}", "error", "API")
         response_content["message"] = "System resource or file error"
     except json.JSONEncodeError as e:
-        print_message(f"JSON encoding error: {str(e)}", "error", "API")
+        print_message(f"JSON encoding error: {e!s}", "error", "API")
         response_content["message"] = "Error encoding response"
     except ImportError as e:
-        print_message(f"DeepSpeed import error: {str(e)}", "error", "API")
+        print_message(f"DeepSpeed import error: {e!s}", "error", "API")
         response_content["message"] = "DeepSpeed module not properly installed"
     except MemoryError as e:
-        print_message(f"Memory allocation error: {str(e)}", "error", "API")
+        print_message(f"Memory allocation error: {e!s}", "error", "API")
         response_content["message"] = "Insufficient memory for DeepSpeed operation"
 
     return Response(content=json.dumps(response_content))
+
 
 #################################
 # API Endpoint - /api/voice2rvc #
 #################################
 @app.post("/api/voice2rvc")
-async def voice2rvc(input_tts_path: str = Form(...), output_rvc_path: str = Form(...),
-                   pth_name: str = Form(...), pitch: str = Form(...), method: str = Form(...)):
+async def voice2rvc(
+    input_tts_path: str = Form(...),
+    output_rvc_path: str = Form(...),
+    pth_name: str = Form(...),
+    pitch: str = Form(...),
+    method: str = Form(...),
+):
     """Handle voice conversion using RVC. Processes input audio through specified RVC model."""
     debug_func_entry()
 
@@ -688,7 +741,8 @@ async def voice2rvc(input_tts_path: str = Form(...), output_rvc_path: str = Form
         print_message(f"Error during Voice2RVC conversion: {e}", "error")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-def run_voice2rvc(input_tts_path, output_rvc_path, pth_path, pitch, method) -> Optional[str]:
+
+def run_voice2rvc(input_tts_path, output_rvc_path, pth_path, pitch, method) -> str | None:
     """Run RVC conversion on input audio using specified model and parameters."""
     debug_func_entry()
 
@@ -724,16 +778,30 @@ def run_voice2rvc(input_tts_path, output_rvc_path, pth_path, pitch, method) -> O
     print_message(f"Using RVC model: {os.path.basename(pth_path)}", "debug_rvc", "GEN")
     print_message(f"Using index file: {os.path.basename(index_path) if index_path else 'None'}", "debug_rvc", "GEN")
 
-    infer_pipeline(settings["f0up_key"], settings["filter_radius"], settings["index_rate"],
-                settings["rms_mix_rate"], settings["protect"], settings["hop_length"],
-                settings["f0method"], input_tts_path, output_rvc_path, pth_path, index_path,
-                settings["split_audio"], settings["f0autotune"], settings["embedder_model"],
-                settings["training_data_size"], config.debugging.debug_rvc)
+    infer_pipeline(
+        settings["f0up_key"],
+        settings["filter_radius"],
+        settings["index_rate"],
+        settings["rms_mix_rate"],
+        settings["protect"],
+        settings["hop_length"],
+        settings["f0method"],
+        input_tts_path,
+        output_rvc_path,
+        pth_path,
+        index_path,
+        settings["split_audio"],
+        settings["f0autotune"],
+        settings["embedder_model"],
+        settings["training_data_size"],
+        config.debugging.debug_rvc,
+    )
 
     generate_elapsed_time = time.time() - generate_start_time
     print_message(f"\033[94mVoice2RVC Convert: \033[91m{generate_elapsed_time:.2f} seconds.\033[0m", component="GEN")
 
     return output_rvc_path
+
 
 ##################################
 # Transcode between file formats #
@@ -743,17 +811,20 @@ async def get_audio_duration(file_path):
     debug_func_entry()
 
     file_path_str = str(file_path)
-    print_message("\033[94mGet Audio Duration > get_audio_duration > tts_server.py\033[0m", "debug_transcode" or "debug_openai")
+    print_message(
+        "\033[94mGet Audio Duration > get_audio_duration > tts_server.py\033[0m", "debug_transcode" or "debug_openai"
+    )
     print_message(f"├─ Input file: {file_path_str}", "debug_transcode")
 
     try:
         probe = ffmpeg.probe(file_path_str)
-        duration = float(probe['format']['duration'])
+        duration = float(probe["format"]["duration"])
         print_message(f"└─ Duration: {duration} seconds", "debug_transcode")
         return duration
     except Exception as e:
-        print_message(f"Error getting audio duration: {str(e)}", "error")
+        print_message(f"Error getting audio duration: {e!s}", "error")
         raise
+
 
 async def transcode_audio(input_file, output_format, output_file=None):
     """Transcode audio files between different formats using FFmpeg."""
@@ -779,46 +850,27 @@ async def transcode_audio(input_file, output_format, output_file=None):
         stream = ffmpeg.input(input_file_str)
         # Configure format-specific options
         format_options = {
-            'mp3': {
-                'acodec': 'libmp3lame',
-                **{'b:a': '192k'},
-                'ar': 44100,
-                'ac': 2
+            "mp3": {"acodec": "libmp3lame", **{"b:a": "192k"}, "ar": 44100, "ac": 2},
+            "opus": {
+                "acodec": "libopus",
+                **{"b:a": "128k"},
+                "vbr": "on",
+                "compression_level": "10",
+                "frame_duration": "60",
+                "application": "voip",
+                "ar": 48000,
+                "ac": 2,
             },
-            'opus': {
-                'acodec': 'libopus',
-                **{'b:a': '128k'},
-                'vbr': 'on',
-                'compression_level': '10',
-                'frame_duration': '60',
-                'application': 'voip',
-                'ar': 48000,
-                'ac': 2
+            "aac": {"acodec": "aac", **{"b:a": "192k"}, "ar": 44100, "ac": 2},
+            "vorbis": {  # for ogg
+                "acodec": "libvorbis",
+                **{"b:a": "192k"},
+                "ar": 44100,
+                "ac": 2,
+                "f": "ogg",  # Force OGG container format
             },
-            'aac': {
-                'acodec': 'aac',
-                **{'b:a': '192k'},
-                'ar': 44100,
-                'ac': 2
-            },
-            'vorbis': {  # for ogg
-                'acodec': 'libvorbis',
-                **{'b:a': '192k'},
-                'ar': 44100,
-                'ac': 2,
-                'f': 'ogg'  # Force OGG container format
-            },
-            'flac': {
-                'acodec': 'flac',
-                'compression_level': '8',
-                'ar': 44100,
-                'ac': 2
-            },
-            'wav': {
-                'acodec': 'pcm_s16le',
-                'ar': 44100,
-                'ac': 2
-            }
+            "flac": {"acodec": "flac", "compression_level": "8", "ar": 44100, "ac": 2},
+            "wav": {"acodec": "pcm_s16le", "ar": 44100, "ac": 2},
         }
         if output_format not in format_options:
             raise ValueError(f"Unsupported output format: {output_format}")
@@ -837,8 +889,9 @@ async def transcode_audio(input_file, output_format, output_file=None):
         print_message(f"stderr: {e.stderr.decode('utf8')}", "error")
         raise
     except Exception as e:
-        print_message(f"Error during transcoding: {str(e)}", "error")
+        print_message(f"Error during transcoding: {e!s}", "error")
         raise
+
 
 ##############################
 # Central Transcode function #
@@ -856,7 +909,7 @@ async def transcode_audio_if_necessary(output_file, model_audio_format, output_a
         output_file = await transcode_audio(output_file, output_audio_format)
         print_message("Transcode completed successfully", "debug_transcode")
     except Exception as e:
-        print_message(f"Error occurred during transcoding: {str(e)}", "error")
+        print_message(f"Error occurred during transcoding: {e!s}", "error")
         raise
 
     print_message("Transcode condition completed", "debug_transcode")
@@ -864,17 +917,18 @@ async def transcode_audio_if_necessary(output_file, model_audio_format, output_a
 
     # Generate appropriate URLs based on API configuration
     if config.api_def.api_use_legacy_api:
-        output_file_url = f'http://{config.api_def.api_legacy_ip_address}:{config.api_def.api_port_number}/audio/{os.path.basename(output_file)}'
-        output_cache_url = f'http://{config.api_def.api_legacy_ip_address}:{config.api_def.api_port_number}/audiocache/{os.path.basename(output_file)}'
+        output_file_url = f"http://{config.api_def.api_legacy_ip_address}:{config.api_def.api_port_number}/audio/{os.path.basename(output_file)}"
+        output_cache_url = f"http://{config.api_def.api_legacy_ip_address}:{config.api_def.api_port_number}/audiocache/{os.path.basename(output_file)}"
     else:
-        output_file_url = f'/audio/{os.path.basename(output_file)}'
-        output_cache_url = f'/audiocache/{os.path.basename(output_file)}'
+        output_file_url = f"/audio/{os.path.basename(output_file)}"
+        output_cache_url = f"/audiocache/{os.path.basename(output_file)}"
 
     print_message("Output file paths and URLs updated", "debug_transcode")
     print_message(f"Transcode output_file is now     : {output_file}", "debug_transcode")
     print_message(f"Transcode output_file_url is now : {output_file_url}", "debug_transcode")
     print_message(f"Transcode output_cache_url is now: {output_cache_url}", "debug_transcode")
     return output_file, output_file_url, output_cache_url
+
 
 ##############################
 #### Streaming Generation ####
@@ -885,95 +939,142 @@ async def apifunction_generate_streaming(text: str, voice: str, language: str, o
     debug_func_entry()
 
     if not model_engine.streaming_capable:
-        print_message("The selected TTS Engine does not support streaming. To use streaming, please select a TTS", "warning", "GEN")
-        print_message("Engine that has streaming capability. You can find the streaming support information for", "warning", "GEN")
+        print_message(
+            "The selected TTS Engine does not support streaming. To use streaming, please select a TTS",
+            "warning",
+            "GEN",
+        )
+        print_message(
+            "Engine that has streaming capability. You can find the streaming support information for", "warning", "GEN"
+        )
         print_message("each TTS Engine in its 'Engine Information' section of the Gradio interface.", "warning", "GEN")
 
     try:
-        output_file_path = f'{this_dir / config.get_output_directory() / output_file}.{model_engine.audio_format}'
+        output_file_path = f"{this_dir / config.get_output_directory() / output_file}.{model_engine.audio_format}"
         print_message(f"Starting streaming TTS generation for: {text[:50]}{'...' if len(text) > 50 else ''}")
-        stream = await generate_audio(text, voice, language, model_engine.temperature_set,
-                                   model_engine.repetitionpenalty_set, 1.0, 1.0,
-                                   output_file_path, streaming=True)
+        stream = await generate_audio(
+            text,
+            voice,
+            language,
+            model_engine.temperature_set,
+            model_engine.repetitionpenalty_set,
+            1.0,
+            1.0,
+            output_file_path,
+            streaming=True,
+        )
         return StreamingResponse(stream, media_type="audio/wav")
     except ValueError as e:
-        print_message(f"Value error occurred: {str(e)}", "error", "GEN")
-        return JSONResponse(content={"error": f"Invalid value: {str(e)}"}, status_code=400)
+        print_message(f"Value error occurred: {e!s}", "error", "GEN")
+        return JSONResponse(content={"error": f"Invalid value: {e!s}"}, status_code=400)
     except KeyError as e:
-        print_message(f"Key error occurred: Missing key {str(e)}", "error", "GEN")
-        return JSONResponse(content={"error": f"Missing required field: {str(e)}"}, status_code=400)
+        print_message(f"Key error occurred: Missing key {e!s}", "error", "GEN")
+        return JSONResponse(content={"error": f"Missing required field: {e!s}"}, status_code=400)
     except FileNotFoundError as e:
-        print_message(f"File not found: {str(e)}", "error", "GEN")
-        return JSONResponse(content={"error": f"File not found: {str(e)}"}, status_code=404)
+        print_message(f"File not found: {e!s}", "error", "GEN")
+        return JSONResponse(content={"error": f"File not found: {e!s}"}, status_code=404)
     except TypeError as e:
-        print_message(f"Type error occurred: {str(e)}", "error", "GEN")
-        return JSONResponse(content={"error": f"Type error: {str(e)}"}, status_code=400)
+        print_message(f"Type error occurred: {e!s}", "error", "GEN")
+        return JSONResponse(content={"error": f"Type error: {e!s}"}, status_code=400)
     except RuntimeError as e:
-        print_message(f"Runtime error occurred: {str(e)}", "error", "GEN")
+        print_message(f"Runtime error occurred: {e!s}", "error", "GEN")
         return JSONResponse(content={"error": "An internal runtime error occurred"}, status_code=500)
 
+
 @app.post("/api/tts-generate-streaming", response_class=JSONResponse)
-async def tts_generate_streaming(_request: Request, text: str = Form(...), voice: str = Form(...),
-                               language: str = Form(...), output_file: str = Form(...)):
+async def tts_generate_streaming(
+    _request: Request,
+    text: str = Form(...),
+    voice: str = Form(...),
+    language: str = Form(...),
+    output_file: str = Form(...),
+):
     """Handle streaming TTS generation via POST request."""
     debug_func_entry()
 
     if not model_engine.streaming_capable:
-        print_message("The selected TTS Engine does not support streaming. To use streaming, please select a TTS", "warning", "GEN")
-        print_message("Engine that has streaming capability. You can find the streaming support information for", "warning", "GEN")
+        print_message(
+            "The selected TTS Engine does not support streaming. To use streaming, please select a TTS",
+            "warning",
+            "GEN",
+        )
+        print_message(
+            "Engine that has streaming capability. You can find the streaming support information for", "warning", "GEN"
+        )
         print_message("each TTS Engine in its 'Engine Information' section of the Gradio interface.", "warning", "GEN")
 
     try:
-        output_file_path = f'{this_dir / config.get_output_directory() / output_file}.{model_engine.audio_format}'
+        output_file_path = f"{this_dir / config.get_output_directory() / output_file}.{model_engine.audio_format}"
         print_message(f"Starting TTS generation for file: {os.path.basename(output_file)}")
-        await generate_audio(text, voice, language, model_engine.temperature_set,
-                           model_engine.repetitionpenalty_set, "1.0", "1.0",
-                           output_file_path, streaming=False)
+        await generate_audio(
+            text,
+            voice,
+            language,
+            model_engine.temperature_set,
+            model_engine.repetitionpenalty_set,
+            "1.0",
+            "1.0",
+            output_file_path,
+            streaming=False,
+        )
         return JSONResponse(content={"output_file_path": str(output_file)}, status_code=200)
     except ValueError as e:
-        print_message(f"Invalid streaming parameters: {str(e)}", "error", "GEN")
+        print_message(f"Invalid streaming parameters: {e!s}", "error", "GEN")
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except IOError as e:
-        print_message(f"IO error during streaming: {str(e)}", "error", "GEN")
+    except OSError as e:
+        print_message(f"IO error during streaming: {e!s}", "error", "GEN")
         raise HTTPException(status_code=500, detail="Audio streaming failed") from e
     except RuntimeError as e:
-        print_message(f"Runtime error during streaming: {str(e)}", "error", "GEN")
-        raise HTTPException(status_code=500, detail="Audio generation failed")  from e
+        print_message(f"Runtime error during streaming: {e!s}", "error", "GEN")
+        raise HTTPException(status_code=500, detail="Audio generation failed") from e
 
 
 ###################################
 # Central generate_audio function #
 ###################################
-async def generate_audio(text, voice, language, temperature, repetition_penalty, speed, pitch, output_file, streaming=False):
+async def generate_audio(
+    text, voice, language, temperature, repetition_penalty, speed, pitch, output_file, streaming=False
+):
     """Generate TTS audio with specified parameters. Supports streaming and non-streaming modes."""
     debug_func_entry()
 
     if not model_engine.streaming_capable and streaming:
-        print_message("The selected TTS Engine does not support streaming. To use streaming, please select a TTS", "warning", "GEN")
-        print_message("Engine that has streaming capability. You can find the streaming support information for", "warning", "GEN")
+        print_message(
+            "The selected TTS Engine does not support streaming. To use streaming, please select a TTS",
+            "warning",
+            "GEN",
+        )
+        print_message(
+            "Engine that has streaming capability. You can find the streaming support information for", "warning", "GEN"
+        )
         print_message("each TTS Engine in the 'Engine Information' section of the Gradio interface.", "warning", "GEN")
         raise ValueError("Streaming not supported by current TTS engine")
 
     if language == "auto":
         language = detect_language(text)
 
-    response = model_engine.generate_tts(text, voice, language, temperature, repetition_penalty, speed, pitch, output_file, streaming)
+    response = model_engine.generate_tts(
+        text, voice, language, temperature, repetition_penalty, speed, pitch, output_file, streaming
+    )
 
     if streaming:
+
         async def stream_response():
             try:
                 async for chunk in response:
                     yield chunk
             except Exception as e:
-                print_message(f"Error during streaming audio generation: {str(e)}", "error", "GEN")
+                print_message(f"Error during streaming audio generation: {e!s}", "error", "GEN")
                 raise
+
         return stream_response()
     try:
         async for _ in response:
             pass
     except Exception as e:
-        print_message(f"Error during audio generation: {str(e)}", "error", "GEN")
+        print_message(f"Error during audio generation: {e!s}", "error", "GEN")
         raise
+
 
 ###########################
 #### PREVIEW VOICE API ####
@@ -982,8 +1083,8 @@ async def generate_audio(text, voice, language, temperature, repetition_penalty,
 async def apifunction_preview_voice(
     _request: Request,
     voice: str = Form(...),
-    rvccharacter_voice_gen: Optional[str] = Form(None),
-    rvccharacter_pitch: Optional[float] = Form(None)
+    rvccharacter_voice_gen: str | None = Form(None),
+    rvccharacter_pitch: float | None = Form(None),
 ):
     """Generate preview audio for selected voice with optional RVC processing."""
     debug_func_entry()
@@ -992,29 +1093,35 @@ async def apifunction_preview_voice(
         language = "en"
         output_file_name = "api_preview_voice"
 
-        clean_voice_filename = re.sub(r'\.wav$', '', voice.replace(' ', '_'))
-        clean_voice_filename = re.sub(r'[^a-zA-Z0-9]', ' ', clean_voice_filename)
+        clean_voice_filename = re.sub(r"\.wav$", "", voice.replace(" ", "_"))
+        clean_voice_filename = re.sub(r"[^a-zA-Z0-9]", " ", clean_voice_filename)
         text = f"Hello, this is a preview of voice {clean_voice_filename}."
 
         rvccharacter_voice_gen = rvccharacter_voice_gen or "Disabled"
         rvccharacter_pitch = rvccharacter_pitch if rvccharacter_pitch is not None else 0
 
         print_message(f"Generating preview for voice: {clean_voice_filename}", "debug_tts", "GEN")
-        output_file_path = this_dir / config.get_output_directory() / f'{output_file_name}.{model_engine.audio_format}'
+        output_file_path = this_dir / config.get_output_directory() / f"{output_file_name}.{model_engine.audio_format}"
 
         await generate_audio(
-            text, voice, language,
+            text,
+            voice,
+            language,
             model_engine.temperature_set,
             model_engine.repetitionpenalty_set,
-            1.0, 0, output_file_path,
-            streaming=False
+            1.0,
+            0,
+            output_file_path,
+            streaming=False,
         )
 
         if config.rvc_settings.rvc_enabled:
             if rvccharacter_voice_gen.lower() in ["disabled", "disable"]:
                 print_message("def apifunction_preview_voice RVC processing skipped", "debug_tts")
             else:
-                print_message(f"def apifunction_preview_voice processing with RVC: {rvccharacter_voice_gen}", "debug_tts")
+                print_message(
+                    f"def apifunction_preview_voice processing with RVC: {rvccharacter_voice_gen}", "debug_tts"
+                )
                 rvccharacter_voice_gen = this_dir / "models" / "rvc_voices" / rvccharacter_voice_gen
                 pth_path = rvccharacter_voice_gen if rvccharacter_voice_gen else config.rvc_settings.rvc_char_model_file
 
@@ -1023,7 +1130,7 @@ async def apifunction_preview_voice(
 
                 run_rvc(output_file_path, pth_path, rvccharacter_pitch, infer_pipeline)
 
-        output_file_url = f'/audio/{output_file_name}.{model_engine.audio_format}'
+        output_file_url = f"/audio/{output_file_name}.{model_engine.audio_format}"
         return JSONResponse(
             content={
                 "status": "generate-success",
@@ -1034,19 +1141,19 @@ async def apifunction_preview_voice(
         )
 
     except ValueError as e:
-        print_message(f"Value error occurred: {str(e)}", "error", "GEN")
-        return JSONResponse(content={"error": f"Invalid value: {str(e)}"}, status_code=400)
+        print_message(f"Value error occurred: {e!s}", "error", "GEN")
+        return JSONResponse(content={"error": f"Invalid value: {e!s}"}, status_code=400)
     except KeyError as e:
-        print_message(f"Key error occurred: Missing key {str(e)}", "error", "GEN")
-        return JSONResponse(content={"error": f"Missing required field: {str(e)}"}, status_code=400)
+        print_message(f"Key error occurred: Missing key {e!s}", "error", "GEN")
+        return JSONResponse(content={"error": f"Missing required field: {e!s}"}, status_code=400)
     except FileNotFoundError as e:
         print_message(str(e), "error", "GEN")
-        return JSONResponse(content={"error": f"File not found: {str(e)}"}, status_code=404)
+        return JSONResponse(content={"error": f"File not found: {e!s}"}, status_code=404)
     except TypeError as e:
-        print_message(f"Type error occurred: {str(e)}", "error", "GEN")
-        return JSONResponse(content={"error": f"Type error: {str(e)}"}, status_code=400)
+        print_message(f"Type error occurred: {e!s}", "error", "GEN")
+        return JSONResponse(content={"error": f"Type error: {e!s}"}, status_code=400)
     except RuntimeError as e:
-        print_message(f"Runtime error occurred: {str(e)}", "error", "GEN")
+        print_message(f"Runtime error occurred: {e!s}", "error", "GEN")
         return JSONResponse(content={"error": "An internal runtime error occurred"}, status_code=500)
 
 
@@ -1055,13 +1162,16 @@ async def apifunction_preview_voice(
 ##################################################################
 class OpenAIInput(BaseModel):
     """Validates input parameters for OpenAI TTS generation."""
+
     model: str = Field(..., description="The TTS model to use. Currently ignored.")
     input: str = Field(..., max_length=4096, description="The text to generate audio for.")
     voice: str = Field(..., description="The voice to use when generating the audio.")
-    response_format: str = Field(default="wav", description="The format of the audio. Currently only 'wav' is supported.")
+    response_format: str = Field(
+        default="wav", description="The format of the audio. Currently only 'wav' is supported."
+    )
     speed: float = Field(default=1.0, ge=0.25, le=4.0, description="The speed of the generated audio.")
 
-    @field_validator('voice', mode='before')
+    @field_validator("voice", mode="before")
     @classmethod
     def validate_voice(cls, value):
         """Validate that the requested voice is supported by OpenAI TTS."""
@@ -1069,6 +1179,7 @@ class OpenAIInput(BaseModel):
         if value not in supported_voices:
             raise ValueError(f"Voice must be one of {supported_voices}")
         return value
+
 
 class OpenAIGenerator:
     """
@@ -1078,8 +1189,9 @@ class OpenAIGenerator:
     If validation succeeds, it returns `None`. If validation fails, it returns a string detailing the errors,
     including the field name, validation error message, and field description.
     """
+
     @staticmethod
-    def validate_input(json_data: dict) -> Union[None, str]:
+    def validate_input(json_data: dict) -> None | str:
         """Validate OpenAI TTS request parameters."""
         debug_func_entry()
         try:
@@ -1089,13 +1201,14 @@ class OpenAIGenerator:
         except ValidationError as e:
             errors = []
             for err in e.errors():
-                field = err['loc'][0]
-                message = err['msg']
+                field = err["loc"][0]
+                message = err["msg"]
                 description = OpenAIInput.model_fields[field].field_info.description
                 errors.append(f"Error in field '{field}': {message}. Description: {description}")
-            error_msg = ', '.join(errors)
+            error_msg = ", ".join(errors)
             print_message(f"OpenAI input validation failed: {error_msg}", "error", "TTS")
             return error_msg
+
 
 #########################################################################
 # API Endpoint - OpenAI Speech API compatable endpoint /v1/audio/speech #
@@ -1137,7 +1250,7 @@ async def openai_tts_generate(request: Request):
             "fable": model_engine.openai_fable,
             "nova": model_engine.openai_nova,
             "onyx": model_engine.openai_onyx,
-            "shimmer": model_engine.openai_shimmer
+            "shimmer": model_engine.openai_shimmer,
         }
 
         mapped_voice = voice_mapping.get(voice)
@@ -1157,9 +1270,17 @@ async def openai_tts_generate(request: Request):
         else:
             print_message(f"{cleaned_string[:90]}{'...' if len(cleaned_string) > 90 else ''}", component="TTS")
 
-        await generate_audio(cleaned_string, mapped_voice, "auto", model_engine.temperature_set,
-                           model_engine.repetitionpenalty_set, speed, model_engine.pitch_set,
-                           output_file_path, streaming=False)
+        await generate_audio(
+            cleaned_string,
+            mapped_voice,
+            "auto",
+            model_engine.temperature_set,
+            model_engine.repetitionpenalty_set,
+            speed,
+            model_engine.pitch_set,
+            output_file_path,
+            streaming=False,
+        )
 
         print_message(f"Audio generated at: {output_file_path}", "debug_openai", "TTS")
 
@@ -1176,33 +1297,35 @@ async def openai_tts_generate(request: Request):
         transcoded_file_path = await transcode_for_openai(output_file_path, response_format)
         print_message(f"Audio transcoded to: {transcoded_file_path}", "debug_openai", "TTS")
 
-        response = FileResponse(transcoded_file_path, media_type=f"audio/{response_format}",
-                              filename=f"output.{response_format}")
+        response = FileResponse(
+            transcoded_file_path, media_type=f"audio/{response_format}", filename=f"output.{response_format}"
+        )
 
     except ValueError as e:
-        print_message(f"Value error occurred: {str(e)}", "error", "TTS")
-        response = JSONResponse(content={"error": f"Invalid value: {str(e)}"})
+        print_message(f"Value error occurred: {e!s}", "error", "TTS")
+        response = JSONResponse(content={"error": f"Invalid value: {e!s}"})
         status_code = 400
     except KeyError as e:
-        print_message(f"Key error occurred: Missing key {str(e)}", "error", "TTS")
-        response = JSONResponse(content={"error": f"Missing required field: {str(e)}"})
+        print_message(f"Key error occurred: Missing key {e!s}", "error", "TTS")
+        response = JSONResponse(content={"error": f"Missing required field: {e!s}"})
         status_code = 400
     except FileNotFoundError as e:
-        print_message(f"File not found error: {str(e)}", "error", "TTS")
+        print_message(f"File not found error: {e!s}", "error", "TTS")
         response = JSONResponse(content={"error": "Required file not found"})
         status_code = 404
     except TypeError as e:
-        print_message(f"Type error occurred: {str(e)}", "error", "TTS")
-        response = JSONResponse(content={"error": f"Type error: {str(e)}"})
+        print_message(f"Type error occurred: {e!s}", "error", "TTS")
+        response = JSONResponse(content={"error": f"Type error: {e!s}"})
         status_code = 400
     except RuntimeError as e:
-        print_message(f"Runtime error occurred: {str(e)}", "error", "TTS")
+        print_message(f"Runtime error occurred: {e!s}", "error", "TTS")
         response = JSONResponse(content={"error": "An internal runtime error occurred"})
         status_code = 500
 
     if status_code != 200:
         return response.status_code(status_code)
     return response
+
 
 ###########################################################################
 # API Endpoint - OpenAI Speech API compatable endpoint Transcode Function #
@@ -1218,13 +1341,13 @@ async def transcode_for_openai(input_file, output_format):
 
     # Map formats to codecs but preserve original extension
     format_mapping = {
-        "m4a": ("aac", "m4a"),     # (codec, extension)
+        "m4a": ("aac", "m4a"),  # (codec, extension)
         "ogg": ("vorbis", "ogg"),
         "aac": ("aac", "aac"),
         "mp3": ("mp3", "mp3"),
         "opus": ("opus", "opus"),
         "flac": ("flac", "flac"),
-        "wav": ("wav", "wav")
+        "wav": ("wav", "wav"),
     }
 
     if output_format not in format_mapping:
@@ -1240,7 +1363,7 @@ async def transcode_for_openai(input_file, output_format):
         result = await transcode_audio(input_file, codec, output_file)
         return result
     except Exception as e:
-        print_message(f"Error in OpenAI transcoding: {str(e)}", "error", "TTS")
+        print_message(f"Error in OpenAI transcoding: {e!s}", "error", "TTS")
         raise
 
 
@@ -1249,12 +1372,14 @@ async def transcode_for_openai(input_file, output_format):
 ######################################################################################
 class VoiceMappings(BaseModel):
     """OpenAI to engine voice mapping configuration."""
+
     alloy: str
     echo: str
     fable: str
     nova: str
     onyx: str
     shimmer: str
+
 
 @app.put("/api/openai-voicemap")
 async def update_openai_voice_mappings(mappings: VoiceMappings):
@@ -1284,8 +1409,9 @@ async def update_openai_voice_mappings(mappings: VoiceMappings):
         return {"message": "OpenAI voice mappings updated successfully"}
 
     except Exception as e:
-        print_message(f"Failed to update voice mappings: {str(e)}", "error", "TTS")
-        raise HTTPException(status_code=500, detail=f"Failed to update model settings file: {str(e)}") from e
+        print_message(f"Failed to update voice mappings: {e!s}", "error", "TTS")
+        raise HTTPException(status_code=500, detail=f"Failed to update model settings file: {e!s}") from e
+
 
 #######################
 # Play at the console #
@@ -1312,8 +1438,12 @@ def play_audio(file_path, volume):
             print_message(f"\033[94mError: File does not exist: {normalized_file_path}\033[0m", "error", "GEN")
             return
 
-        if normalized_file_path.lower().endswith('.aac'):
-            print_message("\033[94mPlay Audio  : \033[0mAAC format files cannot be played at the console. Please choose another format", "error", "GEN")
+        if normalized_file_path.lower().endswith(".aac"):
+            print_message(
+                "\033[94mPlay Audio  : \033[0mAAC format files cannot be played at the console. Please choose another format",
+                "error",
+                "GEN",
+            )
             return
 
         print_message("\033[94mPlay Audio  : \033[0mPlaying audio at console", "debug_tts", "GEN")
@@ -1323,15 +1453,17 @@ def play_audio(file_path, volume):
 
     except FileNotFoundError as e:
         print_message(f"\033[94mAudio file not found: {e}\033[0m", "error", "GEN")
-    except IOError as e:
+    except OSError as e:
         print_message(f"\033[94mError reading audio file: {e}\033[0m", "error", "GEN")
     except sd.PortAudioError as e:
         print_message(f"\033[94mAudio playback error: {e}\033[0m", "error", "GEN")
+
 
 class TTSGenerator:
     """
     Validate JSON input parameters for TTS generation.
     """
+
     @staticmethod
     def validate_json_input(json_input_data):
         """
@@ -1351,6 +1483,7 @@ class TTSGenerator:
             print_message(f"Error with API request: {error_message}", "error", "API")
             return error_message
 
+
 #################################################################
 # /api/tts-generate Generation API Endpoint Narration Filtering #
 #################################################################
@@ -1360,7 +1493,7 @@ def process_text(text):
 
     # Normalize and clean text
     text = html.unescape(text)
-    text = re.sub(r'\.{3,}', '.', text)
+    text = re.sub(r"\.{3,}", ".", text)
 
     # Pattern for identifying speech segments
     combined_pattern = r'(\*[^*"]+\*|"[^"*]+")'
@@ -1371,28 +1504,28 @@ def process_text(text):
     for match in re.finditer(combined_pattern, text):
         # Handle pre-match ambiguous text
         if start < match.start():
-            ambiguous_text = text[start:match.start()].strip()
+            ambiguous_text = text[start : match.start()].strip()
             if ambiguous_text:
-                ordered_parts.append(('ambiguous', ambiguous_text))
+                ordered_parts.append(("ambiguous", ambiguous_text))
                 print_message(f"Added ambiguous segment: {ambiguous_text}", "debug_tts", "GEN")
 
         # Process matched segment
         matched_text = match.group(0)
-        if matched_text.startswith('*') and matched_text.endswith('*'):
-            text_part = matched_text.strip('*').strip()
-            ordered_parts.append(('narrator', text_part))
+        if matched_text.startswith("*") and matched_text.endswith("*"):
+            text_part = matched_text.strip("*").strip()
+            ordered_parts.append(("narrator", text_part))
             print_message(f"Added narrator segment: {text_part}", "debug_tts", "GEN")
         elif matched_text.startswith('"') and matched_text.endswith('"'):
             text_part = matched_text.strip('"').strip()
-            ordered_parts.append(('character', text_part))
+            ordered_parts.append(("character", text_part))
             print_message(f"Added character segment: {text_part}", "debug_tts", "GEN")
         else:
-            text_part = matched_text.strip('*').strip('"')
-            if '*' in matched_text:
-                ordered_parts.append(('narrator', text_part))
+            text_part = matched_text.strip("*").strip('"')
+            if "*" in matched_text:
+                ordered_parts.append(("narrator", text_part))
                 print_message(f"Added mixed narrator segment: {text_part}", "debug_tts", "GEN")
             else:
-                ordered_parts.append(('character', text_part))
+                ordered_parts.append(("character", text_part))
                 print_message(f"Added mixed character segment: {text_part}", "debug_tts", "GEN")
 
         start = match.end()
@@ -1401,26 +1534,23 @@ def process_text(text):
     if start < len(text):
         ambiguous_text = text[start:].strip()
         if ambiguous_text:
-            ordered_parts.append(('ambiguous', ambiguous_text))
+            ordered_parts.append(("ambiguous", ambiguous_text))
             print_message(f"Added final ambiguous segment: {ambiguous_text}", "debug_tts", "GEN")
 
     return ordered_parts
+
 
 def standard_filtering(text_input):
     """Remove special characters and normalize text formatting."""
     debug_func_entry()
 
-    text_output = (text_input
-                  .replace("***", "")
-                  .replace("**", "")
-                  .replace("*", "")
-                  .replace("\n\n", "\n")
-                  .replace("&#x27;", "'")
-                  )
+    text_output = (
+        text_input.replace("***", "").replace("**", "").replace("*", "").replace("\n\n", "\n").replace("&#x27;", "'")
+    )
 
-    print_message(f"Filtered text: {text_output[:50]}{'...' if len(text_output) > 50 else ''}",
-                 "debug_tts", "GEN")
+    print_message(f"Filtered text: {text_output[:50]}{'...' if len(text_output) > 50 else ''}", "debug_tts", "GEN")
     return text_output
+
 
 #################################################################
 # /api/tts-generate Generation API Endpoint Narration Combining #
@@ -1428,7 +1558,7 @@ def standard_filtering(text_input):
 def combine(output_file_timestamp, output_file_name, audio_files, target_sample_rate=44100, delete_originals=True):
     """
     Combine multiple audio files into one, with optional resampling and timestamping.
-    
+
     Args:
         output_file_timestamp (bool): Whether to add timestamp to output filename
         output_file_name (str): Base name for output file
@@ -1451,11 +1581,16 @@ def combine(output_file_timestamp, output_file_name, audio_files, target_sample_
                 return None, None, None
 
             audio_data, current_sample_rate = sf.read(normalized_audio_file)
-            print_message(f"Read file: {normalized_audio_file}, Sample rate: {current_sample_rate}, Data shape: {audio_data.shape}",
-                         "debug_concat", "TTS")
+            print_message(
+                f"Read file: {normalized_audio_file}, Sample rate: {current_sample_rate}, Data shape: {audio_data.shape}",
+                "debug_concat",
+                "TTS",
+            )
 
             if current_sample_rate != target_sample_rate:
-                print_message(f"Resampling file from {current_sample_rate} to {target_sample_rate} Hz", "debug_concat", "TTS")
+                print_message(
+                    f"Resampling file from {current_sample_rate} to {target_sample_rate} Hz", "debug_concat", "TTS"
+                )
                 audio_data = librosa.resample(audio_data, orig_sr=current_sample_rate, target_sr=target_sample_rate)
 
             audio = audio_data if audio.size == 0 else np.concatenate((audio, audio_data))
@@ -1464,15 +1599,19 @@ def combine(output_file_timestamp, output_file_name, audio_files, target_sample_
         # Prepare output paths
         if output_file_timestamp:
             timestamp = int(time.time())
-            filename = f'{output_file_name}_{timestamp}_combined.wav'
+            filename = f"{output_file_name}_{timestamp}_combined.wav"
         else:
-            filename = f'{output_file_name}_combined.wav'
+            filename = f"{output_file_name}_combined.wav"
 
         output_file_path = os.path.join(this_dir / "outputs" / filename)
         sf.write(output_file_path, audio, target_sample_rate)
 
         # Generate URLs based on API configuration
-        base_url = f"http://{config.api_def.api_legacy_ip_address}:{config.api_def.api_port_number}" if config.api_def.api_use_legacy_api else ""
+        base_url = (
+            f"http://{config.api_def.api_legacy_ip_address}:{config.api_def.api_port_number}"
+            if config.api_def.api_use_legacy_api
+            else ""
+        )
         output_file_url = f"{base_url}/audio/{filename}"
         output_cache_url = f"{base_url}/audiocache/{filename}"
 
@@ -1487,23 +1626,24 @@ def combine(output_file_timestamp, output_file_name, audio_files, target_sample_
                     os.remove(file_path)
                     print_message(f"Deleted original file: {file_path}", "debug_concat", "TTS")
                 except OSError as e:
-                    print_message(f"Error deleting file {file_path}: {str(e)}", "error", "TTS")
+                    print_message(f"Error deleting file {file_path}: {e!s}", "error", "TTS")
 
         return output_file_path, output_file_url, output_cache_url
 
-    except (OSError, IOError) as e:
-        print_message(f"File system error while processing audio: {str(e)}", "error", "TTS")
+    except OSError as e:
+        print_message(f"File system error while processing audio: {e!s}", "error", "TTS")
     except sf.SoundFileError as e:
-        print_message(f"Error reading audio file: {str(e)}", "error", "TTS")
+        print_message(f"Error reading audio file: {e!s}", "error", "TTS")
     except ValueError as e:
-        print_message(f"Invalid audio data or sample rate: {str(e)}", "error", "TTS")
+        print_message(f"Invalid audio data or sample rate: {e!s}", "error", "TTS")
     except MemoryError as e:
-        print_message(f"Out of memory while processing audio: {str(e)}", "error", "TTS")
+        print_message(f"Out of memory while processing audio: {e!s}", "error", "TTS")
     except librosa.ParameterError as e:
-        print_message(f"Error during audio resampling: {str(e)}", "error", "TTS")
+        print_message(f"Error during audio resampling: {e!s}", "error", "TTS")
     except Exception as e:  # pylint: disable=broad-exception-caught
-        print_message(f"An unexpected error occurred: {str(e)}", "error", "TTS")
+        print_message(f"An unexpected error occurred: {e!s}", "error", "TTS")
     return None, None, None
+
 
 ##################################
 # Central RVC Generation request #
@@ -1547,8 +1687,16 @@ def run_rvc(input_tts_path, pth_path, pitch, inference_pipeline):
         index_size_print = settings["training_data_size"]
     else:
         if len(index_files) > 1:
-            print_message(f"RVC Convert: Multiple RVC index files found in the models folder where {pth_filename} is", "warning", "GEN")
-            print_message("RVC Convert: located. Unable to determine which index to use. Continuing without an index file.", "warning", "GEN")
+            print_message(
+                f"RVC Convert: Multiple RVC index files found in the models folder where {pth_filename} is",
+                "warning",
+                "GEN",
+            )
+            print_message(
+                "RVC Convert: located. Unable to determine which index to use. Continuing without an index file.",
+                "warning",
+                "GEN",
+            )
         index_path = ""
         index_filename_print = "None used"
         index_size_print = "N/A"
@@ -1562,17 +1710,34 @@ def run_rvc(input_tts_path, pth_path, pitch, inference_pipeline):
         print_message(f"pth_path: {pth_path}", "debug_rvc", "GEN")
         print_message(f"index_path: {index_path}", "debug_rvc", "GEN")
 
-    inference_pipeline(settings["f0up_key"], settings["filter_radius"], settings["index_rate"],
-                  settings["rms_mix_rate"], settings["protect"], settings["hop_length"],
-                  settings["f0method"], input_tts_path, output_rvc_path, pth_path, index_path,
-                  settings["split_audio"], settings["f0autotune"], settings["embedder_model"],
-                  settings["training_data_size"], config.debugging.debug_rvc)
+    inference_pipeline(
+        settings["f0up_key"],
+        settings["filter_radius"],
+        settings["index_rate"],
+        settings["rms_mix_rate"],
+        settings["protect"],
+        settings["hop_length"],
+        settings["f0method"],
+        input_tts_path,
+        output_rvc_path,
+        pth_path,
+        index_path,
+        settings["split_audio"],
+        settings["f0autotune"],
+        settings["embedder_model"],
+        settings["training_data_size"],
+        config.debugging.debug_rvc,
+    )
 
     generate_elapsed_time = time.time() - generate_start_time
     print_message(f"RVC Convert: Model: {pth_filename} Index: {index_filename_print}", "debug_rvc", "GEN")
-    print_message(f"RVC Convert: {generate_elapsed_time:.2f} seconds. Method: {settings['f0method']} Index size used {index_size_print}",
-                 "debug_rvc", "GEN")
+    print_message(
+        f"RVC Convert: {generate_elapsed_time:.2f} seconds. Method: {settings['f0method']} Index size used {index_size_print}",
+        "debug_rvc",
+        "GEN",
+    )
     return
+
 
 ####################################################################
 # /api/tts-generate Generation API Endpoint Narration RVC handling #
@@ -1592,16 +1757,19 @@ def process_rvc_narrator(part_type, voice_gen, pitch, default_model_file, output
             print_message(f"RVC model not found: {pth_path}", "error", "GEN")
             return
 
-        print_message(f"Processing {part_type} segment with RVC model: {os.path.basename(pth_path)}", "debug_rvc", "GEN")
+        print_message(
+            f"Processing {part_type} segment with RVC model: {os.path.basename(pth_path)}", "debug_rvc", "GEN"
+        )
         run_rvc(output_file, pth_path, pitch, narr_infer_pipeline)
     except FileNotFoundError as e:
-        print_message(f"File not found during RVC processing for {part_type} segment: {str(e)}", "error", "GEN")
+        print_message(f"File not found during RVC processing for {part_type} segment: {e!s}", "error", "GEN")
     except TypeError as e:
-        print_message(f"Type error during RVC processing for {part_type} segment: {str(e)}", "error", "GEN")
+        print_message(f"Type error during RVC processing for {part_type} segment: {e!s}", "error", "GEN")
     except ValueError as e:
-        print_message(f"Value error during RVC processing for {part_type} segment: {str(e)}", "error", "GEN")
+        print_message(f"Value error during RVC processing for {part_type} segment: {e!s}", "error", "GEN")
     except OSError as e:
-        print_message(f"OS error during RVC processing for {part_type} segment: {str(e)}", "error", "GEN")
+        print_message(f"OS error during RVC processing for {part_type} segment: {e!s}", "error", "GEN")
+
 
 #############################################################
 # /api/tts-generate Generation API Endpoint JSON validation #
@@ -1614,25 +1782,62 @@ class JSONInput(BaseModel):
     Validation is performed using Pydantic's `Field` definitions with patterns, ranges, and descriptions.
     Custom validation methods ensure specific fields like RVC voice files and pitch values meet the required formats.
     """
-    text_input: str = Field(..., max_length=int(config.api_def.api_max_characters), description=f"text_input needs to be {config.api_def.api_max_characters} characters or less.")
-    text_filtering: str = Field(..., pattern="^(none|standard|html)$", description="text_filtering needs to be 'none', 'standard' or 'html'.")
-    character_voice_gen: str = Field(..., pattern=r'^[^<>"|?*]+$', description="character_voice_gen needs to be the name of a valid voice for the loaded TTS engine.")
-    rvccharacter_voice_gen: str = Field(..., description="rvccharacter_voice_gen needs to be the name of a valid pth file in the 'folder\\file.pth' format or the word 'Disabled'.")
+
+    text_input: str = Field(
+        ...,
+        max_length=int(config.api_def.api_max_characters),
+        description=f"text_input needs to be {config.api_def.api_max_characters} characters or less.",
+    )
+    text_filtering: str = Field(
+        ..., pattern="^(none|standard|html)$", description="text_filtering needs to be 'none', 'standard' or 'html'."
+    )
+    character_voice_gen: str = Field(
+        ...,
+        pattern=r'^[^<>"|?*]+$',
+        description="character_voice_gen needs to be the name of a valid voice for the loaded TTS engine.",
+    )
+    rvccharacter_voice_gen: str = Field(
+        ...,
+        description="rvccharacter_voice_gen needs to be the name of a valid pth file in the 'folder\\file.pth' format or the word 'Disabled'.",
+    )
     rvccharacter_pitch: float = Field(..., description="RVC Character pitch needs to be a number between -24 and 24")
-    narrator_enabled: str = Field(..., pattern="^(true|false|silent)$", description="narrator_enabled needs to be 'true', 'false' or 'silent'.")
-    narrator_voice_gen: str = Field(..., pattern=r'^[^<>"|?*]+$', description="character_voice_gen needs to be the name of a valid voice for the loaded TTS engine.")
-    rvcnarrator_voice_gen: str = Field(..., description="rvcnarrator_voice_gen needs to be the name of a valid pth file in the 'folder\\file.pth' format or the word 'Disabled'.")
+    narrator_enabled: str = Field(
+        ..., pattern="^(true|false|silent)$", description="narrator_enabled needs to be 'true', 'false' or 'silent'."
+    )
+    narrator_voice_gen: str = Field(
+        ...,
+        pattern=r'^[^<>"|?*]+$',
+        description="character_voice_gen needs to be the name of a valid voice for the loaded TTS engine.",
+    )
+    rvcnarrator_voice_gen: str = Field(
+        ...,
+        description="rvcnarrator_voice_gen needs to be the name of a valid pth file in the 'folder\\file.pth' format or the word 'Disabled'.",
+    )
     rvcnarrator_pitch: float = Field(..., description="RVC Narrator pitch needs to be a number between -24 and 24")
-    text_not_inside: str = Field(..., pattern="^(character|narrator|silent)$", description="text_not_inside needs to be 'character', 'narrator' or 'silent'.")
-    language: str = Field(..., pattern="^(auto|ar|zh-cn|zh|cs|nl|en|fr|de|hu|hi|it|ja|ko|pl|pt|ru|es|tr)$", description="language needs to be one of the following: auto, ar, zh-cn, zh, cs, nl, en, fr, de, hu, hi, it, ja, ko, pl, pt, ru, es, tr.")
-    output_file_name: str = Field(..., pattern="^[a-zA-Z0-9_]+$", description="output_file_name needs to be the name without any special characters or file extension, e.g., 'filename'.")
+    text_not_inside: str = Field(
+        ...,
+        pattern="^(character|narrator|silent)$",
+        description="text_not_inside needs to be 'character', 'narrator' or 'silent'.",
+    )
+    language: str = Field(
+        ...,
+        pattern="^(auto|ar|zh-cn|zh|cs|nl|en|fr|de|hu|hi|it|ja|ko|pl|pt|ru|es|tr)$",
+        description="language needs to be one of the following: auto, ar, zh-cn, zh, cs, nl, en, fr, de, hu, hi, it, ja, ko, pl, pt, ru, es, tr.",
+    )
+    output_file_name: str = Field(
+        ...,
+        pattern="^[a-zA-Z0-9_]+$",
+        description="output_file_name needs to be the name without any special characters or file extension, e.g., 'filename'.",
+    )
     output_file_timestamp: bool = Field(..., description="output_file_timestamp needs to be true or false.")
     autoplay: bool = Field(..., description="autoplay needs to be a true or false value.")
     autoplay_volume: float = Field(..., ge=0.1, le=1.0, description="autoplay_volume needs to be from 0.1 to 1.0.")
     speed: float = Field(..., ge=0.25, le=2.0, description="speed needs to be between 0.25 and 2.0.")
     pitch: float = Field(..., ge=-10, le=10, description="pitch needs to be between -10 and 10.")
     temperature: float = Field(..., ge=0.1, le=1.0, description="temperature needs to be between 0.1 and 1.0.")
-    repetition_penalty: float = Field(..., ge=1.0, le=20.0, description="repetition_penalty needs to be between 1.0 and 20.0.")
+    repetition_penalty: float = Field(
+        ..., ge=1.0, le=20.0, description="repetition_penalty needs to be between 1.0 and 20.0."
+    )
 
     @classmethod
     def validate_autoplay_volume(cls, value):
@@ -1645,7 +1850,7 @@ class JSONInput(BaseModel):
             print_message(f"Autoplay volume validated: {value}", "debug_tts", "GEN")
             return value
         except Exception as e:
-            print_message(f"Error validating autoplay volume: {str(e)}", "error", "GEN")
+            print_message(f"Error validating autoplay volume: {e!s}", "error", "GEN")
             raise
 
     @classmethod
@@ -1656,14 +1861,16 @@ class JSONInput(BaseModel):
             if v.lower() == "disabled":
                 print_message("RVC character voice disabled", "debug_rvc", "GEN")
                 return v
-            pattern = re.compile(r'^.*\.(pth)$')
+            pattern = re.compile(r"^.*\.(pth)$")
             if not pattern.match(v):
                 print_message(f"Invalid RVC character voice format: {v}", "error", "GEN")
-                raise ValueError("rvccharacter_voice_gen needs to be the name of a valid pth file in the 'folder\\file.pth' format or 'Disabled'.")
+                raise ValueError(
+                    "rvccharacter_voice_gen needs to be the name of a valid pth file in the 'folder\\file.pth' format or 'Disabled'."
+                )
             print_message(f"RVC character voice validated: {v}", "debug_rvc", "GEN")
             return v
         except Exception as e:
-            print_message(f"Error validating RVC character voice: {str(e)}", "error", "GEN")
+            print_message(f"Error validating RVC character voice: {e!s}", "error", "GEN")
             raise
 
     @classmethod
@@ -1674,14 +1881,16 @@ class JSONInput(BaseModel):
             if v.lower() == "disabled":
                 print_message("RVC narrator voice disabled", "debug_rvc", "GEN")
                 return v
-            pattern = re.compile(r'^.*\.(pth)$')
+            pattern = re.compile(r"^.*\.(pth)$")
             if not pattern.match(v):
                 print_message(f"Invalid RVC narrator voice format: {v}", "error", "GEN")
-                raise ValueError("rvcnarrator_voice_gen needs to be the name of a valid pth file in the 'folder\\file.pth' format or 'Disabled'.")
+                raise ValueError(
+                    "rvcnarrator_voice_gen needs to be the name of a valid pth file in the 'folder\\file.pth' format or 'Disabled'."
+                )
             print_message(f"RVC narrator voice validated: {v}", "debug_rvc", "GEN")
             return v
         except Exception as e:
-            print_message(f"Error validating RVC narrator voice: {str(e)}", "error", "GEN")
+            print_message(f"Error validating RVC narrator voice: {e!s}", "error", "GEN")
             raise
 
     @classmethod
@@ -1699,8 +1908,9 @@ class JSONInput(BaseModel):
             print_message(f"Invalid pitch format: {value}", "error", "GEN")
             raise ValueError("Pitch must be a number or a string representing a number.") from exc
         except Exception as e:
-            print_message(f"Error validating pitch: {str(e)}", "error", "GEN")
+            print_message(f"Error validating pitch: {e!s}", "error", "GEN")
             raise
+
 
 def validate_json_input(json_input_data):
     """Validate JSON input against JSONInput model schema."""
@@ -1718,86 +1928,122 @@ def validate_json_input(json_input_data):
         print_message(f"Error with API request: {error_message}", "error", "API")
         return error_message
 
+
 # API Configuration Getters
 def get_api_text_filtering():
     """Get text filtering setting."""
     return config.api_def.api_text_filtering
+
+
 def get_api_narrator_enabled():
     """Get narrator mode status."""
     return config.api_def.api_narrator_enabled
+
+
 def get_api_text_not_inside():
     """Get text parsing mode."""
     return config.api_def.api_text_not_inside
+
+
 def get_api_language():
     """Get API language setting."""
     return config.api_def.api_language
+
+
 def get_api_output_file_name():
     """Get output filename template."""
     return config.api_def.api_output_file_name
+
+
 def get_api_output_file_timestamp():
     """Get file timestamp setting."""
     return config.api_def.api_output_file_timestamp
+
+
 def get_api_autoplay():
     """Get autoplay status."""
     return config.api_def.api_autoplay
+
+
 def get_api_autoplay_volume():
     """Get autoplay volume level."""
     return config.api_def.api_autoplay_volume
+
 
 # Engine Parameter Getters
 def get_params_speed():
     """Get speech generation speed."""
     return model_engine.generationspeed_set
+
+
 def get_params_temperature():
     """Get model temperature."""
     return model_engine.temperature_set
+
+
 def get_params_repetition():
     """Get repetition penalty."""
-    return float(str(model_engine.repetitionpenalty_set).replace(',', '.'))
+    return float(str(model_engine.repetitionpenalty_set).replace(",", "."))
+
+
 def get_params_pitch():
     """Get voice pitch setting."""
     return model_engine.pitch_set
+
+
 def get_character_voice_gen():
     """Get default character voice."""
     return model_engine.def_character_voice
+
+
 def get_narrator_voice_gen():
     """Get default narrator voice."""
     return model_engine.def_narrator_voice
+
 
 # RVC Settings Getters
 def get_rvccharacter_voice_gen():
     """Get RVC character model."""
     return config.rvc_settings.rvc_char_model_file
+
+
 def get_rvccharacter_pitch():
     """Get RVC character pitch."""
     return config.rvc_settings.pitch
+
+
 def get_rvcnarrator_voice_gen():
     """Get RVC narrator model."""
     return config.rvc_settings.rvc_narr_model_file
+
+
 def get_rvcnarrator_pitch():
     """Get RVC narrator pitch."""
     return config.rvc_settings.pitch
+
 
 #############################################
 # /api/tts-generate Generation API Endpoint #
 #############################################
 async def tts_validate_and_prepare_input(
-    text_input: str,
-    request_params: dict,
-    default_params: dict
-) -> Tuple[dict, Union[None, str]]:
+    text_input: str, request_params: dict, default_params: dict
+) -> tuple[dict, None | str]:
     """Validate TTS input parameters and prepare settings."""
     debug_func_entry()
 
     if config.debugging.debug_tts or config.debugging.debug_tts_variables:
-        print_message("\033[94mPre-validation parameter check > tts_validate_and_prepare_input > tts_server.py\033[0m", "debug_tts_variables", "GEN")
+        print_message(
+            "\033[94mPre-validation parameter check > tts_validate_and_prepare_input > tts_server.py\033[0m",
+            "debug_tts_variables",
+            "GEN",
+        )
         print_message("API Configuration:", "debug_tts_variables", "GEN")
         config_items = {
             "max_characters": config.api_def.api_max_characters,
             "length_stripping": config.api_def.api_length_stripping,
             "legacy_api": config.api_def.api_use_legacy_api,
             "legacy_api_ip": config.api_def.api_legacy_ip_address,
-            "allowed_filter": config.api_def.api_allowed_filter
+            "allowed_filter": config.api_def.api_allowed_filter,
         }
         keys = list(config_items.keys())
         for i, key in enumerate(keys):
@@ -1805,13 +2051,16 @@ async def tts_validate_and_prepare_input(
             prefix = "└─" if i == len(keys) - 1 else "├─"
             print_message(f"{prefix} {key}: {config_items[key]}", "debug_tts_variables", "GEN")
 
-        print_message("\033[94mIncoming TTS Variables > tts_validate_and_prepare_input > tts_server.py\033[0m", "debug_tts_variables", "GEN")
+        print_message(
+            "\033[94mIncoming TTS Variables > tts_validate_and_prepare_input > tts_server.py\033[0m",
+            "debug_tts_variables",
+            "GEN",
+        )
         keys = list(request_params.keys())
         for i, key in enumerate(keys):
             # Use └─ for the last item, and ├─ for others
             prefix = "└─" if i == len(keys) - 1 else "├─"
             print_message(f"{prefix} {key}: {request_params[key]}", "debug_tts_variables", "GEN")
-
 
     # Merge request parameters with defaults
     params = {}
@@ -1819,15 +2068,16 @@ async def tts_validate_and_prepare_input(
         params[key] = request_params.get(key) if request_params.get(key) is not None else default_value
 
     # Validate merged parameters
-    json_input_data = {
-        "text_input": text_input,
-        **params
-    }
+    json_input_data = {"text_input": text_input, **params}
 
     validation_result = validate_json_input(json_input_data)
 
     if config.debugging.debug_tts or config.debugging.debug_tts_variables:
-        print_message("\033[94mPost Validation Variables > tts_validate_and_prepare_input > tts_server.py\033[0m", "debug_tts_variables", "GEN")
+        print_message(
+            "\033[94mPost Validation Variables > tts_validate_and_prepare_input > tts_server.py\033[0m",
+            "debug_tts_variables",
+            "GEN",
+        )
         keys = list(params.keys())
         for i, key in enumerate(keys):
             # Use └─ for the last item, and ├─ for others
@@ -1836,7 +2086,8 @@ async def tts_validate_and_prepare_input(
 
     return params, validation_result
 
-async def tts_handle_output_paths(output_file_name: str, timestamp: bool = True) -> Tuple[Path, str, str]:
+
+async def tts_handle_output_paths(output_file_name: str, timestamp: bool = True) -> tuple[Path, str, str]:
     """Generate output paths and URLs for TTS files."""
     debug_func_entry()
 
@@ -1844,24 +2095,25 @@ async def tts_handle_output_paths(output_file_name: str, timestamp: bool = True)
         hash_object = hashlib.sha256(str(uuid.uuid4()).encode())
         short_uuid = hash_object.hexdigest()[:5]
         timestamp_str = str(int(time.time()))
-        filename = f'{output_file_name}_{timestamp_str}{short_uuid}.{model_engine.audio_format}'
+        filename = f"{output_file_name}_{timestamp_str}{short_uuid}.{model_engine.audio_format}"
     else:
         filename = f"{output_file_name}.{model_engine.audio_format}"
 
     output_path = this_dir / config.get_output_directory() / filename
 
     if config.api_def.api_use_legacy_api:
-        base_url = f'http://{config.api_def.api_legacy_ip_address}:{config.api_def.api_port_number}'
-        file_url = f'{base_url}/audio/{filename}'
-        cache_url = f'{base_url}/audiocache/{filename}'
+        base_url = f"http://{config.api_def.api_legacy_ip_address}:{config.api_def.api_port_number}"
+        file_url = f"{base_url}/audio/{filename}"
+        cache_url = f"{base_url}/audiocache/{filename}"
     else:
-        file_url = f'/audio/{filename}'
-        cache_url = f'/audiocache/{filename}'
+        file_url = f"/audio/{filename}"
+        cache_url = f"/audiocache/{filename}"
 
     print_message(f"Generated output path: {output_path}", "debug_tts", "GEN")
     print_message(f"Generated URLs: {file_url}, {cache_url}", "debug_tts", "GEN")
 
     return output_path, file_url, cache_url
+
 
 def tts_clean_text(text: str, filtering_type: str) -> str:
     """Clean and filter input text based on specified filtering type."""
@@ -1878,15 +2130,16 @@ def tts_clean_text(text: str, filtering_type: str) -> str:
         return text
 
     # Common cleaning steps
-    cleaned = re.sub(r'([!?.])\1+', r'\1', cleaned)
-    cleaned = re.sub(rf'{config.api_def.api_allowed_filter}', '', cleaned)
-    cleaned = re.sub(r'\n+', ' ', cleaned)
+    cleaned = re.sub(r"([!?.])\1+", r"\1", cleaned)
+    cleaned = re.sub(rf"{config.api_def.api_allowed_filter}", "", cleaned)
+    cleaned = re.sub(r"\n+", " ", cleaned)
 
     print_message(f"Cleaned text: {cleaned}", "debug_tts", "GEN")
 
     return cleaned
 
-async def tts_process_narrator_mode(params: dict, text_input: str) -> Tuple[Path, str, str]:
+
+async def tts_process_narrator_mode(params: dict, text_input: str) -> tuple[Path, str, str]:
     """Process text with narrator mode, handling different voice types."""
     debug_func_entry()
 
@@ -1895,8 +2148,10 @@ async def tts_process_narrator_mode(params: dict, text_input: str) -> Tuple[Path
     else:
         print_message(f"{text_input[:90]}{'...' if len(text_input) > 90 else ''}", component="TTS")
 
-    if params['narrator_enabled'].lower() == "silent" and params['text_not_inside'].lower() == "silent":
-        print_message("Both Narrator & Text-not-inside are set to silent. If you get no TTS, this is why.", "warning", "GEN")
+    if params["narrator_enabled"].lower() == "silent" and params["text_not_inside"].lower() == "silent":
+        print_message(
+            "Both Narrator & Text-not-inside are set to silent. If you get no TTS, this is why.", "warning", "GEN"
+        )
 
     if model_engine.lowvram_enabled and model_engine.device == "cpu":
         await model_engine.handle_lowvram_change()
@@ -1929,102 +2184,132 @@ async def tts_process_narrator_mode(params: dict, text_input: str) -> Tuple[Path
     print_message("\033[92mNarrated TTS generation complete\033[0m", component="GEN")
     return await tts_finalize_output(audio_files, params)
 
-def tts_get_voice_for_part(part_type: str, params: dict, part: str) -> Optional[str]:
+
+def tts_get_voice_for_part(part_type: str, params: dict, part: str) -> str | None:
     """Determine appropriate voice for text part."""
     debug_func_entry()
-    preview = part[:50] + ('...' if len(part) > 50 else '') if not config.debugging.debug_fullttstext else part
+    preview = part[:50] + ("..." if len(part) > 50 else "") if not config.debugging.debug_fullttstext else part
 
-    if part_type == 'narrator':
-        if params['narrator_enabled'].lower() == "silent":
+    if part_type == "narrator":
+        if params["narrator_enabled"].lower() == "silent":
             print_message(f"\033[95mNarrator Silent:\033[0m {preview}", component="GEN")
             return None
-        voice = params['narrator_voice_gen']
+        voice = params["narrator_voice_gen"]
         print_message(f"\033[92mNarrator:\033[0m {preview}", component="GEN")
 
-    elif part_type == 'character':
-        voice = params['character_voice_gen']
+    elif part_type == "character":
+        voice = params["character_voice_gen"]
         print_message(f"\033[96mCharacter:\033[0m {preview}", component="GEN")
 
     else:
-        if params['text_not_inside'] == "silent":
+        if params["text_not_inside"] == "silent":
             print_message(f"\033[95mText-not-inside Silent:\033[0m {preview}", component="GEN")
             return None
 
-        voice = params['character_voice_gen'] if params['text_not_inside'] == "character" else params['narrator_voice_gen']
-        voice_type = "\033[96mCharacter (Text-not-inside)\033[0m" if params['text_not_inside'] == "character" else "\033[92mNarrator (Text-not-inside)\033[0m"
+        voice = (
+            params["character_voice_gen"] if params["text_not_inside"] == "character" else params["narrator_voice_gen"]
+        )
+        voice_type = (
+            "\033[96mCharacter (Text-not-inside)\033[0m"
+            if params["text_not_inside"] == "character"
+            else "\033[92mNarrator (Text-not-inside)\033[0m"
+        )
         print_message(f"{voice_type}: {preview}", component="GEN")
 
     return voice
 
-async def tts_generate_part(part: str, voice: str, params: dict) -> Optional[Path]:
+
+async def tts_generate_part(part: str, voice: str, params: dict) -> Path | None:
     """Generate audio for text part."""
     debug_func_entry()
-    cleaned_part = tts_clean_text(part, params['text_filtering'])
-    output_file = await tts_handle_output_paths(params['output_file_name'])
+    cleaned_part = tts_clean_text(part, params["text_filtering"])
+    output_file = await tts_handle_output_paths(params["output_file_name"])
 
     try:
         await generate_audio(
-            cleaned_part, voice, params['language'],
-            params['temperature'], params['repetition_penalty'],
-            params['speed'], params['pitch'],
-            output_file[0], False
+            cleaned_part,
+            voice,
+            params["language"],
+            params["temperature"],
+            params["repetition_penalty"],
+            params["speed"],
+            params["pitch"],
+            output_file[0],
+            False,
         )
         return output_file[0]
     except ValueError as e:
-        print_message(f"Invalid parameter value: {str(e)}", "error", "GEN")
+        print_message(f"Invalid parameter value: {e!s}", "error", "GEN")
         return None
-    except (OSError, IOError) as e:
-        print_message(f"File system error: {str(e)}", "error", "GEN")
+    except OSError as e:
+        print_message(f"File system error: {e!s}", "error", "GEN")
         return None
     except RuntimeError as e:
-        print_message(f"Audio generation runtime error: {str(e)}", "error", "GEN")
+        print_message(f"Audio generation runtime error: {e!s}", "error", "GEN")
         return None
     except KeyError as e:
-        print_message(f"Missing required parameter: {str(e)}", "error", "GEN")
+        print_message(f"Missing required parameter: {e!s}", "error", "GEN")
         return None
     except MemoryError as e:
-        print_message(f"Insufficient memory for audio generation: {str(e)}", "error", "GEN")
+        print_message(f"Insufficient memory for audio generation: {e!s}", "error", "GEN")
         return None
+
 
 async def tts_apply_rvc(output_file: Path, part_type: str, params: dict):
     """Apply RVC processing if enabled."""
     if not config.rvc_settings.rvc_enabled:
         return
 
-    if part_type == 'character':
-        process_rvc_narrator(part_type, params['rvccharacter_voice_gen'],
-                           params['rvccharacter_pitch'],
-                           config.rvc_settings.rvc_char_model_file,
-                           output_file, infer_pipeline)
-    elif part_type == 'narrator':
-        process_rvc_narrator(part_type, params['rvcnarrator_voice_gen'],
-                           params['rvcnarrator_pitch'],
-                           config.rvc_settings.rvc_narr_model_file,
-                           output_file, infer_pipeline)
+    if part_type == "character":
+        process_rvc_narrator(
+            part_type,
+            params["rvccharacter_voice_gen"],
+            params["rvccharacter_pitch"],
+            config.rvc_settings.rvc_char_model_file,
+            output_file,
+            infer_pipeline,
+        )
+    elif part_type == "narrator":
+        process_rvc_narrator(
+            part_type,
+            params["rvcnarrator_voice_gen"],
+            params["rvcnarrator_pitch"],
+            config.rvc_settings.rvc_narr_model_file,
+            output_file,
+            infer_pipeline,
+        )
     else:
-        if params['text_not_inside'] == 'character':
-            process_rvc_narrator('character', params['rvccharacter_voice_gen'],
-                               params['rvccharacter_pitch'],
-                               config.rvc_settings.rvc_char_model_file,
-                               output_file, infer_pipeline)
-        elif params['text_not_inside'] == 'narrator':
-            process_rvc_narrator('narrator', params['rvcnarrator_voice_gen'],
-                               params['rvcnarrator_pitch'],
-                               config.rvc_settings.rvc_narr_model_file,
-                               output_file, infer_pipeline)
+        if params["text_not_inside"] == "character":
+            process_rvc_narrator(
+                "character",
+                params["rvccharacter_voice_gen"],
+                params["rvccharacter_pitch"],
+                config.rvc_settings.rvc_char_model_file,
+                output_file,
+                infer_pipeline,
+            )
+        elif params["text_not_inside"] == "narrator":
+            process_rvc_narrator(
+                "narrator",
+                params["rvcnarrator_voice_gen"],
+                params["rvcnarrator_pitch"],
+                config.rvc_settings.rvc_narr_model_file,
+                output_file,
+                infer_pipeline,
+            )
 
-async def tts_process_standard_mode(params: dict, text_input: str) -> Union[StreamingResponse, Tuple[Path, str, str]]:
+
+async def tts_process_standard_mode(params: dict, text_input: str) -> StreamingResponse | tuple[Path, str, str]:
     """Process text with standard mode, without narrator functionality."""
     debug_func_entry()
 
     print_message("Standard generation mode", "debug_tts", "GEN")
 
-    output_file_path, output_file_url, output_cache_url = await tts_handle_output_paths( # pylint: disable=unused-variable # Do not remove output_file_url, output_cache_url
-        params['output_file_name'],
-        params['output_file_timestamp']
+    output_file_path, output_file_url, output_cache_url = await tts_handle_output_paths(  # pylint: disable=unused-variable # Do not remove output_file_url, output_cache_url
+        params["output_file_name"], params["output_file_timestamp"]
     )
 
-    cleaned_text = tts_clean_text(text_input, params['text_filtering'])
+    cleaned_text = tts_clean_text(text_input, params["text_filtering"])
 
     if config.debugging.debug_fullttstext:
         print_message(cleaned_text, component="TTS")
@@ -2032,56 +2317,68 @@ async def tts_process_standard_mode(params: dict, text_input: str) -> Union[Stre
         print_message(f"{cleaned_text[:90]}{'...' if len(cleaned_text) > 90 else ''}", component="TTS")
 
     try:
-        if params.get('streaming', False):
+        if params.get("streaming", False):
             stream = await generate_audio(
-                cleaned_text, params['character_voice_gen'], params['language'],
-                params['temperature'], params['repetition_penalty'],
-                params['speed'], params['pitch'],
-                output_file_path, True
+                cleaned_text,
+                params["character_voice_gen"],
+                params["language"],
+                params["temperature"],
+                params["repetition_penalty"],
+                params["speed"],
+                params["pitch"],
+                output_file_path,
+                True,
             )
             return StreamingResponse(stream, media_type="audio/wav")
 
         await generate_audio(
-            cleaned_text, params['character_voice_gen'], params['language'],
-            params['temperature'], params['repetition_penalty'],
-            params['speed'], params['pitch'],
-            output_file_path, False
+            cleaned_text,
+            params["character_voice_gen"],
+            params["language"],
+            params["temperature"],
+            params["repetition_penalty"],
+            params["speed"],
+            params["pitch"],
+            output_file_path,
+            False,
         )
 
         if config.rvc_settings.rvc_enabled:
             await tts_handle_rvc_processing(output_file_path, params)
 
-        return await tts_handle_audio_output(output_file_path, params['autoplay'], params['autoplay_volume'])
+        return await tts_handle_audio_output(output_file_path, params["autoplay"], params["autoplay_volume"])
 
     except Exception as e:
-        print_message(f"Error in standard processing: {str(e)}", "error", "GEN")
+        print_message(f"Error in standard processing: {e!s}", "error", "GEN")
         raise
+
 
 async def tts_handle_rvc_processing(output_file_path: Path, params: dict):
     """Handle RVC voice conversion if enabled."""
     debug_func_entry()
-    if params['rvccharacter_voice_gen'].lower() in ["disabled", "disable"]:
+    if params["rvccharacter_voice_gen"].lower() in ["disabled", "disable"]:
         print_message("RVC processing skipped", "debug_tts", "GEN")
         return
 
     print_message("Processing with RVC", "debug_tts", "GEN")
-    rvc_model_path = this_dir / "models" / "rvc_voices" / params['rvccharacter_voice_gen']
+    rvc_model_path = this_dir / "models" / "rvc_voices" / params["rvccharacter_voice_gen"]
     pth_path = rvc_model_path if rvc_model_path else config.rvc_settings.rvc_char_model_file
-    run_rvc(output_file_path, pth_path, params['rvccharacter_pitch'], infer_pipeline)
+    run_rvc(output_file_path, pth_path, params["rvccharacter_pitch"], infer_pipeline)
 
-async def tts_handle_audio_output(output_file_path: Path, autoplay: bool, volume: float) -> Tuple[Path, str, str]:
+
+async def tts_handle_audio_output(output_file_path: Path, autoplay: bool, volume: float) -> tuple[Path, str, str]:
     """Handle audio transcoding and playback."""
     debug_func_entry()
     model_format = str(model_engine.audio_format).lower()
     output_format = str(config.transcode_audio_format).lower()
 
-    output_file_url = f'/audio/{output_file_path.name}'
-    output_cache_url = f'/audiocache/{output_file_path.name}'
+    output_file_url = f"/audio/{output_file_path.name}"
+    output_cache_url = f"/audiocache/{output_file_path.name}"
 
     if config.api_def.api_use_legacy_api:
-        base_url = f'http://{config.api_def.api_legacy_ip_address}:{config.api_def.api_port_number}'
-        output_file_url = f'{base_url}{output_file_url}'
-        output_cache_url = f'{base_url}{output_cache_url}'
+        base_url = f"http://{config.api_def.api_legacy_ip_address}:{config.api_def.api_port_number}"
+        output_file_url = f"{base_url}{output_file_url}"
+        output_cache_url = f"{base_url}{output_cache_url}"
 
     if output_format not in ("disabled", model_format):
         output_file_path, output_file_url, output_cache_url = await transcode_audio_if_necessary(
@@ -2093,14 +2390,13 @@ async def tts_handle_audio_output(output_file_path: Path, autoplay: bool, volume
 
     return output_file_path, output_file_url, output_cache_url
 
-async def tts_finalize_output(audio_files: List[Path], params: dict) -> Tuple[Path, str, str]:
+
+async def tts_finalize_output(audio_files: list[Path], params: dict) -> tuple[Path, str, str]:
     """Combine audio files and handle final processing."""
     debug_func_entry()
 
     output_file_path, output_file_url, output_cache_url = combine(
-        params['output_file_timestamp'],
-        params['output_file_name'],
-        audio_files
+        params["output_file_timestamp"], params["output_file_name"], audio_files
     )
 
     model_format = str(model_engine.audio_format).lower()
@@ -2112,10 +2408,11 @@ async def tts_finalize_output(audio_files: List[Path], params: dict) -> Tuple[Pa
                 output_file_path, model_format, output_format
             )
 
-    if sounddevice_installed and params['autoplay']:
-        play_audio(output_file_path, params['autoplay_volume'])
+    if sounddevice_installed and params["autoplay"]:
+        play_audio(output_file_path, params["autoplay_volume"])
 
     return output_file_path, output_file_url, output_cache_url
+
 
 def detect_language(text: str) -> str:
     """
@@ -2127,19 +2424,21 @@ def detect_language(text: str) -> str:
     try:
         # Detect the language of the text
         detected_lang = detect(text)
-        print_message(f"Detected language: {detected_lang}",
-                      message_type="debug_tts")
+        print_message(f"Detected language: {detected_lang}", message_type="debug_tts")
 
         # Use the fallback language if the detected one is unsupported
         fallback_lang = LANG_FALLBACKS.get(detected_lang, "en")  # Default fallback: French
         if detected_lang != fallback_lang:
-            print_message(f"Language '{detected_lang}' not supported, using fallback '{fallback_lang}'", message_type="debug_tts")
+            print_message(
+                f"Language '{detected_lang}' not supported, using fallback '{fallback_lang}'", message_type="debug_tts"
+            )
 
         return fallback_lang
     except LangDetectException as e:
         # Handle errors in language detection
-        print_message(f"Language detection error: {str(e)}", message_type="debug_tts")
+        print_message(f"Language detection error: {e!s}", message_type="debug_tts")
         raise ValueError("Could not detect language")
+
 
 @app.post("/api/tts-generate", response_class=JSONResponse)
 async def apifunction_generate_tts_standard(
@@ -2205,7 +2504,7 @@ async def apifunction_generate_tts_standard(
             "speed": speed,
             "temperature": temperature,
             "repetition_penalty": repetition_penalty,
-            "pitch": pitch
+            "pitch": pitch,
         }
 
         default_params = {
@@ -2226,13 +2525,11 @@ async def apifunction_generate_tts_standard(
             "speed": _speed,
             "temperature": _temperature,
             "repetition_penalty": _repetition_penalty,
-            "pitch": _pitch
+            "pitch": _pitch,
         }
 
         # Validate and prepare input
-        params, validation_error = await tts_validate_and_prepare_input(
-            text_input, request_params, default_params
-        )
+        params, validation_error = await tts_validate_and_prepare_input(text_input, request_params, default_params)
 
         if validation_error:
             return JSONResponse(content={"error": validation_error}, status_code=400)
@@ -2248,9 +2545,7 @@ async def apifunction_generate_tts_standard(
                 if model_engine.lowvram_enabled and model_engine.device == "cuda" and model_engine.lowvram_capable:
                     await model_engine.handle_lowvram_change()
         else:
-            output_file_path, output_file_url, output_cache_url = await tts_process_standard_mode(
-                params, text_input
-            )
+            output_file_path, output_file_url, output_cache_url = await tts_process_standard_mode(params, text_input)
 
         print_message(f"Final output_file_path is: {output_file_path}", "debug_tts", "GEN")
         print_message(f"Final output_file_url is : {output_file_url}", "debug_tts", "GEN")
@@ -2264,56 +2559,62 @@ async def apifunction_generate_tts_standard(
                 "status": "generate-success",
                 "output_file_path": str(output_file_path),
                 "output_file_url": str(output_file_url),
-                "output_cache_url": str(output_cache_url)
+                "output_cache_url": str(output_cache_url),
             },
-            status_code=200
+            status_code=200,
         )
 
     except ValueError as e:
-        print_message(f"Invalid parameter value: {str(e)}", "error", "GEN")
+        print_message(f"Invalid parameter value: {e!s}", "error", "GEN")
         return JSONResponse(content={"status": "generate-failure", "error": str(e)}, status_code=400)
     except ValidationError as e:
-        print_message(f"Input validation error: {str(e)}", "error", "GEN")
+        print_message(f"Input validation error: {e!s}", "error", "GEN")
         return JSONResponse(content={"status": "generate-failure", "error": str(e)}, status_code=400)
     except FileNotFoundError as e:
-        print_message(f"File or directory not found: {str(e)}", "error", "GEN")
+        print_message(f"File or directory not found: {e!s}", "error", "GEN")
         return JSONResponse(content={"status": "generate-failure", "error": "Resource not found"}, status_code=404)
     except PermissionError as e:
-        print_message(f"Permission denied: {str(e)}", "error", "GEN")
+        print_message(f"Permission denied: {e!s}", "error", "GEN")
         return JSONResponse(content={"status": "generate-failure", "error": "Permission denied"}, status_code=403)
-    except (OSError, IOError) as e:
-        print_message(f"I/O operation failed: {str(e)}", "error", "GEN")
+    except OSError as e:
+        print_message(f"I/O operation failed: {e!s}", "error", "GEN")
         return JSONResponse(content={"status": "generate-failure", "error": "File operation failed"}, status_code=500)
     except RuntimeError as e:
-        print_message(f"Runtime error in TTS generation: {str(e)}", "error", "GEN")
+        print_message(f"Runtime error in TTS generation: {e!s}", "error", "GEN")
         return JSONResponse(content={"status": "generate-failure", "error": "TTS generation failed"}, status_code=500)
     except MemoryError as e:
-        print_message(f"Out of memory: {str(e)}", "error", "GEN")
+        print_message(f"Out of memory: {e!s}", "error", "GEN")
         return JSONResponse(content={"status": "generate-failure", "error": "Insufficient memory"}, status_code=507)
+
 
 #############################
 #### Word Add-in Sharing ####
 #############################
 # Mount the static files from the 'word_addin' directory
-app.mount("/api/word_addin", StaticFiles(directory=os.path.join(this_dir / 'system' / 'word_addin')), name="word_addin")
+app.mount("/api/word_addin", StaticFiles(directory=os.path.join(this_dir / "system" / "word_addin")), name="word_addin")
+
 
 #############################################
 #### TTS Generator Comparision Endpoints ####
 #############################################
 class TTSItem(BaseModel):
     """Individual TTS item structure for saving."""
+
     id: int
     fileUrl: str
     text: str
     characterVoice: str
     language: str
 
+
 class TTSData(BaseModel):
     """Collection of TTS items."""
-    ttsList: List[TTSItem]
+
+    ttsList: list[TTSItem]
+
 
 @app.post("/api/save-tts-data")
-async def apifunction_save_tts_data(tts_data: List[TTSItem]):
+async def apifunction_save_tts_data(tts_data: list[TTSItem]):
     """Save TTS data to JSON file in output directory."""
     debug_func_entry()
 
@@ -2326,23 +2627,26 @@ async def apifunction_save_tts_data(tts_data: List[TTSItem]):
 
         output_path = this_dir / config.get_output_directory() / "ttsList.json"
 
-        async with aiofiles.open(output_path, 'w') as f:
+        async with aiofiles.open(output_path, "w") as f:
             await f.write(tts_data_json)
 
         print_message(f"TTS data saved to {output_path}", "debug_tts", "GEN")
         return {"message": "Data saved successfully"}
 
     except Exception as e:
-        print_message(f"Error saving TTS data: {str(e)}", "error", "GEN")
+        print_message(f"Error saving TTS data: {e!s}", "error", "GEN")
         raise HTTPException(status_code=500, detail="Failed to save TTS data") from e
+
 
 ########################################
 # Trigger TTS Gen Text/Speech Analysis #
 ########################################
 @app.get("/api/trigger-analysis")
-async def apifunction_trigger_analysis(threshold: int = Query(default=98), whisper_model: str = Query(default="large-v3")):
+async def apifunction_trigger_analysis(
+    threshold: int = Query(default=98), whisper_model: str = Query(default="large-v3")
+):
     """Trigger Whisper analysis to compare generated TTS against original text.
-    
+
     Args:
         threshold: Minimum acceptable match percentage (default: 98)
     """
@@ -2362,7 +2666,11 @@ async def apifunction_trigger_analysis(threshold: int = Query(default=98), whisp
             print_message("TTS list file not found", "error", "GEN")
             raise HTTPException(status_code=404, detail="TTS list file not found")
 
-        print_message(f"Starting TTS analysis with threshold: {threshold}%, using Whisper model: {whisper_model}", "debug_tts", "GEN")
+        print_message(
+            f"Starting TTS analysis with threshold: {threshold}%, using Whisper model: {whisper_model}",
+            "debug_tts",
+            "GEN",
+        )
 
         # Run analysis script
         result = subprocess.run(
@@ -2372,12 +2680,12 @@ async def apifunction_trigger_analysis(threshold: int = Query(default=98), whisp
                 f"--threshold={threshold}",
                 f"--ttslistpath={ttslist_path}",
                 f"--wavfilespath={wavfile_path}",
-                f"--whisper-model={whisper_model}"
+                f"--whisper-model={whisper_model}",
             ],
             cwd=this_dir / "system" / "tts_diff",
             env=env,
             text=True,
-            check=True
+            check=True,
         )
 
         if result.returncode != 0:
@@ -2387,21 +2695,22 @@ async def apifunction_trigger_analysis(threshold: int = Query(default=98), whisp
         # Read analysis results
         try:
             summary_path = this_dir / config.get_output_directory() / "analysis_summary.json"
-            with open(summary_path, "r", encoding="utf-8") as summary_file:
+            with open(summary_path, encoding="utf-8") as summary_file:
                 summary_data = json.load(summary_file)
                 print_message("Analysis summary loaded successfully", "debug_tts", "GEN")
         except FileNotFoundError:
             print_message("Analysis summary file not found", "error", "GEN")
             summary_data = {"error": "Analysis summary file not found."}
         except json.JSONDecodeError as e:
-            print_message(f"Error parsing analysis summary: {str(e)}", "error", "GEN")
+            print_message(f"Error parsing analysis summary: {e!s}", "error", "GEN")
             summary_data = {"error": "Invalid analysis summary format."}
 
         return {"message": "Analysis Completed", "summary": summary_data}
 
     except Exception as e:
-        print_message(f"Error during analysis: {str(e)}", "error", "GEN")
+        print_message(f"Error during analysis: {e!s}", "error", "GEN")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
 
 ###########################################
 # TTS Generator SRT Subtitiles generation #
@@ -2431,17 +2740,12 @@ async def apifunction_srt_generation():
 
         # Run SRT generation script
         result = subprocess.run(
-            [
-                sys.executable,
-                "tts_srt.py",
-                f"--ttslistpath={ttslist_path}",
-                f"--wavfilespath={wavfile_path}"
-            ],
+            [sys.executable, "tts_srt.py", f"--ttslistpath={ttslist_path}", f"--wavfilespath={wavfile_path}"],
             cwd=this_dir / "system" / "tts_srt",
             env=env,
             capture_output=True,
             text=True,
-            check=True
+            check=True,
         )
 
         # Validate subprocess result
@@ -2456,18 +2760,14 @@ async def apifunction_srt_generation():
             raise HTTPException(status_code=404, detail="Subtitle file not found")
 
         print_message("SRT generation completed successfully", "debug_tts", "GEN")
-        return FileResponse(
-            path=srt_file_path,
-            filename="subtitles.srt",
-            media_type='application/octet-stream'
-        )
+        return FileResponse(path=srt_file_path, filename="subtitles.srt", media_type="application/octet-stream")
 
     except subprocess.CalledProcessError as e:
-        print_message(f"Subprocess execution failed: {str(e)}", "error", "GEN")
-        raise HTTPException(status_code=500, detail=f"Subprocess execution failed: {str(e)}") from e
+        print_message(f"Subprocess execution failed: {e!s}", "error", "GEN")
+        raise HTTPException(status_code=500, detail=f"Subprocess execution failed: {e!s}") from e
 
     except Exception as e:
-        print_message(f"Error during SRT generation: {str(e)}", "error", "GEN")
+        print_message(f"Error during SRT generation: {e!s}", "error", "GEN")
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
@@ -2481,6 +2781,7 @@ app.mount("/static", StaticFiles(directory=str(this_dir / "system")), name="stat
 ########################################
 # Loguru handles logging configuration via system/logging_config.py
 
+
 @app.get("/settings")
 async def get_settings(request: Request):
     """Return HTML template with current configuration settings."""
@@ -2489,13 +2790,11 @@ async def get_settings(request: Request):
     try:
         settings_data = config.to_dict()
         print_message("Rendering admin settings page", "debug_api", "API")
-        return templates.TemplateResponse("admin.html", {
-            "request": request, 
-            "data": settings_data
-        })
+        return templates.TemplateResponse("admin.html", {"request": request, "data": settings_data})
     except Exception as e:
-        print_message(f"Error rendering settings page: {str(e)}", "error", "API")
+        print_message(f"Error rendering settings page: {e!s}", "error", "API")
         raise HTTPException(status_code=500, detail="Failed to load settings page") from e
+
 
 @app.get("/settings-json")
 async def get_settings_json():
@@ -2507,8 +2806,9 @@ async def get_settings_json():
         print_message("Returning JSON settings data", "debug_api", "API")
         return settings_data
     except Exception as e:
-        print_message(f"Error retrieving settings data: {str(e)}", "error", "API")
+        print_message(f"Error retrieving settings data: {e!s}", "error", "API")
         raise HTTPException(status_code=500, detail="Failed to retrieve settings") from e
+
 
 @app.post("/update-settings")
 async def update_settings(
@@ -2539,7 +2839,7 @@ async def update_settings(
 
         # Update configuration
         config.delete_output_wavs = delete_output_wavs
-        config.gradio_interface = gradio_interface.lower() == 'true'
+        config.gradio_interface = gradio_interface.lower() == "true"
         config.gradio_port_number = gradio_port_number
         config.api_def.api_port_number = api_port_number
 
@@ -2556,17 +2856,15 @@ async def update_settings(
         print_message("Settings saved successfully", "debug_api", "API")
 
         # Return updated settings page
-        return templates.TemplateResponse("admin.html", {
-            "request": request, 
-            "data": config.to_dict()
-        })
+        return templates.TemplateResponse("admin.html", {"request": request, "data": config.to_dict()})
 
     except ValueError as e:
-        print_message(f"Validation error in settings update: {str(e)}", "error", "API")
+        print_message(f"Validation error in settings update: {e!s}", "error", "API")
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        print_message(f"Error updating settings: {str(e)}", "error", "API")
+        print_message(f"Error updating settings: {e!s}", "error", "API")
         raise HTTPException(status_code=500, detail="Failed to update settings") from e
+
 
 # Create an instance of Jinja2Templates for rendering HTML templates
 templates = Jinja2Templates(directory=this_dir / "system")
@@ -2574,6 +2872,7 @@ templates = Jinja2Templates(directory=this_dir / "system")
 template = templates.get_template("admin.html")
 # Render the template with the dynamic values
 rendered_html = template.render(params=config.to_dict())
+
 
 ###################################################
 #### Webserver Startup & Initial model Loading ####
@@ -2587,11 +2886,13 @@ async def read_root():
         print_message("Serving main application page", "debug_api", "API")
         return HTMLResponse(content=rendered_html, status_code=200)
     except Exception as e:
-        print_message(f"Error serving main page: {str(e)}", "error", "API")
+        print_message(f"Error serving main page: {e!s}", "error", "API")
         raise HTTPException(status_code=500, detail="Failed to load application page") from e
+
 
 # Start Uvicorn Webserver
 # port_parameter = int(config.api_def.api_port_number)
+
 
 def start_server():
     """
@@ -2602,7 +2903,7 @@ def start_server():
     It assigns the server instance to the global `uvicorn_server` variable
     (although Uvicorn's `run` function does not return a useful value).
     """
-    global uvicorn_server # pylint: disable=global-statement
+    global uvicorn_server  # pylint: disable=global-statement
     # Command line argument parser
     parser = argparse.ArgumentParser(description="AllTalk TTS Server")
     parser.add_argument("--port", type=int, help="Port number for the server")
@@ -2611,8 +2912,8 @@ def start_server():
     config_port = int(config.api_def.api_port_number)
     port_to_use = args.port if args.port is not None else config_port
     # Start Uvicorn Webserver
-    uvicorn_server = uvicorn.run(app, host="0.0.0.0", port=port_to_use, log_level="debug") # pylint: disable=assignment-from-no-return
+    uvicorn_server = uvicorn.run(app, host="0.0.0.0", port=port_to_use, log_level="debug")  # pylint: disable=assignment-from-no-return
+
 
 if __name__ == "__main__":
     start_server()
-    

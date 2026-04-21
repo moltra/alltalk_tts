@@ -1,22 +1,19 @@
-from typing import Union
-
-import torch.nn.functional as F
-import numpy as np
-import torch
-import torch.nn as nn
-from torch.nn.utils.parametrizations import weight_norm
-from torchaudio.transforms import Resample
-import os
-import librosa
-import soundfile as sf
-import torch.utils.data
-from librosa.filters import mel as librosa_mel_fn
 import math
+import os
 from functools import partial
 
+import librosa
+import numpy as np
+import soundfile as sf
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.utils.data
 from einops import rearrange, repeat
+from librosa.filters import mel as librosa_mel_fn
 from local_attention import LocalAttention
-from torch import nn
+from torch.nn.utils.parametrizations import weight_norm
+from torchaudio.transforms import Resample
 
 os.environ["LRU_CACHE_CAPACITY"] = "3"
 
@@ -39,29 +36,21 @@ def load_wav_to_torch(full_path, target_sr=None, return_empty_on_exception=False
         )  # check duration of audio file is > 2 samples (because otherwise the slice operation was on the wrong dimension)
 
     if np.issubdtype(data.dtype, np.integer):  # if audio data is type int
-        max_mag = -np.iinfo(
-            data.dtype
-        ).min  # maximum magnitude = min possible value of intXX
+        max_mag = -np.iinfo(data.dtype).min  # maximum magnitude = min possible value of intXX
     else:  # if audio data is type fp32
         max_mag = max(np.amax(data), -np.amin(data))
         max_mag = (
-            (2**31) + 1
-            if max_mag > (2**15)
-            else ((2**15) + 1 if max_mag > 1.01 else 1.0)
+            (2**31) + 1 if max_mag > (2**15) else ((2**15) + 1 if max_mag > 1.01 else 1.0)
         )  # data should be either 16-bit INT, 32-bit INT or [-1 to 1] float32
 
     data = torch.FloatTensor(data.astype(np.float32)) / max_mag
 
     if (
-        torch.isinf(data) | torch.isnan(data)
-    ).any() and return_empty_on_exception:  # resample will crash with inf/NaN inputs. return_empty_on_exception will return empty arr instead of except
+        (torch.isinf(data) | torch.isnan(data)).any() and return_empty_on_exception
+    ):  # resample will crash with inf/NaN inputs. return_empty_on_exception will return empty arr instead of except
         return [], sampling_rate or target_sr or 48000
     if target_sr is not None and sampling_rate != target_sr:
-        data = torch.from_numpy(
-            librosa.core.resample(
-                data.numpy(), orig_sr=sampling_rate, target_sr=target_sr
-            )
-        )
+        data = torch.from_numpy(librosa.core.resample(data.numpy(), orig_sr=sampling_rate, target_sr=target_sr))
         sampling_rate = target_sr
 
     return data, sampling_rate
@@ -130,9 +119,7 @@ class STFT:
 
         mel_basis_key = str(fmax) + "_" + str(y.device)
         if mel_basis_key not in mel_basis:
-            mel = librosa_mel_fn(
-                sr=sampling_rate, n_fft=n_fft, n_mels=n_mels, fmin=fmin, fmax=fmax
-            )
+            mel = librosa_mel_fn(sr=sampling_rate, n_fft=n_fft, n_mels=n_mels, fmin=fmin, fmax=fmax)
             mel_basis[mel_basis_key] = torch.from_numpy(mel).float().to(y.device)
 
         keyshift_key = str(keyshift) + "_" + str(y.device)
@@ -185,9 +172,7 @@ stft = STFT()
 # import fast_transformers.causal_product.causal_product_cuda
 
 
-def softmax_kernel(
-    data, *, projection_matrix, is_query, normalize_data=True, eps=1e-4, device=None
-):
+def softmax_kernel(data, *, projection_matrix, is_query, normalize_data=True, eps=1e-4, device=None):
     b, h, *_ = data.shape
     # (batch size, head, length, model_dim)
 
@@ -211,18 +196,9 @@ def softmax_kernel(
     diag_data = diag_data.unsqueeze(dim=-1)
 
     if is_query:
-        data_dash = ratio * (
-            torch.exp(
-                data_dash
-                - diag_data
-                - torch.max(data_dash, dim=-1, keepdim=True).values
-            )
-            + eps
-        )
+        data_dash = ratio * (torch.exp(data_dash - diag_data - torch.max(data_dash, dim=-1, keepdim=True).values) + eps)
     else:
-        data_dash = ratio * (
-            torch.exp(data_dash - diag_data + eps)
-        )  # - torch.max(data_dash)) + eps)
+        data_dash = ratio * (torch.exp(data_dash - diag_data + eps))  # - torch.max(data_dash)) + eps)
 
     return data_dash.type_as(data)
 
@@ -283,7 +259,6 @@ class PCmer(nn.Module):
     #  METHODS  ########################################################################################################
 
     def forward(self, phone, mask=None):
-
         # apply all layers to the input
         for i, layer in enumerate(self._layers):
             phone = layer(phone, mask)
@@ -317,14 +292,11 @@ class _EncoderLayer(nn.Module):
         self.dropout = nn.Dropout(parent.residual_dropout)
 
         # selfatt -> fastatt: performer!
-        self.attn = SelfAttention(
-            dim=parent.dim_model, heads=parent.num_heads, causal=False
-        )
+        self.attn = SelfAttention(dim=parent.dim_model, heads=parent.num_heads, causal=False)
 
     #  METHODS  ########################################################################################################
 
     def forward(self, phone, mask=None):
-
         # compute attention sub-layer
         phone = phone + (self.attn(self.norm(phone), mask=mask))
 
@@ -378,9 +350,7 @@ class DepthWiseConv1d(nn.Module):
 
 
 class ConformerConvModule(nn.Module):
-    def __init__(
-        self, dim, causal=False, expansion_factor=2, kernel_size=31, dropout=0.0
-    ):
+    def __init__(self, dim, causal=False, expansion_factor=2, kernel_size=31, dropout=0.0):
         super().__init__()
 
         inner_dim = dim * expansion_factor
@@ -391,9 +361,7 @@ class ConformerConvModule(nn.Module):
             Transpose((1, 2)),
             nn.Conv1d(dim, inner_dim * 2, 1),
             GLU(dim=1),
-            DepthWiseConv1d(
-                inner_dim, inner_dim, kernel_size=kernel_size, padding=padding
-            ),
+            DepthWiseConv1d(inner_dim, inner_dim, kernel_size=kernel_size, padding=padding),
             # nn.BatchNorm1d(inner_dim) if not causal else nn.Identity(),
             Swish(),
             nn.Conv1d(inner_dim, dim, 1),
@@ -420,23 +388,17 @@ def linear_attention(q, k, v):
         return out
 
 
-def gaussian_orthogonal_random_matrix(
-    nb_rows, nb_columns, scaling=0, qr_uniform_q=False, device=None
-):
+def gaussian_orthogonal_random_matrix(nb_rows, nb_columns, scaling=0, qr_uniform_q=False, device=None):
     nb_full_blocks = int(nb_rows / nb_columns)
     block_list = []
 
     for _ in range(nb_full_blocks):
-        q = orthogonal_matrix_chunk(
-            nb_columns, qr_uniform_q=qr_uniform_q, device=device
-        )
+        q = orthogonal_matrix_chunk(nb_columns, qr_uniform_q=qr_uniform_q, device=device)
         block_list.append(q)
 
     remaining_rows = nb_rows - nb_full_blocks * nb_columns
     if remaining_rows > 0:
-        q = orthogonal_matrix_chunk(
-            nb_columns, qr_uniform_q=qr_uniform_q, device=device
-        )
+        q = orthogonal_matrix_chunk(nb_columns, qr_uniform_q=qr_uniform_q, device=device)
 
         block_list.append(q[:remaining_rows])
 
@@ -445,9 +407,7 @@ def gaussian_orthogonal_random_matrix(
     if scaling == 0:
         multiplier = torch.randn((nb_rows, nb_columns), device=device).norm(dim=1)
     elif scaling == 1:
-        multiplier = math.sqrt((float(nb_columns))) * torch.ones(
-            (nb_rows,), device=device
-        )
+        multiplier = math.sqrt(float(nb_columns)) * torch.ones((nb_rows,), device=device)
     else:
         raise ValueError(f"Invalid scaling {scaling}")
 
@@ -505,9 +465,7 @@ class FastAttention(nn.Module):
             q = q.softmax(dim=-1)
             k = torch.exp(k) if self.causal else k.softmax(dim=-2)
         else:
-            create_kernel = partial(
-                softmax_kernel, projection_matrix=self.projection_matrix, device=device
-            )
+            create_kernel = partial(softmax_kernel, projection_matrix=self.projection_matrix, device=device)
 
             q = create_kernel(q, is_query=True)
             k = create_kernel(k, is_query=False)
@@ -610,9 +568,7 @@ class SelfAttention(nn.Module):
             attn_outs.append(out)
 
         if not empty(lq):
-            assert (
-                not cross_attend
-            ), "local attention is not compatible with cross attention"
+            assert not cross_attend, "local attention is not compatible with cross attention"
             out = self.local_attn(lq, lk, lv, input_mask=mask)
             attn_outs.append(out)
 
@@ -657,18 +613,12 @@ class FCPE(nn.Module):
             raise ValueError("Full model is not supported yet.")
 
         self.loss_mse_scale = loss_mse_scale if (loss_mse_scale is not None) else 10
-        self.loss_l2_regularization = (
-            loss_l2_regularization if (loss_l2_regularization is not None) else False
-        )
+        self.loss_l2_regularization = loss_l2_regularization if (loss_l2_regularization is not None) else False
         self.loss_l2_regularization_scale = (
-            loss_l2_regularization_scale
-            if (loss_l2_regularization_scale is not None)
-            else 1
+            loss_l2_regularization_scale if (loss_l2_regularization_scale is not None) else 1
         )
         self.loss_grad1_mse = loss_grad1_mse if (loss_grad1_mse is not None) else False
-        self.loss_grad1_mse_scale = (
-            loss_grad1_mse_scale if (loss_grad1_mse_scale is not None) else 1
-        )
+        self.loss_grad1_mse_scale = loss_grad1_mse_scale if (loss_grad1_mse_scale is not None) else 1
         self.f0_max = f0_max if (f0_max is not None) else 1975.5
         self.f0_min = f0_min if (f0_min is not None) else 32.70
         self.confidence = confidence if (confidence is not None) else False
@@ -709,9 +659,7 @@ class FCPE(nn.Module):
         self.n_out = out_dims
         self.dense_out = weight_norm(nn.Linear(n_chans, self.n_out))
 
-    def forward(
-        self, mel, infer=True, gt_f0=None, return_hz_f0=False, cdecoder="local_argmax"
-    ):
+    def forward(self, mel, infer=True, gt_f0=None, return_hz_f0=False, cdecoder="local_argmax"):
         """
         input:
             B x n_frames x n_unit
@@ -733,14 +681,10 @@ class FCPE(nn.Module):
         if not infer:
             gt_cent_f0 = self.f0_to_cent(gt_f0)  # mel f0  #[B,N,1]
             gt_cent_f0 = self.gaussian_blurred_cent(gt_cent_f0)  # #[B,N,out_dim]
-            loss_all = self.loss_mse_scale * F.binary_cross_entropy(
-                x, gt_cent_f0
-            )  # bce loss
+            loss_all = self.loss_mse_scale * F.binary_cross_entropy(x, gt_cent_f0)  # bce loss
             # l2 regularization
             if self.loss_l2_regularization:
-                loss_all = loss_all + l2_regularization(
-                    model=self, l2_alpha=self.loss_l2_regularization_scale
-                )
+                loss_all = loss_all + l2_regularization(model=self, l2_alpha=self.loss_l2_regularization_scale)
             x = loss_all
         if infer:
             x = self.cdecoder(x)
@@ -752,9 +696,7 @@ class FCPE(nn.Module):
     def cents_decoder(self, y, mask=True):
         B, N, _ = y.size()
         ci = self.cent_table[None, None, :].expand(B, N, -1)
-        rtn = torch.sum(ci * y, dim=-1, keepdim=True) / torch.sum(
-            y, dim=-1, keepdim=True
-        )  # cents: [B,N,1]
+        rtn = torch.sum(ci * y, dim=-1, keepdim=True) / torch.sum(y, dim=-1, keepdim=True)  # cents: [B,N,1]
         if mask:
             confident = torch.max(y, dim=-1, keepdim=True)[0]
             confident_mask = torch.ones_like(confident)
@@ -774,9 +716,7 @@ class FCPE(nn.Module):
         local_argmax_index[local_argmax_index >= self.n_out] = self.n_out - 1
         ci_l = torch.gather(ci, -1, local_argmax_index)
         y_l = torch.gather(y, -1, local_argmax_index)
-        rtn = torch.sum(ci_l * y_l, dim=-1, keepdim=True) / torch.sum(
-            y_l, dim=-1, keepdim=True
-        )  # cents: [B,N,1]
+        rtn = torch.sum(ci_l * y_l, dim=-1, keepdim=True) / torch.sum(y_l, dim=-1, keepdim=True)  # cents: [B,N,1]
         if mask:
             confident_mask = torch.ones_like(confident)
             confident_mask[confident <= self.threshold] = float("-INF")
@@ -839,7 +779,6 @@ class FCPEInfer:
 
 
 class Wav2Mel:
-
     def __init__(self, args, device=None, dtype=torch.float32):
         # self.args = args
         self.sampling_rate = args.mel.sampling_rate
@@ -860,9 +799,7 @@ class Wav2Mel:
         self.resample_kernel = {}
 
     def extract_nvstft(self, audio, keyshift=0, train=False):
-        mel = self.stft.get_mel(audio, keyshift=keyshift, train=train).transpose(
-            1, 2
-        )  # B, n_frames, bins
+        mel = self.stft.get_mel(audio, keyshift=keyshift, train=train).transpose(1, 2)  # B, n_frames, bins
         return mel
 
     def extract_mel(self, audio, sample_rate, keyshift=0, train=False):
@@ -873,18 +810,12 @@ class Wav2Mel:
         else:
             key_str = str(sample_rate)
             if key_str not in self.resample_kernel:
-                self.resample_kernel[key_str] = Resample(
-                    sample_rate, self.sampling_rate, lowpass_filter_width=128
-                )
-            self.resample_kernel[key_str] = (
-                self.resample_kernel[key_str].to(self.dtype).to(self.device)
-            )
+                self.resample_kernel[key_str] = Resample(sample_rate, self.sampling_rate, lowpass_filter_width=128)
+            self.resample_kernel[key_str] = self.resample_kernel[key_str].to(self.dtype).to(self.device)
             audio_res = self.resample_kernel[key_str](audio)
 
         # extract
-        mel = self.extract_nvstft(
-            audio_res, keyshift=keyshift, train=train
-        )  # B, n_frames, bins
+        mel = self.extract_nvstft(audio_res, keyshift=keyshift, train=train)  # B, n_frames, bins
         n_frames = int(audio.shape[1] // self.hop_size) + 1
         if n_frames > int(mel.shape[1]):
             mel = torch.cat((mel, mel[:, -1:, :]), 1)
@@ -905,7 +836,7 @@ class DotDict(dict):
     __delattr__ = dict.__delitem__
 
 
-class F0Predictor(object):
+class F0Predictor:
     def compute_f0(self, wav, p_len):
         """
         input: wav:[signal_length]
@@ -950,7 +881,7 @@ class FCPEF0Predictor(F0Predictor):
 
     def repeat_expand(
         self,
-        content: Union[torch.Tensor, np.ndarray],
+        content: torch.Tensor | np.ndarray,
         target_len: int,
         mode: str = "nearest",
     ):

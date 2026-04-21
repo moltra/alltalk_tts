@@ -41,7 +41,7 @@ formant 8 120 120 150
 intonation 10
 
 # Establecer el rango de tono. El primer número le da un tono base a la voz (valor en hz). El segundo número controla el rango de tonos usado por la voz. Poniéndolo igual
-# si los 2 números son iguales, la voz será monótona. Por defecto los ajustes son 82 y 118 
+# si los 2 números son iguales, la voz será monótona. Por defecto los ajustes son 82 y 118
 pitch 43 120
 ## La configuración del tono. El primer número en la línea de configuración, 600, es la configuración de frecuencia para la cantidad de graves en la voz.
 ## El segundo número en la línea de tono es el volumen de la frecuencia de graves. Puede configurarlo de 0 a 255, siendo 0 la menor cantidad, 255 la mayor.

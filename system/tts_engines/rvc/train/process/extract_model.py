@@ -1,8 +1,9 @@
-import os
-import torch
-import hashlib
 import datetime
+import hashlib
+import os
 from collections import OrderedDict
+
+import torch
 
 
 def replace_keys_in_dict(d, old_key_part, new_key_part):
@@ -22,14 +23,8 @@ def extract_model(ckpt, sr, if_f0, name, model_dir, epoch, step, version, hps):
     try:
         print(f"Saved model '{model_dir}' (epoch {epoch} and step {step})")
         pth_file = f"{name}_{epoch}e_{step}s.pth"
-        pth_file_old_version_path = os.path.join(
-            model_dir, f"{pth_file}_old_version.pth"
-        )
-        opt = OrderedDict(
-            weight={
-                key: value.half() for key, value in ckpt.items() if "enc_q" not in key
-            }
-        )
+        pth_file_old_version_path = os.path.join(model_dir, f"{pth_file}_old_version.pth")
+        opt = OrderedDict(weight={key: value.half() for key, value in ckpt.items() if "enc_q" not in key})
         opt["config"] = [
             hps.data.filter_length // 2 + 1,
             32,
@@ -58,7 +53,7 @@ def extract_model(ckpt, sr, if_f0, name, model_dir, epoch, step, version, hps):
         opt["version"] = version
         opt["creation_date"] = datetime.datetime.now().isoformat()
 
-        hash_input = f"{str(ckpt)} {epoch} {step} {datetime.datetime.now().isoformat()}"
+        hash_input = f"{ckpt!s} {epoch} {step} {datetime.datetime.now().isoformat()}"
         model_hash = hashlib.sha256(hash_input.encode()).hexdigest()
         opt["model_hash"] = model_hash
 
@@ -67,9 +62,7 @@ def extract_model(ckpt, sr, if_f0, name, model_dir, epoch, step, version, hps):
         model = torch.load(model_dir, map_location=torch.device("cpu"))
         torch.save(
             replace_keys_in_dict(
-                replace_keys_in_dict(
-                    model, ".parametrizations.weight.original1", ".weight_v"
-                ),
+                replace_keys_in_dict(model, ".parametrizations.weight.original1", ".weight_v"),
                 ".parametrizations.weight.original0",
                 ".weight_g",
             ),

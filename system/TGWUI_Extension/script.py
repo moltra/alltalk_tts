@@ -23,19 +23,20 @@ Dependencies:
 - Python 3.7+
 - Gradio, requests, threading, and additional libraries.
 """
-import re
-import json
-import time
+
 import inspect
+import json
 import random
-from loguru import logger
+import re
 import threading
+import time
 from pathlib import Path
-import requests
+
 import gradio as gr
+import requests
 from modules import chat, shared, ui_chat
 from modules.utils import gradio
-from requests.exceptions import RequestException, ConnectionError
+from requests.exceptions import ConnectionError, RequestException
 
 # Loguru handles logging levels via configuration
 this_dir = Path(__file__).parent.resolve()
@@ -76,7 +77,7 @@ class TGWUIModeManager:
 
         except (ImportError, FileNotFoundError) as e:
             # Don't try to use mode_manager here since it doesn't exist yet
-            print(f"Error detecting mode: {str(e)}")
+            print(f"Error detecting mode: {e!s}")
             return False
 
     def _setup_config(self):
@@ -122,10 +123,10 @@ class TGWUIModeManager:
         else:
             config_path = Path(__file__).parent / "tgwui_remote_config.json"
             try:
-                with open(config_path, "r", encoding="utf8") as config_f:
+                with open(config_path, encoding="utf8") as config_f:
                     self.config = json.load(config_f)
             except (FileNotFoundError, json.JSONDecodeError) as e:
-                print(f"Error loading remote config ({str(e)}), using defaults")
+                print(f"Error loading remote config ({e!s}), using defaults")
                 self.config = {
                     "branding": "AllTalk ",
                     "tgwui": {
@@ -186,9 +187,7 @@ class TGWUIModeManager:
                     "server_protocol": self.server["protocol"],
                     "server_address": self.server["address"],
                     "connection_timeout": self.server["timeout"],
-                    "use_legacy_api": self.config["remote_connection"][
-                        "use_legacy_api"
-                    ],
+                    "use_legacy_api": self.config["remote_connection"]["use_legacy_api"],
                 },
             }
             config_path = Path(__file__).parent / "tgwui_remote_config.json"
@@ -255,9 +254,7 @@ tts_model_loaded = None
 def get_alltalk_settings():
     """Fetches current AllTalk settings and updates global configurations."""
     if mode_manager.debug_func:
-        print_func(
-            "Function entry", "debug", debug_type=inspect.currentframe().f_code.co_name
-        )
+        print_func("Function entry", "debug", debug_type=inspect.currentframe().f_code.co_name)
     global current_model_loaded, models_available
 
     def log_error(message, status_code=None):
@@ -292,9 +289,7 @@ def get_alltalk_settings():
                 settings_data = api_calls["settings"].json()
 
                 # Update global variables
-                models_available = [
-                    model["name"] for model in settings_data["models_available"]
-                ]
+                models_available = [model["name"] for model in settings_data["models_available"]]
                 current_model_loaded = settings_data["current_model_loaded"]
 
                 # Update our local config with received values
@@ -302,31 +297,21 @@ def get_alltalk_settings():
                     mode_manager.config["tgwui"].update(
                         {
                             "tgwui_character_voice": (
-                                voices_data["voices"][0]
-                                if voices_data["voices"]
-                                else "Please Refresh Settings"
+                                voices_data["voices"][0] if voices_data["voices"] else "Please Refresh Settings"
                             ),
                             "tgwui_narrator_voice": (
-                                voices_data["voices"][0]
-                                if voices_data["voices"]
-                                else "Please Refresh Settings"
+                                voices_data["voices"][0] if voices_data["voices"] else "Please Refresh Settings"
                             ),
                             "tgwui_rvc_char_voice": (
-                                rvcvoices_data["rvcvoices"][0]
-                                if rvcvoices_data["rvcvoices"]
-                                else "Disabled"
+                                rvcvoices_data["rvcvoices"][0] if rvcvoices_data["rvcvoices"] else "Disabled"
                             ),
                             "tgwui_rvc_narr_voice": (
-                                rvcvoices_data["rvcvoices"][0]
-                                if rvcvoices_data["rvcvoices"]
-                                else "Disabled"
+                                rvcvoices_data["rvcvoices"][0] if rvcvoices_data["rvcvoices"] else "Disabled"
                             ),
                         }
                     )
 
-                return AllTalkServerSettings.from_api_response(
-                    voices_data, rvcvoices_data, settings_data
-                )
+                return AllTalkServerSettings.from_api_response(voices_data, rvcvoices_data, settings_data)
             except json.JSONDecodeError as e:
                 log_error(f"Failed to decode JSON response: {e}")
                 return AllTalkServerSettings()
@@ -335,9 +320,7 @@ def get_alltalk_settings():
             log_error(f"Failed to retrieve {mode_manager.branding}settings from API.")
             for name, response in api_calls.items():
                 if response.status_code != 200:
-                    log_error(
-                        f"Failed to retrieve {name} from API", response.status_code
-                    )
+                    log_error(f"Failed to retrieve {name} from API", response.status_code)
             return AllTalkServerSettings()
 
     except (RequestException, ConnectionError) as e:
@@ -393,9 +376,7 @@ class AllTalkServerSettings:
         # Update voice and model information
         settings.voices = sorted(voices_data["voices"])
         settings.rvcvoices = rvcvoices_data["rvcvoices"]
-        settings.models_available = [
-            model["name"] for model in settings_data["models_available"]
-        ]
+        settings.models_available = [model["name"] for model in settings_data["models_available"]]
         settings.current_model_loaded = settings_data["current_model_loaded"]
         settings.manufacturer_name = settings_data.get("manufacturer_name", "")
 
@@ -433,27 +414,16 @@ class AllTalkServerSettings:
 # Print Spashscreen to console if running as Remote Extension
 # pylint: disable=line-too-long,anomalous-backslash-in-string
 if not mode_manager.is_local:
-    print_func(
-        "\033[94m     _    _ _ \033[1;35m_____     _ _     \033[0m  _____ _____ ____  "
-    )  # pylint: disable=line-too-long anomalous-backslash-in-string
-    print_func(
-        "\033[94m    / \  | | |\033[1;35m_   _|_ _| | | __ \033[0m |_   _|_   _/ ___| "
-    )  # pylint: disable=line-too-long anomalous-backslash-in-string
-    print_func(
-        "\033[94m   / _ \ | | |\033[1;35m | |/ _` | | |/ / \033[0m   | |   | | \___ \ "
-    )  # pylint: disable=line-too-long anomalous-backslash-in-string
-    print_func(
-        "\033[94m  / ___ \| | |\033[1;35m | | (_| | |   <  \033[0m   | |   | |  ___) |"
-    )  # pylint: disable=line-too-long anomalous-backslash-in-string
-    print_func(
-        "\033[94m /_/   \_\_|_|\033[1;35m |_|\__,_|_|_|\_\ \033[0m   |_|   |_| |____/ "
-    )  # pylint: disable=line-too-long anomalous-backslash-in-string
+    print_func("\033[94m     _    _ _ \033[1;35m_____     _ _     \033[0m  _____ _____ ____  ")  # pylint: disable=line-too-long anomalous-backslash-in-string
+    print_func("\033[94m    / \\  | | |\033[1;35m_   _|_ _| | | __ \033[0m |_   _|_   _/ ___| ")  # pylint: disable=line-too-long anomalous-backslash-in-string
+    print_func("\033[94m   / _ \\ | | |\033[1;35m | |/ _` | | |/ / \033[0m   | |   | | \\___ \\ ")  # pylint: disable=line-too-long anomalous-backslash-in-string
+    print_func("\033[94m  / ___ \\| | |\033[1;35m | | (_| | |   <  \033[0m   | |   | |  ___) |")  # pylint: disable=line-too-long anomalous-backslash-in-string
+    print_func("\033[94m /_/   \\_\\_|_|\033[1;35m |_|\\__,_|_|_|\\_\\ \033[0m   |_|   |_| |____/ ")  # pylint: disable=line-too-long anomalous-backslash-in-string
     print_func("")
-    print_func(
-        f"\033[92m{mode_manager.branding}startup Mode   : \033[93mText-Gen-webui Remote\033[0m"
-    )
+    print_func(f"\033[92m{mode_manager.branding}startup Mode   : \033[93mText-Gen-webui Remote\033[0m")
     print_func("")
 # pylint: enable=line-too-long,anomalous-backslash-in-string
+
 
 def stop_generate_tts():
     """Sends request to stop current TTS generation"""
@@ -479,7 +449,7 @@ def stop_generate_tts():
             return {"message": "Failed to stop generation"}
     except (RequestException, ConnectionError) as e:
         print_func(
-            f"Unable to connect to the {mode_manager.branding}server. Status code:\n{str(e)}",
+            f"Unable to connect to the {mode_manager.branding}server. Status code:\n{e!s}",
             message_type="warning",
         )
         return {"message": "Failed to stop generation"}
@@ -531,9 +501,7 @@ def send_lowvram_request(value_sent):
         }
     try:
         tts_model_loaded = False
-        audio_path = this_dir / (
-            "lowvramenabled.wav" if value_sent else "lowvramdisabled.wav"
-        )
+        audio_path = this_dir / ("lowvramenabled.wav" if value_sent else "lowvramdisabled.wav")
 
         if mode_manager.debug_tgwui:
             print_func(
@@ -542,9 +510,7 @@ def send_lowvram_request(value_sent):
                 debug_type="send_lowvram_request",
             )
 
-        url = mode_manager.get_api_url(
-            f"lowvramsetting?new_low_vram_value={value_sent}"
-        )
+        url = mode_manager.get_api_url(f"lowvramsetting?new_low_vram_value={value_sent}")
         response = requests.post(url, headers={"Content-Type": "application/json"})
         response.raise_for_status()
 
@@ -574,9 +540,7 @@ def send_deepspeed_request(value_sent):
         }
     try:
         tts_model_loaded = False
-        audio_path = this_dir / (
-            "deepspeedenabled.wav" if value_sent else "deepspeeddisabled.wav"
-        )
+        audio_path = this_dir / ("deepspeedenabled.wav" if value_sent else "deepspeeddisabled.wav")
 
         if mode_manager.debug_tgwui:
             print_func(
@@ -648,10 +612,10 @@ def send_and_generate(
         api_url = mode_manager.get_api_url("tts-generate-streaming")
         encoded_text = requests.utils.quote(gen_text)
         streaming_url = f"{api_url}?text={encoded_text}&voice={gen_character_voice}&language={gen_language}&output_file={gen_file_name}"
-        return streaming_url, str("TTS Streaming Audio Generated")
+        return streaming_url, "TTS Streaming Audio Generated"
 
     data = {
-        "text_input": gen_text[0] if isinstance(gen_text, tuple) else gen_text, 
+        "text_input": gen_text[0] if isinstance(gen_text, tuple) else gen_text,
         "text_filtering": gen_filter,
         "character_voice_gen": gen_character_voice,
         "rvccharacter_voice_gen": gen_rvccharacter_voice,
@@ -679,9 +643,7 @@ def send_and_generate(
             debug_type="send_and_generate",
         )
         for key, value in data.items():
-            print_func(
-                f"{key}: {value}", message_type="debug", debug_type="send_and_generate"
-            )
+            print_func(f"{key}: {value}", message_type="debug", debug_type="send_and_generate")
 
     try:
         response = requests.post(api_url, data=data)
@@ -689,31 +651,31 @@ def send_and_generate(
         result = response.json()
 
         if gen_autoplay == "true":
-            return None, str("TTS Audio Generated (Played remotely)")
+            return None, "TTS Audio Generated (Played remotely)"
 
         if mode_manager.config["remote_connection"]["use_legacy_api"]:
-            return result["output_file_url"], str("TTS Audio Generated")
+            return result["output_file_url"], "TTS Audio Generated"
         else:
             output_file_url = f"{mode_manager.server_url}{result['output_file_url']}"
-            return output_file_url, str("TTS Audio Generated")
+            return output_file_url, "TTS Audio Generated"
     except (RequestException, ConnectionError) as e:
         print_func(
-            f"Error occurred during the API request: Status code:\n{str(e)}",
+            f"Error occurred during the API request: Status code:\n{e!s}",
             message_type="warning",
         )
-        return None, str("Error occurred during the API request")
+        return None, "Error occurred during the API request"
 
 
 def output_modifier(string, state):
     """Modifies TGWUI output to include TTS audio"""
     debug_func_entry()
-    
+
     # Input validation
     if string is None:
         print_func("Error: Received no text input from TGWUI so cannot generate TTS.", message_type="error")
         print_func(f"Input text first 100 char's: {string[:100]}...", message_type="error")
-        return string    
-    
+        return string
+
     if not mode_manager.config["tgwui"]["tgwui_activate_tts"]:
         return string
 
@@ -732,7 +694,7 @@ def output_modifier(string, state):
     if cleaned_text is None:
         print_func("Error: Image processing resulted in no text to generate TTS", message_type="error")
         print_func(f"Input text first 100 char's: {cleaned_text[:100]}...", message_type="error")
-        return string    
+        return string
 
     # Get current settings
     language_code = languages.get(mode_manager.config["tgwui"]["tgwui_language"])
@@ -764,9 +726,15 @@ def output_modifier(string, state):
     # Lock and process TTS request
     if process_lock.acquire(blocking=False):
         try:
-            output_file = (state["character_menu"] if "character_menu" in state else str("TTSOUT_"))
-            output_file = (state["character_menu"] if "character_menu" in state and state["character_menu"] is not None else "TTSOUT_")
-            output_file = sanitize_windows_filename(output_file) # Ensure filenames dont hit any Windows file name limits
+            output_file = state["character_menu"] if "character_menu" in state else "TTSOUT_"
+            output_file = (
+                state["character_menu"]
+                if "character_menu" in state and state["character_menu"] is not None
+                else "TTSOUT_"
+            )
+            output_file = sanitize_windows_filename(
+                output_file
+            )  # Ensure filenames dont hit any Windows file name limits
 
             generate_response, status_message = send_and_generate(
                 cleaned_text,
@@ -793,17 +761,11 @@ def output_modifier(string, state):
             )
 
             if status_message == "TTS Audio Generated":
-                autoplay = (
-                    "autoplay"
-                    if mode_manager.config["tgwui"]["tgwui_autoplay_tts"]
-                    else ""
-                )
-                string = (
-                    f'<audio src="{generate_response}" controls {autoplay}></audio>'
-                )
+                autoplay = "autoplay" if mode_manager.config["tgwui"]["tgwui_autoplay_tts"] else ""
+                string = f'<audio src="{generate_response}" controls {autoplay}></audio>'
 
                 if mode_manager.config["tgwui"]["tgwui_show_text"]:
-                    string += f'\n\n{original_string}'  # Use original_string
+                    string += f"\n\n{original_string}"  # Use original_string
 
                 if string is None:
                     print_func("Error: Final processed text is None after image reinsertion", message_type="error")
@@ -826,7 +788,9 @@ def output_modifier(string, state):
         )
         return
 
+
 img_pattern = r'<img[^>]*src\s*=\s*["\'][^"\'>]+["\'][^>]*>'
+
 
 def tgwui_extract_and_remove_images(text):
     """Extracts and removes image tags from text for clean TTS processing"""
@@ -842,28 +806,54 @@ def tgwui_extract_and_remove_images(text):
 
     return cleaned_text  # Just return the cleaned text
 
+
 def sanitize_windows_filename(original_name):
     # First conversion
     filename = original_name.replace(" ", "_")
     # Remove invalid characters
-    filename = re.sub(r'[^a-zA-Z0-9_]', '', filename)
-    
+    filename = re.sub(r"[^a-zA-Z0-9_]", "", filename)
+
     # Check for Windows reserved names
-    reserved = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 
-               'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 
-               'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9']
-    
+    reserved = [
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        "COM1",
+        "COM2",
+        "COM3",
+        "COM4",
+        "COM5",
+        "COM6",
+        "COM7",
+        "COM8",
+        "COM9",
+        "LPT1",
+        "LPT2",
+        "LPT3",
+        "LPT4",
+        "LPT5",
+        "LPT6",
+        "LPT7",
+        "LPT8",
+        "LPT9",
+    ]
+
     if filename.upper() in reserved:
         filename = f"_{filename}"
-    
+
     # Use TTSOUT_ if empty
     filename = filename or "TTSOUT_"
-    
+
     # Print if changes were made
     if original_name != filename:
-        print_func(f"Character name '{original_name}' contained special characters - sanitized to '{filename}'", message_type="warning")
-    
+        print_func(
+            f"Character name '{original_name}' contained special characters - sanitized to '{filename}'",
+            message_type="warning",
+        )
+
     return filename
+
 
 def voice_preview(string):
     """Generates a preview of the selected voice settings"""
@@ -873,18 +863,14 @@ def voice_preview(string):
         return string
 
     if mode_manager.debug_tgwui:
-        print_func(
-            "Generating voice preview", message_type="debug", debug_type="voice_preview"
-        )
+        print_func("Generating voice preview", message_type="debug", debug_type="voice_preview")
 
     language_code = languages.get(mode_manager.config["tgwui"]["tgwui_language"])
     if not string:
         string = random_sentence()
 
     if mode_manager.debug_tgwui:
-        print_func(
-            f"Preview text: {string}", message_type="debug", debug_type="voice_preview"
-        )
+        print_func(f"Preview text: {string}", message_type="debug", debug_type="voice_preview")
 
     generate_response, status_message = send_and_generate(
         string,
@@ -911,9 +897,7 @@ def voice_preview(string):
     )
 
     if status_message == "TTS Audio Generated":
-        autoplay = (
-            "autoplay" if mode_manager.config["tgwui"]["tgwui_autoplay_tts"] else ""
-        )
+        autoplay = "autoplay" if mode_manager.config["tgwui"]["tgwui_autoplay_tts"] else ""
         return f'<audio src="{generate_response}?{int(time.time())}" controls {autoplay}></audio>'
     else:
         return f"[{mode_manager.branding}Server] Audio generation failed. Status code:\n{status_message}"
@@ -1116,15 +1100,11 @@ def tgwui_update_dropdowns():
     current_pitch_capable = at_settings.pitch_capable
     current_deepspeed_capable = at_settings.deepspeed_capable
     current_deepspeed_enabled = at_settings.deepspeed_enabled
-    current_non_quoted_text_is = mode_manager.config["tgwui"][
-        "tgwui_non_quoted_text_is"
-    ]
+    current_non_quoted_text_is = mode_manager.config["tgwui"]["tgwui_non_quoted_text_is"]
     current_languages_capable = at_settings.languages_capable
 
     # Set appropriate labels based on capabilities
-    language_label = (
-        "Languages" if at_settings.languages_capable else "Model not multi language"
-    )
+    language_label = "Languages" if at_settings.languages_capable else "Model not multi language"
 
     # Update voice selections if needed
     if current_character_voice not in current_voices:
@@ -1156,9 +1136,7 @@ def tgwui_update_dropdowns():
                 debug_type="update_dropdowns",
             )
         rvccurrent_character_voice = rvccurrent_voices[0] if rvccurrent_voices else ""
-        mode_manager.config["tgwui"][
-            "tgwui_rvc_char_voice"
-        ] = rvccurrent_character_voice
+        mode_manager.config["tgwui"]["tgwui_rvc_char_voice"] = rvccurrent_character_voice
 
     if rvccurrent_narrator_voice not in rvccurrent_voices:
         if mode_manager.debug_tgwui:
@@ -1170,12 +1148,8 @@ def tgwui_update_dropdowns():
         rvccurrent_narrator_voice = rvccurrent_voices[0] if rvccurrent_voices else ""
         mode_manager.config["tgwui"]["tgwui_rvc_char_voice"] = rvccurrent_narrator_voice
 
-    rvccurrent_character_pitch = (
-        rvccurrent_character_pitch if rvccurrent_character_pitch else 0
-    )
-    rvccurrent_narrator_pitch = (
-        rvccurrent_narrator_pitch if rvccurrent_narrator_pitch else 0
-    )
+    rvccurrent_character_pitch = rvccurrent_character_pitch if rvccurrent_character_pitch else 0
+    rvccurrent_narrator_pitch = rvccurrent_narrator_pitch if rvccurrent_narrator_pitch else 0
 
     # Prevent model reload during update
     tgwui_handle_ttsmodel_dropdown_change.skip_reload = True
@@ -1183,9 +1157,7 @@ def tgwui_update_dropdowns():
     # Return updated Gradio components
     return_values = [
         gr.Checkbox(interactive=current_lowvram_capable, value=current_lowvram_enabled),
-        gr.Checkbox(
-            interactive=current_deepspeed_capable, value=current_deepspeed_enabled
-        ),
+        gr.Checkbox(interactive=current_deepspeed_capable, value=current_deepspeed_enabled),
         gr.Dropdown(choices=current_voices, value=current_character_voice),
         gr.Dropdown(
             choices=rvccurrent_voices,
@@ -1194,9 +1166,7 @@ def tgwui_update_dropdowns():
         ),
         gr.Slider(value=rvccurrent_character_pitch),
         gr.Dropdown(choices=current_voices, value=current_narrator_voice),
-        gr.Dropdown(
-            choices=rvccurrent_voices, value=rvccurrent_narrator_voice, interactive=True
-        ),
+        gr.Dropdown(choices=rvccurrent_voices, value=rvccurrent_narrator_voice, interactive=True),
         gr.Slider(value=rvccurrent_narrator_pitch),
         gr.Dropdown(choices=current_models_available, value=current_model_loaded),
         gr.Dropdown(interactive=current_temperature_capable),
@@ -1220,9 +1190,7 @@ def ui():
     global alltalk_settings
 
     if mode_manager.debug_tgwui:
-        print_func(
-            "Initializing TGWUI interface", message_type="debug", debug_type="ui"
-        )
+        print_func("Initializing TGWUI interface", message_type="debug", debug_type="ui")
 
     alltalk_settings = get_alltalk_settings()
 
@@ -1248,11 +1216,7 @@ def ui():
         # Low vram enable, Deepspeed enable, Link
         with gr.Row():
             tgwui_lowvram_enabled_gr = gr.Checkbox(
-                value=(
-                    alltalk_settings.lowvram_enabled
-                    if alltalk_settings.lowvram_capable
-                    else False
-                ),
+                value=(alltalk_settings.lowvram_enabled if alltalk_settings.lowvram_capable else False),
                 label="Enable Low VRAM Mode",
                 interactive=alltalk_settings.lowvram_capable,
             )
@@ -1278,11 +1242,7 @@ def ui():
             )
             tgwui_language_gr = gr.Dropdown(
                 choices=languages.keys(),
-                label=(
-                    "Languages"
-                    if alltalk_settings.languages_capable
-                    else "Model not multi language"
-                ),
+                label=("Languages" if alltalk_settings.languages_capable else "Model not multi language"),
                 interactive=alltalk_settings.languages_capable,
                 value=mode_manager.config["tgwui"]["tgwui_language"],
             )
@@ -1296,23 +1256,15 @@ def ui():
                 value=(
                     "true"
                     if mode_manager.config.get("tgwui_narrator_enabled") == "true"
-                    else (
-                        "silent"
-                        if mode_manager.config.get("tgwui_narrator_enabled") == "silent"
-                        else "false"
-                    )
+                    else ("silent" if mode_manager.config.get("tgwui_narrator_enabled") == "silent" else "false")
                 ),
             )
 
         # Narrator voice settings
         with gr.Row():
-            tgwui_default_voice_gr = mode_manager.config["tgwui"][
-                "tgwui_character_voice"
-            ]
+            tgwui_default_voice_gr = mode_manager.config["tgwui"]["tgwui_character_voice"]
             if tgwui_default_voice_gr not in tgwui_available_voices_gr:
-                tgwui_default_voice_gr = (
-                    tgwui_available_voices_gr[0] if tgwui_available_voices_gr else ""
-                )
+                tgwui_default_voice_gr = tgwui_available_voices_gr[0] if tgwui_available_voices_gr else ""
 
             tgwui_character_voice_gr = gr.Dropdown(
                 choices=tgwui_available_voices_gr,
@@ -1323,9 +1275,7 @@ def ui():
 
             tgwui_narr_voice_gr = mode_manager.config["tgwui"]["tgwui_narrator_voice"]
             if tgwui_narr_voice_gr not in tgwui_available_voices_gr:
-                tgwui_narr_voice_gr = (
-                    tgwui_available_voices_gr[0] if tgwui_available_voices_gr else ""
-                )
+                tgwui_narr_voice_gr = tgwui_available_voices_gr[0] if tgwui_available_voices_gr else ""
 
             tgwui_narrator_voice_gr = gr.Dropdown(
                 choices=tgwui_available_voices_gr,
@@ -1346,19 +1296,11 @@ def ui():
 
         # RVC voices
         with gr.Row():
-            tgwui_rvc_default_voice_gr = mode_manager.config["tgwui"][
-                "tgwui_rvc_char_voice"
-            ]
-            tgwui_rvc_narrator_voice_gr = mode_manager.config["tgwui"][
-                "tgwui_rvc_narr_voice"
-            ]
+            tgwui_rvc_default_voice_gr = mode_manager.config["tgwui"]["tgwui_rvc_char_voice"]
+            tgwui_rvc_narrator_voice_gr = mode_manager.config["tgwui"]["tgwui_rvc_narr_voice"]
 
             if tgwui_rvc_default_voice_gr not in tgwui_rvc_available_voices_gr:
-                tgwui_rvc_default_voice_gr = (
-                    tgwui_rvc_available_voices_gr[0]
-                    if tgwui_rvc_available_voices_gr
-                    else ""
-                )
+                tgwui_rvc_default_voice_gr = tgwui_rvc_available_voices_gr[0] if tgwui_rvc_available_voices_gr else ""
 
             tgwui_rvc_char_voice_gr = gr.Dropdown(
                 choices=tgwui_rvc_available_voices_gr,
@@ -1368,11 +1310,7 @@ def ui():
             )
 
             if tgwui_rvc_narrator_voice_gr not in tgwui_rvc_available_voices_gr:
-                tgwui_rvc_narrator_voice_gr = (
-                    tgwui_rvc_available_voices_gr[0]
-                    if tgwui_rvc_available_voices_gr
-                    else ""
-                )
+                tgwui_rvc_narrator_voice_gr = tgwui_rvc_available_voices_gr[0] if tgwui_rvc_available_voices_gr else ""
 
             tgwui_rvc_narr_voice_gr = gr.Dropdown(
                 choices=tgwui_rvc_available_voices_gr,
@@ -1464,13 +1402,9 @@ def ui():
 
         # Control buttons
         with gr.Row():
-            tgwui_convert_gr = gr.Button(
-                "Remove old TTS audio and leave only message texts"
-            )
+            tgwui_convert_gr = gr.Button("Remove old TTS audio and leave only message texts")
             tgwui_convert_cancel_gr = gr.Button("Cancel", visible=False)
-            tgwui_convert_confirm_gr = gr.Button(
-                "Confirm (cannot be undone)", variant="stop", visible=False
-            )
+            tgwui_convert_confirm_gr = gr.Button("Confirm (cannot be undone)", variant="stop", visible=False)
             tgwui_stop_generation_gr = gr.Button("Stop current TTS generation")
 
         # Convert history with confirmation
@@ -1502,9 +1436,7 @@ def ui():
             chat.save_history,
             gradio("history", "unique_id", "character_menu", "mode"),
             None,
-        ).then(
-            chat.redraw_html, gradio(ui_chat.reload_arr), gradio("display")
-        )
+        ).then(chat.redraw_html, gradio(ui_chat.reload_arr), gradio("display"))
 
         tgwui_convert_cancel_gr.click(
             lambda: [
@@ -1525,9 +1457,7 @@ def ui():
             chat.save_history,
             gradio("history", "unique_id", "character_menu", "mode"),
             None,
-        ).then(
-            chat.redraw_html, gradio(ui_chat.reload_arr), gradio("display")
-        )
+        ).then(chat.redraw_html, gradio(ui_chat.reload_arr), gradio("display"))
 
         # Event functions to update the parameters in the backend
         tgwui_activate_tts_gr.change(
@@ -1556,15 +1486,11 @@ def ui():
         )
 
         # Model change handling
-        tgwui_tts_dropdown_gr.change(
-            tgwui_handle_ttsmodel_dropdown_change, tgwui_tts_dropdown_gr, None
-        )
+        tgwui_tts_dropdown_gr.change(tgwui_handle_ttsmodel_dropdown_change, tgwui_tts_dropdown_gr, None)
 
         # DeepSpeed settings
         tgwui_deepspeed_enabled_gr.change(
-            lambda x: mode_manager.config["tgwui"].update(
-                {"tgwui_deepspeed_enabled": x}
-            ),
+            lambda x: mode_manager.config["tgwui"].update({"tgwui_deepspeed_enabled": x}),
             tgwui_deepspeed_enabled_gr,
             None,
         )
@@ -1597,17 +1523,13 @@ def ui():
         )
 
         tgwui_repetitionpenalty_set_gr.change(
-            lambda x: mode_manager.config["tgwui"].update(
-                {"tgwui_repetitionpenalty_set": x}
-            ),
+            lambda x: mode_manager.config["tgwui"].update({"tgwui_repetitionpenalty_set": x}),
             tgwui_repetitionpenalty_set_gr,
             None,
         )
 
         tgwui_generationspeed_set_gr.change(
-            lambda x: mode_manager.config["tgwui"].update(
-                {"tgwui_generationspeed_set": x}
-            ),
+            lambda x: mode_manager.config["tgwui"].update({"tgwui_generationspeed_set": x}),
             tgwui_generationspeed_set_gr,
             None,
         )
@@ -1620,17 +1542,13 @@ def ui():
 
         # Narrator settings
         tgwui_narrator_enabled_gr.change(
-            lambda x: mode_manager.config["tgwui"].update(
-                {"tgwui_narrator_enabled": x}
-            ),
+            lambda x: mode_manager.config["tgwui"].update({"tgwui_narrator_enabled": x}),
             tgwui_narrator_enabled_gr,
             None,
         )
 
         tgwui_non_quoted_text_is_gr.change(
-            lambda x: mode_manager.config["tgwui"].update(
-                {"tgwui_non_quoted_text_is": x}
-            ),
+            lambda x: mode_manager.config["tgwui"].update({"tgwui_non_quoted_text_is": x}),
             tgwui_non_quoted_text_is_gr,
             None,
         )
@@ -1677,13 +1595,9 @@ def ui():
 
         if not mode_manager.is_local:
             # Remote-only handlers
-            tgwui_protocol_gr.change(
-                tgwui_update_alltalk_protocol, tgwui_protocol_gr, None
-            )
+            tgwui_protocol_gr.change(tgwui_update_alltalk_protocol, tgwui_protocol_gr, None)
 
-            tgwui_ip_address_port_gr.change(
-                tgwui_update_alltalk_ip_port, tgwui_ip_address_port_gr, None
-            )
+            tgwui_ip_address_port_gr.change(tgwui_update_alltalk_ip_port, tgwui_ip_address_port_gr, None)
 
         tgwui_refresh_settings_gr.click(
             tgwui_update_dropdowns,
@@ -1730,9 +1644,7 @@ def ui():
         chat.save_history,
         gradio("history", "unique_id", "character_menu", "mode"),
         None,
-    ).then(
-        chat.redraw_html, gradio(ui_chat.reload_arr), gradio("display")
-    )
+    ).then(chat.redraw_html, gradio(ui_chat.reload_arr), gradio("display"))
     tgwui_convert_cancel_gr.click(
         lambda: [
             gr.update(visible=False),
@@ -1752,9 +1664,7 @@ def ui():
         chat.save_history,
         gradio("history", "unique_id", "character_menu", "mode"),
         None,
-    ).then(
-        chat.redraw_html, gradio(ui_chat.reload_arr), gradio("display")
-    )
+    ).then(chat.redraw_html, gradio(ui_chat.reload_arr), gradio("display"))
 
     # Event functions to update the parameters in the backend
     tgwui_activate_tts_gr.change(
@@ -1780,9 +1690,7 @@ def ui():
     )
 
     # Trigger the send_reload_request function when the dropdown value changes
-    tgwui_tts_dropdown_gr.change(
-        tgwui_handle_ttsmodel_dropdown_change, tgwui_tts_dropdown_gr, None
-    )
+    tgwui_tts_dropdown_gr.change(tgwui_handle_ttsmodel_dropdown_change, tgwui_tts_dropdown_gr, None)
 
     tgwui_deepspeed_enabled_gr.change(
         lambda x: mode_manager.config["tgwui"].update({"tgwui_deepspeed_enabled": x}),
@@ -1813,9 +1721,7 @@ def ui():
         None,
     )
     tgwui_repetitionpenalty_set_gr.change(
-        lambda x: mode_manager.config["tgwui"].update(
-            {"tgwui_repetitionpenalty_set": x}
-        ),
+        lambda x: mode_manager.config["tgwui"].update({"tgwui_repetitionpenalty_set": x}),
         tgwui_repetitionpenalty_set_gr,
         None,
     )

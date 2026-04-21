@@ -1,8 +1,10 @@
 # help_content.py
 # pylint: disable=no-member
 
+
 class AllTalkHelpContent:
     """CSS and help content for help_content.py"""
+
     custom_css = """
     /* Add this to your existing CSS */
     .gradio-container .prose {
@@ -10,7 +12,7 @@ class AllTalkHelpContent:
         padding: 0.5rem !important; /* Reduced padding */
         margin: 0 !important;
     }
-    
+
     .fixed-accordion {
         max-height: 440px; /* or any desired height */
         overflow: auto; /* Ensures content is scrollable if it overflows */
@@ -18,7 +20,7 @@ class AllTalkHelpContent:
 
     .fixed-plot {
         height: 400px; /* Set a fixed height for the plot */
-    }    
+    }
 
     .certificate-group {
     max-height: 280px;  /* Adjust this value to find the right height */
@@ -46,7 +48,7 @@ class AllTalkHelpContent:
         max-width: 100% !important;
         box-sizing: border-box !important;
         /* Default text color for all content (grey) */
-        color: rgba(156, 163, 175, 1) !important; /* Adjust this grey value to match your interface */        
+        color: rgba(156, 163, 175, 1) !important; /* Adjust this grey value to match your interface */
     }
 
     /* Make headings white */
@@ -67,7 +69,7 @@ class AllTalkHelpContent:
     .custom-markdown ol {
         color: rgba(156, 163, 175, 1) !important; /* Same grey as the base text */
     }
-   
+
     /* Additional targeting for any wrapping elements */
     .gradio-container .prose > * {
         margin: 0 !important;
@@ -152,15 +154,15 @@ class AllTalkHelpContent:
         min-width: 0 !important; /* Prevents flex items from overflowing */
     }
 
-    .small-file-upload { 
+    .small-file-upload {
     min-height: 200px;
     max-height: 200px;
     }
 
-    .small-file-upload2 { 
+    .small-file-upload2 {
     min-height: 90px;
     max-height: 90px;
-    }    
+    }
 
     """
 
@@ -244,7 +246,7 @@ class AllTalkHelpContent:
         - Helps debug multi-voice generation issues
         - Example: `[AllTalk GEN] Debug debug_narrator Narrator voice: voice_A`
     """
-    
+
     DEBUG_HELP2 = """
     - **debug_fullttstext**
         - Shows complete text being processed for TTS
@@ -256,7 +258,7 @@ class AllTalkHelpContent:
         - Monitors URL/IP configuration used by Gradio and environment status
         - Shows runtime environment (Docker/Colab) and active AllTalk API endpoint set
         - Helps diagnose connection issues between Gradio UI and AllTalk's API server
-        - Example: `[AllTalk TTS] Debug debug_gradio_IP Base URL is set as : http://127.0.0.1:7851/api/voices`        
+        - Example: `[AllTalk TTS] Debug debug_gradio_IP Base URL is set as : http://127.0.0.1:7851/api/voices`
 
     ## 🔍 Audio Processing Debug Options
 
@@ -291,49 +293,49 @@ class AllTalkHelpContent:
     - Enable `debug_fullttstext` only when necessary to avoid log clutter
     - Combine related options (e.g., `debug_tts` + `debug_tts_variables`) for detailed troubleshooting
     """
-    
+
     ALLTALK_SETTINGS_PAGE1 = """
     ## ⚙️ Global Settings Help
 
     The **Global Settings** page allows you to configure essential system-wide parameters and enable various debugging options for detailed troubleshooting. This section provides an overview of each setting, its purpose, and guidelines for usage.
 
     ## ⚙️ File Management
-    
-    - **Del WAV's Older Than**: On start-up automatically deletes WAV files older than the specified duration to save disk space.  
-        - **Default**: `Disabled`     
+
+    - **Del WAV's Older Than**: On start-up automatically deletes WAV files older than the specified duration to save disk space.
+        - **Default**: `Disabled`
         - **Options**: Disabled or specify a duration (e.g., 7 days, 30 days).
         - **Recommendation**: Set at least 30 days to keep your outputs folder from growing too large.
 
-    - **Output Folder Name (sub AllTalk)**: Defines the subfolder where all generated files will be stored.  
+    - **Output Folder Name (sub AllTalk)**: Defines the subfolder where all generated files will be stored.
         - **Default**: `outputs`
         - **Recommendation**: Preferably do not change this.
         - **Tip**: Ensure the folder name is unique for clarity when managing multiple projects.
 
     ## ⚙️ API and Gradio Interface Settings
-    
-    - **API Port Number**: The port through which the AllTalk API is accessible.  
+
+    - **API Port Number**: The port through which the AllTalk API is accessible.
         - **Default**: `7851`
         - **Note**: As standard AllTalk binds to 0.0.0.0 meaning all available IP addresses on your machine.
         - **Note**: Ensure this port is not blocked by firewalls or used by other applications.
 
-    - **Gradio Port Number**: The port number for the Gradio interface used for the frontend.  
+    - **Gradio Port Number**: The port number for the Gradio interface used for the frontend.
         - **Default**: `7852`
         - **Note**: As standard AllTalk binds to 0.0.0.0 meaning all available IP addresses on your machine.
         - **Note**: Ensure this port is not blocked by firewalls or used by other applications
 
-    - **Gradio Theme Selection**: Customize the appearance of the Gradio interface by choosing a theme.  
+    - **Gradio Theme Selection**: Customize the appearance of the Gradio interface by choosing a theme.
         - **Options**: `gradio/base` (default) or other themes supported by Gradio.
         - **Note**: A restart is required for the change to take effect.
 
-    - **Gradio Interface**: Enables or disables the Gradio interface. 
-        - **Default**: `Enabled` 
+    - **Gradio Interface**: Enables or disables the Gradio interface.
+        - **Default**: `Enabled`
         - **Warning**: Disabling this option will disable Gradio from loading.
         - **Tip**: You can re-enable the gradio interface by using the API web page (e.g., `http://127.0.0.1:7851/`).
     """
-    
+
     ALLTALK_SETTINGS_PAGE2 = """
    ## ⚙️ Transcoding
-   
+
    - **Audio Transcoding**
         - **Default**: `Disabled`
         - Enables or disables automatic audio format conversion for compatibility with the system.
@@ -349,7 +351,7 @@ class AllTalkHelpContent:
         - `debug_func`, `debug_tts`, `debug_rvc`, etc. (See the Debugging Help Section for detailed descriptions).
 
     #### Usage Tips**
-    
+
     - Enable relevant debugging categories based on the issue being investigated.
     - Combine `debug_func` with other options for tracing execution paths.
     - Avoid enabling all options simultaneously to prevent log clutter.
@@ -358,7 +360,7 @@ class AllTalkHelpContent:
 
     #### Disable Gradio Interface Tabs
     Use these checkboxes to hide specific tabs in the Gradio interface, simplifying the user interface for specific workflows.
-     
+
     - **Tabs Available**
         - **Generate Help**: Displays help documentation.
         - **Voice2RVC**: Access the Voice-to-RVC tools.
@@ -366,20 +368,20 @@ class AllTalkHelpContent:
         - **TTS Engines Settings**: Configure and manage TTS engines.
         - **AllTalk Documentation**: View detailed documentation and usage instructions.
         - **API Documentation**: Reference API endpoints and integration details.
-    """    
-    
+    """
+
     RVC_PAGE1 = """
     The **RVC Settings** page provides configuration options for Real-Time Voice Cloning (RVC), a feature that enhances TTS by replicating voice characteristics for characters or narrators. This section provides detailed descriptions of the available settings and recommendations for their usage.
 
     ## 🗣️ Setup and Model Management
 
-    - **Enable RVC**: 
+    - **Enable RVC**:
         - **Purpose**: Toggles the Real-Time Voice Cloning feature & downloads the base RVC model required.
         - **Default**: Disabled
         - **Recommendation**: Enable this only if you plan to use RVC-enhanced TTS.
-        - **Tip**: Enable this to download and setup your base RVC models and folders. `/models/rvc_voices` 
+        - **Tip**: Enable this to download and setup your base RVC models and folders. `/models/rvc_voices`
 
-    - **Refresh Model Choices**: 
+    - **Refresh Model Choices**:
         - **Purpose**: Refreshes the list of available voice models from the `/models/rvc_voices` directory.
         - **Tip**: Use this after adding new voice models to ensure they are recognized by the system.
 
@@ -414,14 +416,14 @@ class AllTalkHelpContent:
         - **Default**: `0.5`
         - **Range**: `0.1` to `0.5`
         - **Recommendation**: Use the default value for most cases to preserve sound quality without overloading the index.
-    
+
     - **Filter Radius**
         - **Purpose**: Applies median filtering to reduce respiration artifacts.
         - **Default**: `3`
         - **Range**: `1` to `5`
         - **Recommendation**: Higher values are recommended for smoother audio but may slightly reduce naturalness.
     """
-    
+
     RVC_PAGE2 = """
     ## 🗣️ Advanced Settings
 
@@ -474,7 +476,7 @@ class AllTalkHelpContent:
     2. **Refine Pitch and Volume**: Use small, incremental changes to maintain naturalness.
     3. **Choose the Right Embedder**: Experiment with `contentvec` for expressive voices or `hubert` for precise replication.
     4. **Test Pitch Algorithms**: The default (`rmvpe`) works well for most scenarios, but alternative options can enhance specific audio characteristics.
-    """    
+    """
 
     API_DEFAULTS1 = """
     ## 🎯 Quick Start Guide
@@ -531,7 +533,7 @@ class AllTalkHelpContent:
     - Monitor logs when changing defaults to ensure desired behavior
     - Test API calls after changing defaults to verify results
     """
-    
+
     API_DEFAULTS2 = """
     ## 🔄 API Version Selection
     Choose which API response format your system should use:
@@ -539,7 +541,7 @@ class AllTalkHelpContent:
     - **AllTalk v2 API (Recommended):**
         - Returns relative file paths only
         - More flexible for different deployments
-        - Example response: 
+        - Example response:
             ```json
             {
                 "output_file": "/outputs/tts_output.wav",
@@ -604,7 +606,7 @@ class AllTalkHelpContent:
         - Check file access methods
         - Confirm URL resolution
    """
-   
+
     API_DEFAULTS3 = """
     ## 🎛️ Character Limits
     Control text processing boundaries and system load:
@@ -751,7 +753,7 @@ class AllTalkHelpContent:
             - Rich text
             - Formatted documents
     """
-   
+
     API_DEFAULTS5 = """
     ## 🗣️ Text Types & Formatting
     The narrator function recognizes three distinct types of text:
@@ -794,7 +796,7 @@ class AllTalkHelpContent:
         - Example:
             ```
             Input: *She smiled.* "Hello!" She waved.
-            Output: 
+            Output:
             - "She smiled" → Narrator voice
             - "Hello!" → Character voice
             - "She waved" → Based on Text-Not-Inside setting
@@ -897,7 +899,7 @@ class AllTalkHelpContent:
         - Server playback only
         - Adjust for testing needs
    """
-   
+
     API_DEFAULTS6 = """
     ## 📚 API Allowed Text Filtering/Passthrough
     The global character filter that defines what can pass through to the TTS engine:
@@ -1000,17 +1002,17 @@ class AllTalkHelpContent:
 
     - **Common Ranges:**
         ```
-        Basic Latin: \u0000-\u007F
-        Latin-1 Supplement: \u0080-\u00FF
-        Latin Extended-A: \u0100-\u017F
-        CJK Unified: \u4E00-\u9FFF
+        Basic Latin: \u0000-\u007f
+        Latin-1 Supplement: \u0080-\u00ff
+        Latin Extended-A: \u0100-\u017f
+        CJK Unified: \u4e00-\u9fff
         ```
 
     - **Specialized Ranges:**
         ```
-        Currency Symbols: \u20A0-\u20CF
-        Arrows: \u2190-\u21FF
-        Mathematical Operators: \u2200-\u22FF
+        Currency Symbols: \u20a0-\u20cf
+        Arrows: \u2190-\u21ff
+        Mathematical Operators: \u2200-\u22ff
         ```
 
     ## 📚 Best Practices
@@ -1053,7 +1055,7 @@ class AllTalkHelpContent:
         - Check for unexpected interactions
         - Monitor processing performance
         """
-        
+
     API_DEFAULTS7 = """
     ## ❗ Troubleshooting & Best Practices
 
@@ -1108,7 +1110,7 @@ class AllTalkHelpContent:
         - Test changes incrementally
         - Maintain backup configurations
         - Regular setting reviews
-        
+
     - **Text Processing:**
         - Keep requests under limits
         - Use appropriate filtering
@@ -1183,7 +1185,7 @@ class AllTalkHelpContent:
         - Secure output directory
         - Monitor access logs
    """
-   
+
     GENERATE_SCREEN1 = """
     ## 🎯 Basic Operation
     1. Select your TTS engine and model/voice
@@ -1231,10 +1233,10 @@ class AllTalkHelpContent:
         - Shows as "Disabled" until RVC activated
         - Requires RVC set to **`Enabled`** in **Global Settings** > **RVC Settings**
         - When enabled, **each** voice can be stored in:
-            - `/models/rvc_voices/{YOUR_VOICE_MODEL} 
+            - `/models/rvc_voices/{YOUR_VOICE_MODEL}
         - Read the [Github WIKI](https://github.com/erew123/alltalk_tts/wiki) for more information
     """
-   
+
     GENERATE_SCREEN2 = """
     ## 🎯 Generation Settings
 
@@ -1283,9 +1285,9 @@ class AllTalkHelpContent:
         - Not all engines support all features
         - Streaming currently unavailable
         - RVC requires separate activation
-   
+
    """
-   
+
     GENERATE_SCREEN3 = """
     ## 🔄 Engine & Model Management
 
@@ -1369,7 +1371,7 @@ class AllTalkHelpContent:
             - Converts HTML entities
             - Ideal for web content
     """
-    
+
     GENERATE_SCREEN4 = """
     ## 🔄 Advanced Settings
 
@@ -1468,7 +1470,7 @@ class AllTalkHelpContent:
     2. For these components to communicate, the Gradio interface needs to know where to find the AllTalk API server.
 
     ## 🐳 What to Enter
-    - Provide the complete URL including protocol and port: 
+    - Provide the complete URL including protocol and port:
     - Example: `http://127.0.0.1:7851` or `https://myserver.ontheinternet.com:7851`
     - This should be the address where AllTalk's API server is accessible via LAN/Internet
     - The address may change each time you restart your Docker environment
@@ -1491,13 +1493,13 @@ class AllTalkHelpContent:
     This shows your current environment and the exact URLs being used for API communication.
     """
 
-    VOICE2RVC = """    
+    VOICE2RVC = """
     ## 🎯 Voice2RVC Help
 
     Voice2RVC is a tool that converts spoken audio into different voices using RVC (Retrieval-based Voice Conversion) models.
     """
 
-    VOICE2RVC1 = """  
+    VOICE2RVC1 = """
     ## 🎤 Input Methods
 
     ### Microphone Recording
@@ -1568,7 +1570,7 @@ class AllTalkHelpContent:
         - Faster than full crepe
         - Lower resource usage
         - Slightly less accurate
-        - Good for quick tests    
+        - Good for quick tests
     """
 
     VOICE2RVC2 = """
@@ -2617,7 +2619,7 @@ class AllTalkHelpContent:
         - Good for most uses
         - Moderate accuracy
         - Efficient processing
-        
+
     3. **Small**
         - Better accuracy
         - Slightly slower
@@ -2630,7 +2632,7 @@ class AllTalkHelpContent:
         - Better with accents
         - Good for complex audio
     """
-        
+
     TRANSCRIBE2 = """
     ## 🎚️ Model Selection cont...
 
@@ -2713,106 +2715,106 @@ class AllTalkHelpContent:
     """
 
     WHISPER_LANGUAGES = {
-    "en": "English",
-    "zh": "Chinese",
-    "de": "German",
-    "es": "Spanish",
-    "ru": "Russian",
-    "ko": "Korean",
-    "fr": "French",
-    "ja": "Japanese",
-    "pt": "Portuguese",
-    "tr": "Turkish",
-    "pl": "Polish",
-    "ca": "Catalan",
-    "nl": "Dutch",
-    "ar": "Arabic",
-    "sv": "Swedish",
-    "it": "Italian",
-    "id": "Indonesian",
-    "hi": "Hindi",
-    "fi": "Finnish",
-    "vi": "Vietnamese",
-    "he": "Hebrew",
-    "uk": "Ukrainian",
-    "el": "Greek",
-    "ms": "Malay",
-    "cs": "Czech",
-    "ro": "Romanian",
-    "da": "Danish",
-    "hu": "Hungarian",
-    "ta": "Tamil",
-    "no": "Norwegian",
-    "th": "Thai",
-    "ur": "Urdu",
-    "hr": "Croatian",
-    "bg": "Bulgarian",
-    "lt": "Lithuanian",
-    "la": "Latin",
-    "mi": "Maori",
-    "ml": "Malayalam",
-    "cy": "Welsh",
-    "sk": "Slovak",
-    "te": "Telugu",
-    "fa": "Persian",
-    "lv": "Latvian",
-    "bn": "Bengali",
-    "sr": "Serbian",
-    "az": "Azerbaijani",
-    "sl": "Slovenian",
-    "kn": "Kannada",
-    "et": "Estonian",
-    "mk": "Macedonian",
-    "br": "Breton",
-    "eu": "Basque",
-    "is": "Icelandic",
-    "hy": "Armenian",
-    "ne": "Nepali",
-    "mn": "Mongolian",
-    "bs": "Bosnian",
-    "kk": "Kazakh",
-    "sq": "Albanian",
-    "sw": "Swahili",
-    "gl": "Galician",
-    "mr": "Marathi",
-    "pa": "Punjabi",
-    "si": "Sinhala",
-    "km": "Khmer",
-    "sn": "Shona",
-    "yo": "Yoruba",
-    "so": "Somali",
-    "af": "Afrikaans",
-    "oc": "Occitan",
-    "ka": "Georgian",
-    "be": "Belarusian",
-    "tg": "Tajik",
-    "sd": "Sindhi",
-    "gu": "Gujarati",
-    "am": "Amharic",
-    "yi": "Yiddish",
-    "lo": "Lao",
-    "uz": "Uzbek",
-    "fo": "Faroese",
-    "ht": "Haitian Creole",
-    "ps": "Pashto",
-    "tk": "Turkmen",
-    "nn": "Nynorsk",
-    "mt": "Maltese",
-    "sa": "Sanskrit",
-    "lb": "Luxembourgish",
-    "my": "Myanmar",
-    "bo": "Tibetan",
-    "tl": "Tagalog",
-    "mg": "Malagasy",
-    "as": "Assamese",
-    "tt": "Tatar",
-    "haw": "Hawaiian",
-    "ln": "Lingala",
-    "ha": "Hausa",
-    "ba": "Bashkir",
-    "jw": "Javanese",
-    "su": "Sundanese",
-}
+        "en": "English",
+        "zh": "Chinese",
+        "de": "German",
+        "es": "Spanish",
+        "ru": "Russian",
+        "ko": "Korean",
+        "fr": "French",
+        "ja": "Japanese",
+        "pt": "Portuguese",
+        "tr": "Turkish",
+        "pl": "Polish",
+        "ca": "Catalan",
+        "nl": "Dutch",
+        "ar": "Arabic",
+        "sv": "Swedish",
+        "it": "Italian",
+        "id": "Indonesian",
+        "hi": "Hindi",
+        "fi": "Finnish",
+        "vi": "Vietnamese",
+        "he": "Hebrew",
+        "uk": "Ukrainian",
+        "el": "Greek",
+        "ms": "Malay",
+        "cs": "Czech",
+        "ro": "Romanian",
+        "da": "Danish",
+        "hu": "Hungarian",
+        "ta": "Tamil",
+        "no": "Norwegian",
+        "th": "Thai",
+        "ur": "Urdu",
+        "hr": "Croatian",
+        "bg": "Bulgarian",
+        "lt": "Lithuanian",
+        "la": "Latin",
+        "mi": "Maori",
+        "ml": "Malayalam",
+        "cy": "Welsh",
+        "sk": "Slovak",
+        "te": "Telugu",
+        "fa": "Persian",
+        "lv": "Latvian",
+        "bn": "Bengali",
+        "sr": "Serbian",
+        "az": "Azerbaijani",
+        "sl": "Slovenian",
+        "kn": "Kannada",
+        "et": "Estonian",
+        "mk": "Macedonian",
+        "br": "Breton",
+        "eu": "Basque",
+        "is": "Icelandic",
+        "hy": "Armenian",
+        "ne": "Nepali",
+        "mn": "Mongolian",
+        "bs": "Bosnian",
+        "kk": "Kazakh",
+        "sq": "Albanian",
+        "sw": "Swahili",
+        "gl": "Galician",
+        "mr": "Marathi",
+        "pa": "Punjabi",
+        "si": "Sinhala",
+        "km": "Khmer",
+        "sn": "Shona",
+        "yo": "Yoruba",
+        "so": "Somali",
+        "af": "Afrikaans",
+        "oc": "Occitan",
+        "ka": "Georgian",
+        "be": "Belarusian",
+        "tg": "Tajik",
+        "sd": "Sindhi",
+        "gu": "Gujarati",
+        "am": "Amharic",
+        "yi": "Yiddish",
+        "lo": "Lao",
+        "uz": "Uzbek",
+        "fo": "Faroese",
+        "ht": "Haitian Creole",
+        "ps": "Pashto",
+        "tk": "Turkmen",
+        "nn": "Nynorsk",
+        "mt": "Maltese",
+        "sa": "Sanskrit",
+        "lb": "Luxembourgish",
+        "my": "Myanmar",
+        "bo": "Tibetan",
+        "tl": "Tagalog",
+        "mg": "Malagasy",
+        "as": "Assamese",
+        "tt": "Tatar",
+        "haw": "Hawaiian",
+        "ln": "Lingala",
+        "ha": "Hausa",
+        "ba": "Bashkir",
+        "jw": "Javanese",
+        "su": "Sundanese",
+    }
     WHISPER_HELP = """
     ## 🎤 Dictate Help
 
@@ -2878,7 +2880,7 @@ class AllTalkHelpContent:
         * Activates **ALL** audio processing features
         * Use when recording quality needs improvement
         * The checkboxes for other settings will not show checked
-        
+
     - **Apply Noise Reduction**:
         * Reduces background noise
         * **Recommendation**: Enable for noisy environments
@@ -2889,8 +2891,8 @@ class AllTalkHelpContent:
 
     - **Apply Bandpass Filter**:
     The Bandpass Filter isolates frequencies within the typical range of human speech, filtering out low-frequency rumbles and high-frequency hiss or noise. This improves transcription quality in challenging environments.<br><br>
-    - **∿ Low Frequency (Hz)** *(Range: 50 - 120 Hz)*  
-        - **Default Value:** 85 Hz  
+    - **∿ Low Frequency (Hz)** *(Range: 50 - 120 Hz)*
+        - **Default Value:** 85 Hz
         - **Lower Values (e.g., 50–70 Hz):**
             - Recommended for deeper male voices or audio with a broader vocal range.
             - Useful when preserving low vocal harmonics in clean recordings.
@@ -2898,8 +2900,8 @@ class AllTalkHelpContent:
             - Filters out low-frequency background hums (e.g., AC noise, mic handling noise).
             - Ideal for recordings with rumble or low-frequency distortion.<br><br>
 
-    - **∿ High Frequency (Hz)** *(Range: 3000 - 5000 Hz)*  
-        - **Default Value:** 3800 Hz  
+    - **∿ High Frequency (Hz)** *(Range: 3000 - 5000 Hz)*
+        - **Default Value:** 3800 Hz
         - **Lower Values (e.g., 3000–3500 Hz):**
             - Reduces high-pitched noise, hissing, or squeals in noisy environments.
             - Useful for telephone-quality recordings or audio with limited frequency range.
@@ -2909,7 +2911,7 @@ class AllTalkHelpContent:
 
     **Use Bandpass Filter in Noisy Environments:** Helps focus on human speech frequencies while ignoring irrelevant noise.
 
-    **Skip Bandpass for Pristine Audio:** For high-quality recordings, skipping this filter ensures no speech frequencies are lost.    
+    **Skip Bandpass for Pristine Audio:** For high-quality recordings, skipping this filter ensures no speech frequencies are lost.
     """
 
     WHISPER_HELP2 = """
@@ -2924,9 +2926,9 @@ class AllTalkHelpContent:
         * Basic implementation - best for clear speaker transitions
         * Format: `Speaker 1: Text`
 
-    - **Silence Threshold** *(Range: 0.001 - 0.02)*  
-    This setting determines the amplitude below which audio is treated as silence. Adjusting this is essential for balancing noise filtering and capturing soft speech.  
-        - **Default Value:** 0.008  
+    - **Silence Threshold** *(Range: 0.001 - 0.02)*
+    This setting determines the amplitude below which audio is treated as silence. Adjusting this is essential for balancing noise filtering and capturing soft speech.
+        - **Default Value:** 0.008
         - **Use Higher Values (e.g., 0.01–0.02):**
             - Reduces false triggers from faint background noise (e.g., air conditioners, hums).
             - Suitable for noisier environments where background noise needs to be suppressed.
@@ -2943,7 +2945,7 @@ class AllTalkHelpContent:
     - **Adapt Based on Speaker Profiles:**
         - Adjust **Low Frequency** for male vs. female speakers.
         - Raise **High Frequency** for tonal clarity in languages like Mandarin or musical recordings.
-        
+
     ## 📊 Real-Time Feedback
 
     ### Audio Levels Graph
@@ -2959,7 +2961,7 @@ class AllTalkHelpContent:
 
     1. **Setup**:
         - Select Whisper model based on your GPU's VRAM
-        - Choose output format and optional file name prefix 
+        - Choose output format and optional file name prefix
         - Configure advanced settings if needed
 
     2. **Recording**:
@@ -3001,8 +3003,8 @@ class AllTalkHelpContent:
     - System administrators
     - Users **with** networking/SSL certificate experience
     - Those requiring **HTTPS for production deployments**
-    - Users needing secure external access to AllTalk services    
-    
+    - Users needing secure external access to AllTalk services
+
     ## 🎯 What is the AllTalk Proxy?
 
     The AllTalk Proxy system provides a secure way to expose your AllTalk instance to external networks while maintaining control and security. It acts as a protective intermediate layer between the internet and your AllTalk services. You can find much of the below information also on the [Github Wiki](https://github.com/erew123/alltalk_tts/wiki/AllTalk-SSL-Proxy-System-%E2%80%90-Technical-Guide/)
@@ -3040,7 +3042,7 @@ class AllTalkHelpContent:
         - **Requires** valid SSL certificates
         - Enables **HTTPS** connections
         - More secure but requires setup
-        
+
     - **Certificate Quick Guide (Optional)**
         - Accepts SSL certificates (.crt/.pem) and private keys (.key)
         - Self-signed certificates work fine on the **API only**
@@ -3086,7 +3088,7 @@ class AllTalkHelpContent:
         - Different from internal ports (7851/7852)
 
     ## Certificate Management
-    
+
     #### Certificate Requirements
     - **Format**: PEM or CRT format for certificate, PEM for private key
     - **Fields Required**:
@@ -3099,7 +3101,7 @@ class AllTalkHelpContent:
     - The Gradio UI will **not** proxy with self-signed certificates
     - Will generate browser warnings but connections are still encrypted
     - Create your own:
-    
+
     ```bash
     openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes
     ```
@@ -3198,7 +3200,7 @@ class AllTalkHelpContent:
 
     #### What Gets Logged
     Different debug flags show different information:
-    - **debug_proxy**: 
+    - **debug_proxy**:
     ```
     [AllTalk PRX] Debug proxy New connection from 192.168.1.100
     [AllTalk PRX] Debug proxy Routing request to internal port 7852
@@ -3267,11 +3269,11 @@ class AllTalkHelpContent:
     - Verify file formats
     - Check file permissions
     - Try different certificate formats
-    
+
     6. **Gradio interface not loading with HTTPS**
     - Verify you're using properly signed certificates (not self-signed)
     - Self-signed certificates will not work with Gradio interface
-    - Try using HTTP mode for testing Gradio interface    
+    - Try using HTTP mode for testing Gradio interface
 
     ## 📝 Best Practices
 

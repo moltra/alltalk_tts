@@ -1,7 +1,8 @@
-import torch
 import json
 import os
 from pathlib import Path
+
+import torch
 
 version_config_list = [
     "v1/32000.json",
@@ -41,7 +42,7 @@ class Config:
         base_path = Path(__file__).resolve().parent
         for config_file in version_config_list:
             config_path = base_path / config_file
-            with open(config_path, "r") as f:
+            with open(config_path) as f:
                 d[config_file] = json.load(f)
         return d
 
@@ -63,18 +64,18 @@ class Config:
             return False
 
     def use_fp32_config(self):
-        print(
-            f"Using FP32 config instead of FP16 due to GPU compatibility ({self.gpu_name})"
-        )
+        print(f"Using FP32 config instead of FP16 due to GPU compatibility ({self.gpu_name})")
         for config_file in version_config_list:
             config_path = os.path.join(os.getcwd(), "system", "tts_engines", "rvc", "configs", config_file)
-            with open(config_path, "r") as f:
+            with open(config_path) as f:
                 config_data = f.read().replace("true", "false")
             with open(config_path, "w") as f:
                 f.write(config_data)
-        
-        preprocess_path = os.path.join(os.getcwd(), "system", "tts_engines", "rvc", "train", "preprocess", "preprocess.py")
-        with open(preprocess_path, "r") as f:
+
+        preprocess_path = os.path.join(
+            os.getcwd(), "system", "tts_engines", "rvc", "train", "preprocess", "preprocess.py"
+        )
+        with open(preprocess_path) as f:
             preprocess_data = f.read().replace("3.7", "3.0")
         with open(preprocess_path, "w") as f:
             f.write(preprocess_data)
@@ -96,16 +97,12 @@ class Config:
             ):
                 self.is_half = False
                 self.use_fp32_config()
-            self.gpu_mem = int(
-                torch.cuda.get_device_properties(i_device).total_memory
-                / 1024
-                / 1024
-                / 1024
-                + 0.4
-            )
+            self.gpu_mem = int(torch.cuda.get_device_properties(i_device).total_memory / 1024 / 1024 / 1024 + 0.4)
             if self.gpu_mem <= 4:
-                preprocess_path = os.path.join(os.getcwd(), "system", "tts_engines", "rvc", "train", "preprocess", "preprocess.py")
-                with open(preprocess_path, "r") as f:
+                preprocess_path = os.path.join(
+                    os.getcwd(), "system", "tts_engines", "rvc", "train", "preprocess", "preprocess.py"
+                )
+                with open(preprocess_path) as f:
                     strr = f.read().replace("3.7", "3.0")
                 with open(preprocess_path, "w") as f:
                     f.write(strr)
@@ -158,10 +155,7 @@ def get_gpu_info():
     if torch.cuda.is_available() or ngpu != 0:
         for i in range(ngpu):
             gpu_name = torch.cuda.get_device_name(i)
-            mem = int(
-                torch.cuda.get_device_properties(i).total_memory / 1024 / 1024 / 1024
-                + 0.4
-            )
+            mem = int(torch.cuda.get_device_properties(i).total_memory / 1024 / 1024 / 1024 + 0.4)
             gpu_infos.append("%s: %s %s GB" % (i, gpu_name, mem))
     if len(gpu_infos) > 0:
         gpu_info = "\n".join(gpu_infos)

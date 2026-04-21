@@ -1,9 +1,9 @@
-"""
+r"""
 This script does not have any specific alltalk integration yet. So we are manually entering paths and it works as a standalone.
 
 The script does the following:
     - Expands the embedding layer of the base XTTSv2 model according to the user created/trained bpe_tokenizer-vocab.json and the base model vocab.json.
-Set variable paths with the base config and base model.pth. 
+Set variable paths with the base config and base model.pth.
 Set the new tokenizer/vocab bpe_tokenizer-vocab.json location.
 The new model will be saved at \expanded_models\expanded_model.pth
 
@@ -15,35 +15,37 @@ I left some print debug statements in the script, they may be nice for the user 
 
 """
 
+import json
+
 import torch
 import torch.nn as nn
-import json
-from TTS.tts.models.xtts import Xtts
-from TTS.tts.layers.xtts.trainer.gpt_trainer import GPTTrainerConfig
 from TTS.tts.layers.xtts.tokenizer import VoiceBpeTokenizer
+from TTS.tts.layers.xtts.trainer.gpt_trainer import GPTTrainerConfig
+from TTS.tts.models.xtts import Xtts
 
-config_path = "/alltalk_tts/models/xtts/xttsv2_2.0.3/config.json"                        # Path to the base model config.json
-pretrained_model_path = "/alltalk_tts/models/xtts/xttsv2_2.0.3/model.pth"                # Path to the base model.pth
-new_tokenizer_path = "/expanded_model/expanded_vocab.json"                               # Path to the new combined expanded_vocab.json
-expanded_model_path = "/expanded_model/expanded_model.pth"                               # Path to where you want the new expanded_model.pth
+config_path = "/alltalk_tts/models/xtts/xttsv2_2.0.3/config.json"  # Path to the base model config.json
+pretrained_model_path = "/alltalk_tts/models/xtts/xttsv2_2.0.3/model.pth"  # Path to the base model.pth
+new_tokenizer_path = "/expanded_model/expanded_vocab.json"  # Path to the new combined expanded_vocab.json
+expanded_model_path = "/expanded_model/expanded_model.pth"  # Path to where you want the new expanded_model.pth
 
 
 # Open and load the configuration file
-with open(config_path, "r") as f:
+with open(config_path) as f:
     config_dict = json.load(f)
 
 # Create a GPTTrainerConfig object and populate it with the loaded configuration
 config = GPTTrainerConfig()
 config.from_dict(data=config_dict)
 
+
 # Function to get the vocabulary size from a tokenizer file
 def get_vocab_size(tokenizer_path):
     tokenizer = VoiceBpeTokenizer(vocab_file=tokenizer_path)
     return len(tokenizer.tokenizer.get_vocab())
 
+
 # Function to adjust the pretrained model with a new tokenizer
-def adjust_pretrained_model(
-    pretrained_model_path, adjusted_model_path, new_tokenizer_path):
+def adjust_pretrained_model(pretrained_model_path, adjusted_model_path, new_tokenizer_path):
     state_dict = torch.load(pretrained_model_path)
     pretrained_state_dict = state_dict["model"]
     model = Xtts(config)
@@ -75,6 +77,8 @@ def adjust_pretrained_model(
     freeze_except_position_embeddings(model)
 
     # Function to adjust the embedding layer for the new vocabulary size
+
+
 def adjust_embedding_layer(model, new_vocab_size, adjusted_model_path):
     old_vocab_size = model.gpt.text_embedding.num_embeddings
     embedding_dim = model.gpt.text_embedding.embedding_dim
@@ -104,18 +108,20 @@ def adjust_embedding_layer(model, new_vocab_size, adjusted_model_path):
     torch.save(checkpoint, adjusted_model_path)
     print(f"Adjusted model saved to {adjusted_model_path}")
 
+
 # Function to freeze all parameters except the position embeddings
 def freeze_except_position_embeddings(model):
     for param in model.parameters():
         param.requires_grad = False
 
     for name, param in model.named_parameters():
-        if 'pos_embedding' in name:
+        if "pos_embedding" in name:
             param.requires_grad = True
 
     # Verify which parameters are frozen and which are not, comment this out if you dont want to debug. You should see only two true values
     for name, param in model.named_parameters():
         print(f"{name}: requires_grad={param.requires_grad}")
+
 
 # Expand the pretrained model with the new tokenizer
 adjust_pretrained_model(pretrained_model_path, expanded_model_path, new_tokenizer_path)

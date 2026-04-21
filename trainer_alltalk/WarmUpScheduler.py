@@ -1,5 +1,6 @@
 from torch.optim.lr_scheduler import LRScheduler
 
+
 class WarmUpScheduler(LRScheduler):
     def __init__(self, optimizer, total_epochs, warmup_lr, target_lr, after_scheduler=None):
         self.total_epochs = total_epochs

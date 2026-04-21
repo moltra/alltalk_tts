@@ -3,20 +3,21 @@
 import csv
 
 # Input and output file names
-input_file = '/alltalkbeta/metadata_eval.csv'  # combine metadata_train and metadata_eval.csv
-output_file = '/alltalkbeta/dataset.txt' # this goes to the tokenizer
+input_file = "/alltalkbeta/metadata_eval.csv"  # combine metadata_train and metadata_eval.csv
+output_file = "/alltalkbeta/dataset.txt"  # this goes to the tokenizer
 
 # Read the input CSV and write to the output file
-with open(input_file, 'r', newline='', encoding='utf-8') as infile, \
-     open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-    
+with (
+    open(input_file, newline="", encoding="utf-8") as infile,
+    open(output_file, "w", newline="", encoding="utf-8") as outfile,
+):
     # Create CSV reader and writer objects
-    reader = csv.reader(infile, delimiter='|')
-    writer = csv.writer(outfile, delimiter='|')
-    
+    reader = csv.reader(infile, delimiter="|")
+    writer = csv.writer(outfile, delimiter="|")
+
     # Skip the header
     next(reader, None)
-    
+
     # Process each row
     for row in reader:
         if len(row) >= 2:

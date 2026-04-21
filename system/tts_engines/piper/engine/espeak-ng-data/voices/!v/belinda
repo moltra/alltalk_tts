@@ -2,7 +2,7 @@ language variant
 name Belinda
 gender female
 
-pitch 200 247  
+pitch 200 247
 flutter 3
 
 formant 0 88 85 154
@@ -17,4 +17,3 @@ formant 8 110 75 150
 
 stressAdd -20 -20 -20 -20 0 3 20 12
 stressAmp 18 16 20 20 10 20 27 20
-

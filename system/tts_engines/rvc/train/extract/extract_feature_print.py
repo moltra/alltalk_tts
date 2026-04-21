@@ -1,10 +1,11 @@
 import os
 import sys
-import tqdm
+
+import numpy as np
+import soundfile as sf
 import torch
 import torch.nn.functional as F
-import soundfile as sf
-import numpy as np
+import tqdm
 
 now_dir = os.getcwd()
 sys.path.append(now_dir)
@@ -51,9 +52,7 @@ todo = sorted(os.listdir(wav_path))[i_part::n_parts]
 n = max(1, len(todo) // 10)
 
 if len(todo) == 0:
-    print(
-        "An error occurred in the feature extraction, make sure you have provided the audios correctly."
-    )
+    print("An error occurred in the feature extraction, make sure you have provided the audios correctly.")
 else:
     print(f"{len(todo)}")
     with tqdm.tqdm(total=len(todo)) as pbar:
@@ -75,11 +74,7 @@ else:
                     }
                     with torch.no_grad():
                         logits = model.extract_features(**inputs)
-                        feats = (
-                            model.final_proj(logits[0])
-                            if version == "v1"
-                            else logits[0]
-                        )
+                        feats = model.final_proj(logits[0]) if version == "v1" else logits[0]
 
                     feats = feats.squeeze(0).float().cpu().numpy()
                     if np.isnan(feats).sum() == 0:

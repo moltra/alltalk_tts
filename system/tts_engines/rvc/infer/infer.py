@@ -1,34 +1,34 @@
 import os
 import sys
 import time
-import torch
-from loguru import logger
+from functools import lru_cache
+
 import faiss
+import librosa
 import numpy as np
 import soundfile as sf
-import librosa
-from functools import lru_cache
+import torch
 
 from config import AlltalkConfig
 
 now_dir = os.getcwd()
 sys.path.append(now_dir)
 
+from ..configs.config import Config
 from ..infer.pipeline import VC
-from ..lib.utils import load_audio
-from ..lib.tools.split_audio import process_audio, merge_audio
 from ..lib.infer_pack.models import (
     SynthesizerTrnMs256NSFsid,
     SynthesizerTrnMs256NSFsid_nono,
     SynthesizerTrnMs768NSFsid,
     SynthesizerTrnMs768NSFsid_nono,
 )
-from ..configs.config import Config
-from ..lib.utils import load_embedding
+from ..lib.tools.split_audio import merge_audio, process_audio
+from ..lib.utils import load_audio, load_embedding
 
 # Loguru handles logging levels via configuration (httpx, httpcore suppressed)
 
 config = Config()
+
 
 @lru_cache
 def load_hubert(embedder_model):
@@ -41,6 +41,7 @@ def load_hubert(embedder_model):
         hubert_model = hubert_model.float()
     hubert_model.eval()
     return hubert_model
+
 
 def voice_conversion(
     vc,
@@ -76,14 +77,7 @@ def voice_conversion(
         print(f"Loading hubert model with {embedder_model}") if debug_rvc else None
         hubert_model = load_hubert(embedder_model)
 
-        file_index = (
-            file_index.strip(" ")
-            .strip('"')
-            .strip("\n")
-            .strip('"')
-            .strip(" ")
-            .replace("trained", "added")
-        )
+        file_index = file_index.strip(" ").strip('"').strip("\n").strip('"').strip(" ").replace("trained", "added")
         if tgt_sr != resample_sr >= 16000:
             tgt_sr = resample_sr
         if split_audio == "True":
@@ -91,9 +85,7 @@ def voice_conversion(
             result, new_dir_path = process_audio(input_audio_path)
             if result == "Error":
                 return "Error with Split Audio", None
-            dir_path = (
-                new_dir_path.strip(" ").strip('"').strip("\n").strip('"').strip(" ")
-            )
+            dir_path = new_dir_path.strip(" ").strip('"').strip("\n").strip('"').strip(" ")
             if dir_path != "":
                 paths = [
                     os.path.join(root, name)
@@ -153,13 +145,13 @@ def voice_conversion(
                 f0autotune,
                 f0_file=f0_file,
             )
-            
+
         # Resample the audio to the target sample rate before saving
         if tgt_sr != resample_sr and resample_sr >= 16000:
             print(f"Resampling audio from {tgt_sr} to {resample_sr}") if debug_rvc else None
             audio_opt = librosa.resample(audio_opt, tgt_sr, resample_sr)
             tgt_sr = resample_sr
-            
+
         if output_path is not None:
             print(f"Saving file to {output_path}") if debug_rvc else None
             sf.write(output_path, audio_opt, tgt_sr, format="WAV")
@@ -175,8 +167,8 @@ def voice_conversion(
 @lru_cache(maxsize=AlltalkConfig.get_instance().rvc_settings.model_cache_size)
 def get_vc(weight_root, sid, file_index=None, training_data_size=10000, debug_rvc=False):
     net_g = None
-    branding="AllTalk "
-    
+    branding = "AllTalk "
+
     if debug_rvc:
         print(f"[{branding}Debug] Entering get_vc function")
         print(f"[{branding}Debug] weight_root: {weight_root}")
@@ -186,17 +178,17 @@ def get_vc(weight_root, sid, file_index=None, training_data_size=10000, debug_rv
 
     if debug_rvc:
         print(f"[{branding}Debug] Loading model checkpoint")
-        
+
     person = weight_root
     cpt = torch.load(person, map_location="cpu")
     tgt_sr = cpt["config"][-1]
     cpt["config"][-3] = cpt["weight"]["emb_g.weight"].shape[0]
     if_f0 = cpt.get("f0", 1)
     version = cpt.get("version", "v1")
-    
+
     if debug_rvc:
         print(f"[{branding}Debug] Model version: {version}")
-    
+
     if version == "v1":
         if if_f0 == 1:
             net_g = SynthesizerTrnMs256NSFsid(*cpt["config"], is_half=config.is_half)
@@ -213,7 +205,7 @@ def get_vc(weight_root, sid, file_index=None, training_data_size=10000, debug_rv
         net_g = net_g.half()
     else:
         net_g = net_g.float()
-    
+
     if file_index is not None:
         if debug_rvc:
             print(f"[{branding}Debug] Loading index file: {file_index}")
@@ -224,10 +216,10 @@ def get_vc(weight_root, sid, file_index=None, training_data_size=10000, debug_rv
         data = index.reconstruct_n(0, index.ntotal)
         d = index.d
         nlist = index.nlist
-        
+
         training_data_size = min(training_data_size, len(data))
         train_data = data[:training_data_size]
-        
+
     else:
         if debug_rvc:
             print(f"[{branding}Debug] No index file provided")
@@ -235,10 +227,10 @@ def get_vc(weight_root, sid, file_index=None, training_data_size=10000, debug_rv
         d = None
         nlist = None
         train_data = None
-    
+
     if debug_rvc:
         print(f"[{branding}Debug] Creating VC instance")
-        
+
     if data is not None and d is not None and nlist is not None and train_data is not None:
         if debug_rvc:
             print(f"[{branding}Debug] Data: {data}")
@@ -277,7 +269,7 @@ def infer_pipeline(
     else:
         file_index = index_path
     vc = get_vc(model_path, 0, file_index, training_data_size, debug_rvc)
-    
+
     try:
         start_time = time.time()
         voice_conversion(
@@ -297,13 +289,14 @@ def infer_pipeline(
             f0autotune=f0autotune,
             filter_radius=filter_radius,
             embedder_model=embedder_model,
-            debug_rvc=debug_rvc
+            debug_rvc=debug_rvc,
         )
-        
+
         end_time = time.time()
         elapsed_time = end_time - start_time
-        print(f"Conversion completed. Output file: '{audio_output_path}' in {elapsed_time:.2f} seconds.") if debug_rvc else None
+        print(
+            f"Conversion completed. Output file: '{audio_output_path}' in {elapsed_time:.2f} seconds."
+        ) if debug_rvc else None
 
     except Exception as error:
         print(f"Voice conversion failed: {error}")
-

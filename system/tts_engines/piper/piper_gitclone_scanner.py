@@ -1,5 +1,5 @@
-import os
 import json
+import os
 from urllib.parse import urljoin
 
 REPO_PATH = "E:/alltalk_tts/models/piper/"
@@ -12,6 +12,7 @@ for root, dirs, files in os.walk(REPO_PATH):
         print(f"  File: {os.path.join(root, file)}")
 
 HF_REPO_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
+
 
 def get_file_info(onnx_path, repo_url):
     base_name = os.path.splitext(os.path.basename(onnx_path))[0]
@@ -32,6 +33,7 @@ def get_file_info(onnx_path, repo_url):
         }
     else:
         return None
+
 
 voice_files = []
 for root, dirs, files in os.walk(REPO_PATH):
