@@ -137,6 +137,13 @@ class AlltalkConfigCorsSettings(BaseModel):
     allow_methods: list[str] = ["*"]
     allow_headers: list[str] = ["*"]
 
+    def __init__(self, **data):
+        # Allow environment variable to override allowed_origins
+        if "ALLTALK_ALLOWED_ORIGINS" in os.environ:
+            env_origins = os.environ["ALLTALK_ALLOWED_ORIGINS"]
+            data["allowed_origins"] = [origin.strip() for origin in env_origins.split(",")]
+        super().__init__(**data)
+
 
 class AbstractJsonConfig(ABC):
     def __init__(self, config_path: Path | str, file_check_interval: int):

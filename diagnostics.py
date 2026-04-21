@@ -15,8 +15,46 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as get_version
 from pathlib import Path
 
-import torch
+try:
+    import torch
+except ImportError:
+    torch = None
+
 from loguru import logger
+
+# Command whitelist for secure subprocess execution
+ALLOWED_PIP_COMMANDS = ["install", "uninstall", "list", "show", "freeze", "check"]
+
+
+def execute_pip_command(command: str):
+    """Execute a pip command safely with validation.
+
+    Args:
+        command: The pip command string to execute
+
+    Returns:
+        subprocess.CompletedProcess: The result of the subprocess execution
+
+    Raises:
+        ValueError: If the command is not in the allowed whitelist or contains shell metacharacters
+        subprocess.CalledProcessError: If the command execution fails
+    """
+    parts = command.split()
+    if not parts:
+        raise ValueError("Empty command")
+
+    if parts[0] not in ALLOWED_PIP_COMMANDS:
+        raise ValueError(f"Command not allowed: {parts[0]}")
+
+    # Check for shell metacharacters that could enable injection
+    dangerous_chars = [";", "&", "|", "$", "`", "(", ")", "<", ">", "\n", "\r"]
+    if any(char in command for char in dangerous_chars):
+        raise ValueError(f"Command contains dangerous characters: {command}")
+
+    # Use list instead of shell=True for security
+    result = subprocess.run([sys.executable, "-m", "pip"] + parts[1:], capture_output=True, text=True, check=False)
+    return result
+
 
 if platform.system() == "Windows":
     import winreg
@@ -1065,10 +1103,16 @@ class PackageComparisonTool(QWidget):
     def run_pip_commands(self):
         commands = self.pip_commands.toPlainText().split("\n")
         for command in commands:
+            if not command.strip():
+                continue
             try:
-                subprocess.run(command, shell=True, check=True)
+                result = execute_pip_command(command)
+                if result.returncode != 0:
+                    logger.error(f"Command failed: {command}\n{result.stderr}")
+            except ValueError as e:
+                logger.error(f"Invalid command: {command} - {e}")
             except Exception as e:
-                print(f"Error executing {command}: {e}")
+                logger.error(f"Error executing {command}: {e}")
 
 
 def cleanup_logging():
@@ -1094,7 +1138,7 @@ def clear_screen():
     """Clear terminal screen cross-platform using subprocess instead of os.system"""
     try:
         if platform.system() == "Windows":
-            subprocess.run(["cls"], shell=True, check=False)
+            subprocess.run(["cmd", "/c", "cls"], check=False)
         else:
             subprocess.run(["clear"], check=False)
     except Exception:

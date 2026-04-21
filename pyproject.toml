@@ -88,10 +88,6 @@ python_functions = ["test_*"]
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=.",
-    "--cov-report=html",
-    "--cov-report=term-missing",
-    "--cov-fail-under=80",
     "-v",
 ]
 markers = [
@@ -102,6 +98,10 @@ markers = [
     "audio: Tests requiring audio output",
 ]
 asyncio_mode = "auto"
+log_cli = true
+log_cli_level = "INFO"
+log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s"
+log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]

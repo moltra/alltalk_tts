@@ -99,6 +99,23 @@ class TestCorsConfiguration:
         if "cors_settings" in config_data and "allowed_origins" in config_data["cors_settings"]:
             assert "*" not in config_data["cors_settings"]["allowed_origins"]
 
+    def test_cors_environment_variable_override(self, monkeypatch):
+        """Test CORS settings can be overridden via environment variable"""
+        monkeypatch.setenv("ALLTALK_ALLOWED_ORIGINS", "http://example.com,http://test.com")
+        cors_settings = AlltalkConfigCorsSettings()
+
+        assert "http://example.com" in cors_settings.allowed_origins
+        assert "http://test.com" in cors_settings.allowed_origins
+        assert len(cors_settings.allowed_origins) == 2
+
+    def test_cors_default_without_env_var(self, monkeypatch):
+        """Test CORS settings use default when no environment variable"""
+        monkeypatch.delenv("ALLTALK_ALLOWED_ORIGINS", raising=False)
+        cors_settings = AlltalkConfigCorsSettings()
+
+        assert "http://localhost:7852" in cors_settings.allowed_origins
+        assert "http://localhost:3000" in cors_settings.allowed_origins
+
 
 @pytest.fixture
 def temp_dir():

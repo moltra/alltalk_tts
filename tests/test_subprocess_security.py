@@ -6,33 +6,67 @@ and that command validation is in place to prevent injection.
 """
 
 import sys
+from pathlib import Path
 from unittest.mock import Mock, patch
+
+import pytest
+
+# Import the functions from diagnostics
+from diagnostics import ALLOWED_PIP_COMMANDS, execute_pip_command
 
 
 class TestSubprocessSecurity:
     """Test subprocess security fixes"""
 
-    def test_subprocess_no_shell_true_in_run_pip_commands(self):
-        """Test that run_pip_commands doesn't use shell=True"""
-        # This is a code review test - we check the source code
-        # In a real scenario, we'd import and test the actual function
-        # For now, we verify the fix is in place by checking the implementation
+    def test_command_whitelist_exists(self):
+        """Test that ALLOWED_PIP_COMMANDS whitelist exists"""
+        assert isinstance(ALLOWED_PIP_COMMANDS, list)
+        assert len(ALLOWED_PIP_COMMANDS) > 0
+        assert "install" in ALLOWED_PIP_COMMANDS
+        assert "uninstall" in ALLOWED_PIP_COMMANDS
 
-        # Read the diagnostics.py file
-        with open("diagnostics.py") as f:
-            content = f.read()
+    def test_execute_pip_command_allowed(self):
+        """Test that allowed commands execute successfully"""
+        with patch("subprocess.run") as mock_subprocess:
+            mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
 
-        # Check that the vulnerable pattern is NOT present
-        assert "subprocess.run(command, shell=True" not in content, "Found vulnerable subprocess.run with shell=True"
+            execute_pip_command("install numpy")
+            assert mock_subprocess.called
+            # Verify the command was called with list arguments, not shell=True
+            call_args = mock_subprocess.call_args
+            assert "shell" not in call_args.kwargs or call_args.kwargs["shell"] is False
 
-        # Check that the secure pattern IS present
-        assert (
-            'subprocess.run([sys.executable, "-m", "pip"] + command.split()' in content
-        ), "Secure subprocess pattern not found"
+    def test_execute_pip_command_disallowed(self):
+        """Test that disallowed commands raise ValueError"""
+        with pytest.raises(ValueError, match="Command not allowed"):
+            execute_pip_command("rm -rf /")
+
+    def test_execute_pip_command_empty(self):
+        """Test that empty commands raise ValueError"""
+        with pytest.raises(ValueError, match="Empty command"):
+            execute_pip_command("")
+
+    def test_execute_pip_command_injection_attempt(self):
+        """Test that command injection attempts are blocked"""
+        with pytest.raises(ValueError, match="dangerous characters"):
+            execute_pip_command("install numpy; rm -rf /")
+
+    @patch("subprocess.run")
+    def test_subprocess_no_shell_true(self, mock_subprocess):
+        """Test that subprocess.run is called without shell=True"""
+        mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
+
+        execute_pip_command("list")
+
+        call_args = mock_subprocess.call_args
+        if "shell" in call_args.kwargs:
+            assert call_args.kwargs["shell"] is False
 
     def test_no_os_system_in_clear_screen(self):
         """Test that clear_screen doesn't use os.system"""
-        with open("diagnostics.py") as f:
+        # Read the diagnostics.py file
+        diagnostics_path = Path(__file__).parent.parent / "diagnostics.py"
+        with diagnostics_path.open() as f:
             content = f.read()
 
         # Check that os.system("cls") is NOT present
@@ -43,31 +77,19 @@ class TestSubprocessSecurity:
 
         # Check that subprocess.run is used instead
         assert (
-            'subprocess.run(["cls"]' in content or 'subprocess.run(["clear"]' in content
+            'subprocess.run(["cmd", "/c", "cls"]' in content or 'subprocess.run(["clear"]' in content
         ), "subprocess.run for screen clearing not found"
 
     def test_subprocess_uses_list_not_string(self):
         """Test that subprocess.run uses list arguments instead of shell=True"""
-        with open("diagnostics.py") as f:
-            content = f.read()
+        with patch("subprocess.run") as mock_subprocess:
+            mock_subprocess.return_value = Mock(returncode=0, stdout="", stderr="")
 
-        # The secure pattern uses a list: [sys.executable, "-m", "pip"] + command.split()
-        assert '[sys.executable, "-m", "pip"]' in content, "Secure list argument pattern not found"
+            execute_pip_command("install numpy")
 
-    @patch("subprocess.run")
-    def test_pip_command_structure(self, mock_subprocess_run):
-        """Test that pip commands are structured correctly"""
-        mock_subprocess_run.return_value = Mock(returncode=0)
-
-        # Simulate the secure command structure
-        command = "install numpy"
-        args = [sys.executable, "-m", "pip"] + command.split()
-
-        # Verify the structure
-        assert args[0] == sys.executable
-        assert args[1] == "-m"
-        assert args[2] == "pip"
-        assert args[3:] == ["install", "numpy"]
-
-        # Verify no shell=True is used
-        # This would be checked in actual implementation
+            # Verify the first argument is a list
+            call_args = mock_subprocess.call_args[0][0]
+            assert isinstance(call_args, list)
+            assert call_args[0] == sys.executable
+            assert call_args[1] == "-m"
+            assert call_args[2] == "pip"
