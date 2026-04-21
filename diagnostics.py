@@ -1012,7 +1012,7 @@ class PackageComparisonTool(QWidget):
         commands = self.pip_commands.toPlainText().split('\n')
         for command in commands:
             try:
-                subprocess.run(command, shell=True, check=True)
+                subprocess.run([sys.executable, "-m", "pip"] + command.split(), check=True)
                 print(f"Successfully executed: {command}")
             except subprocess.CalledProcessError as e:
                 print(f"Error executing {command}: {e}")        
@@ -1032,11 +1032,15 @@ def signal_handler(signum, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 def clear_screen():
-    # Detect the operating system and clear the terminal screen
-    if platform.system() == "Windows":
-        os.system("cls")
-    else:
-        os.system("clear")
+    """Clear terminal screen cross-platform using subprocess instead of os.system"""
+    try:
+        if platform.system() == "Windows":
+            subprocess.run(["cls"], shell=True, check=False)
+        else:
+            subprocess.run(["clear"], check=False)
+    except Exception:
+        # If clearing fails, just continue without error
+        pass
 
 def is_running_in_gui():
     return os.environ.get('DISPLAY') is not None or os.environ.get('WAYLAND_DISPLAY') is not None
