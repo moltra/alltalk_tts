@@ -174,3 +174,21 @@ cython_debug/
 
 # Docker build
 docker/deepspeed/build
+
+# Development tools
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+cython_debug/
+
+# Environment
+.env.local
+.env.*.local
