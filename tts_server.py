@@ -42,7 +42,7 @@ import librosa
 from langdetect import detect, DetectorFactory
 from langdetect.lang_detect_exception import LangDetectException
 from config import AlltalkConfig, AlltalkTTSEnginesConfig
-logging.disable(logging.WARNING)
+# Loguru handles logging levels via configuration
 
 DetectorFactory.seed = 0  # Ensure deterministic behavior of language detector
 
