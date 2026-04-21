@@ -312,24 +312,6 @@ def create_gradio_interface():
     with gr.Blocks(title="AllTalk Multi Engine Manager", theme=gr.themes.Base()) as interface:
         with gr.Row():
             gr.Markdown("# AllTalk Multi Engine Manager")
-            gr.Markdown("")
-            gr.Markdown("")
-            dark_mode_btn = gr.Button("Light/Dark Mode", variant="primary", size="sm")
-            dark_mode_btn.click(
-                None,
-                None,
-                None,
-                js="""() => {
-                if (document.querySelectorAll('.dark').length) {
-                    document.querySelectorAll('.dark').forEach(el => el.classList.remove('dark'));
-                    // localStorage.setItem('darkMode', 'disabled');
-                } else {
-                    document.querySelector('body').classList.add('dark');
-                    // localStorage.setItem('darkMode', 'enabled');
-                }
-            }""",
-                show_api=False,
-            )
         with gr.Tab("Engine Management"):
             with gr.Row():
                 num_instances_input = gr.Slider(
@@ -875,7 +857,6 @@ def create_gradio_interface():
                     label="Engine Status",
                     wrap=True,
                     column_widths=["100px", "70px", "100px", "150px", "100px", "300px"],
-                    height=500,
                 )
 
             with gr.Row():
@@ -884,7 +865,6 @@ def create_gradio_interface():
                     label="Queue Status (Top 10 items)",
                     wrap=True,
                     column_widths=["70px", "100px", "100px", "400px"],
-                    height=500,
                 )
 
             is_monitoring = gr.State(value=False)
@@ -965,11 +945,11 @@ def create_gradio_interface():
             )
 
             # Auto-refresh every 1 seconds when monitoring is active
-            interface.load(
+            timer = gr.Timer(1)
+            timer.tick(
                 update_monitor_data,
                 inputs=[is_monitoring],
                 outputs=[queue_length, running_engines, queue_status, engine_status],
-                every=1,
                 show_progress=False,
             )
 
@@ -1208,7 +1188,7 @@ def is_instance_active(instance):
     try:
         response = requests.get(f"http://127.0.0.1:{port}/api/ready", timeout=1)
         return response.text.strip() == "Ready"
-    except:
+    except requests.RequestException:
         return False
 
 

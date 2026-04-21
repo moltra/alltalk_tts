@@ -153,10 +153,10 @@ class AbstractJsonConfig(ABC):
         self.__last_read_time = 0  # Track when we last read the file
         self.__file_check_interval = file_check_interval
 
-    def get_config_path(self):
+    def get_config_path(self) -> Path:
         return self.__config_path
 
-    def reload(self):
+    def reload(self) -> "AbstractJsonConfig":
         self._load_config()
         return self
 

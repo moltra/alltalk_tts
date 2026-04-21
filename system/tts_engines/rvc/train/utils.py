@@ -63,7 +63,7 @@ def load_checkpoint(checkpoint_path, model, optimizer=None, load_opt=1):
                     saved_state_dict[k].shape,
                 )
                 raise KeyError
-        except:
+        except KeyError:
             print("%s is not in the checkpoint", k)
             new_state_dict[k] = v
     if hasattr(model, "module"):
