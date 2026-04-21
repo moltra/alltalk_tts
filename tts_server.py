@@ -15,7 +15,7 @@ from asyncio import Lock
 import importlib
 import inspect
 import json
-import logging
+from loguru import logger
 import os
 import re
 import html
@@ -2479,8 +2479,7 @@ app.mount("/static", StaticFiles(directory=str(this_dir / "system")), name="stat
 ########################################
 # Legacy JSON update settings function #
 ########################################
-# Setup logging
-logging.basicConfig(level=logging.DEBUG)
+# Loguru handles logging configuration via system/logging_config.py
 
 @app.get("/settings")
 async def get_settings(request: Request):

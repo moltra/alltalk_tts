@@ -6,10 +6,10 @@ import sys
 import json
 import time
 import torch
-import logging
+from loguru import logger
 from pathlib import Path
 from fastapi import (HTTPException)
-logging.disable(logging.WARNING)
+# Loguru handles logging levels via configuration
 #################################################################
 # DONT CHANGE # Get Pytorch & Python versions & setup DeepSpeed #
 #################################################################

@@ -1,7 +1,7 @@
 import subprocess
 import sys
 from pathlib import Path
-import logging
+from loguru import logger
 
 # Auto-install requirements if missing
 def install_requirements():
@@ -100,7 +100,7 @@ def debug_func_entry():
 class ProxyToInternalPort(proxy.ReverseProxyResource):
     def __init__(self, target_host, target_port):
         super().__init__(target_host, target_port, b"")
-        self.logger = logging.getLogger("ProxyManager")
+# Loguru logger imported from loguru
 
     def proxyClientConnectionFailed(self, connector, reason):
         print_message(f"Connection failed: {reason}", message_type="debug_proxy")

@@ -1,6 +1,6 @@
 import platform
 import subprocess
-import logging
+from loguru import logger
 import torch
 import os
 import re
@@ -174,10 +174,7 @@ def check_espeak_ng():
 def setup_logging():
     log_file = 'diagnostics.log'
     
-    # Close existing handlers
-    for handler in logging.root.handlers[:]:
-        handler.close()
-        logging.root.removeHandler(handler)
+    # Loguru handles logging configuration via system/logging_config.py
 
     # Delete the existing log file if it exists
     if os.path.exists(log_file):
@@ -192,13 +189,8 @@ def setup_logging():
 
     # Set up logging
     try:
-        logging.basicConfig(filename=log_file,
-                            filemode='w',
-                            level=logging.INFO,
-                            format='%(message)s')
-
-        logging.info(f"Diagnostic log created at {datetime.now()}")
-        logging.info("="*50 + "\n")
+        logger.info(f"Diagnostic log created at {datetime.now()}")
+        logger.info("="*50 + "\n")
         print(f"  New {log_file} has been set up successfully.\n")
     except Exception as e:
         print(f"  Error setting up logging: {e}")
@@ -285,7 +277,7 @@ def get_cuda_details():
         else:
             return None, None, None
     except Exception as e:
-        logging.warning(f"Error getting CUDA details: {e}")
+        logger.warning(f"Error getting CUDA details: {e}")
         return None, None, None
 
 def find_files_in_path_with_wildcard(pattern):
@@ -426,31 +418,31 @@ def log_system_info():
                             installed_packages[package_name] = installed_version
         except FileNotFoundError:
             print(f"\n{requirements_file} not found. Skipping version checks.")
-            logging.info(f"NOTE {requirements_file} not found. Skipping version checks.")
+            logger.info(f"NOTE {requirements_file} not found. Skipping version checks.")
 
-    logging.info(f"OPERATING SYSTEM:")
-    logging.info(f" OS Version: {os_version}")
-    logging.info(f" Note: Windows 11 will list as build is 10.x.22xxx")
-    logging.info(f"\nHARDWARE ENVIRONMENT:")
-    logging.info(f" CPU: Physical Cores: {cpu_info['physical_cores']}, Total Cores: {cpu_info['total_cores']}, Max Frequency: {cpu_info['max_frequency']} MHz")
-    logging.info(f" System RAM: {system_ram}")
-    logging.info(f"\nGPU INFORMATION:")
-    logging.info(f" {gpu_info}")
-    logging.info(f"CUDA:")
-    logging.info(f" CUDA Working: {cuda_test_result}")
-    logging.info(f" CUDA_HOME   : {cuda_home}")    
-    logging.info(f" CUDA Device : {cuda_device_name if cuda_device_name else 'N/A'}")
-    logging.info(f" CUDA Memory : {cuda_device_memory:.2f} GB" if cuda_device_memory else "N/A")
-    logging.info(f" CUDA Version: {cuda_version if cuda_version else 'N/A'}")
-    logging.info("\nDISK INFORMATION:")
+    logger.info(f"OPERATING SYSTEM:")
+    logger.info(f" OS Version: {os_version}")
+    logger.info(f" Note: Windows 11 will list as build is 10.x.22xxx")
+    logger.info(f"\nHARDWARE ENVIRONMENT:")
+    logger.info(f" CPU: Physical Cores: {cpu_info['physical_cores']}, Total Cores: {cpu_info['total_cores']}, Max Frequency: {cpu_info['max_frequency']} MHz")
+    logger.info(f" System RAM: {system_ram}")
+    logger.info(f"\nGPU INFORMATION:")
+    logger.info(f" {gpu_info}")
+    logger.info(f"CUDA:")
+    logger.info(f" CUDA Working: {cuda_test_result}")
+    logger.info(f" CUDA_HOME   : {cuda_home}")    
+    logger.info(f" CUDA Device : {cuda_device_name if cuda_device_name else 'N/A'}")
+    logger.info(f" CUDA Memory : {cuda_device_memory:.2f} GB" if cuda_device_memory else "N/A")
+    logger.info(f" CUDA Version: {cuda_version if cuda_version else 'N/A'}")
+    logger.info("\nDISK INFORMATION:")
     for disk in disk_info:
-        logging.info(disk)
-    logging.info("\nNETWORK PORT:")
-    logging.info(f" Port Status : {port_status}")
+        logger.info(disk)
+    logger.info("\nNETWORK PORT:")
+    logger.info(f" Port Status : {port_status}")
     if found_paths:
-        logging.info(f" Cublas64_11 Path: {', '.join(found_paths)}")
+        logger.info(f" Cublas64_11 Path: {', '.join(found_paths)}")
     else:
-        logging.info(f" Cublas64_11 Path: Not found in any search path directories.")
+        logger.info(f" Cublas64_11 Path: Not found in any search path directories.")
         
     if platform.system() == "Windows":
         windows_version = check_windows_version()
@@ -459,79 +451,79 @@ def log_system_info():
         setuptools_version = check_setuptools_version()
         espeak_ng_version = check_espeak_ng()
         
-        logging.info("\nWindows C++ Build tools & Windows SDK:")
-        logging.info(f" Windows Version: {windows_version}")
+        logger.info("\nWindows C++ Build tools & Windows SDK:")
+        logger.info(f" Windows Version: {windows_version}")
         
         if build_tools:
-            logging.info(" Visual C++ Build Tools and/or Visual Studio found:")
+            logger.info(" Visual C++ Build Tools and/or Visual Studio found:")
             for tool in build_tools:
-                logging.info(f" {tool}")
+                logger.info(f" {tool}")
         else:
-            logging.info(" No Visual C++ Build Tools or Visual Studio found.")
+            logger.info(" No Visual C++ Build Tools or Visual Studio found.")
         
         if sdks:
-            logging.info("\nWindows SDK(s) found:")
+            logger.info("\nWindows SDK(s) found:")
             for sdk_version, path in sdks:
-                logging.info(f" SDK Version: {sdk_version}")
-                logging.info(f" Path: {path}")
+                logger.info(f" SDK Version: {sdk_version}")
+                logger.info(f" Path: {path}")
         else:
-            logging.info(" No Windows SDKs found.")
+            logger.info(" No Windows SDKs found.")
         
         if setuptools_version:
-            logging.info(f" Python setuptools version: {setuptools_version}")
+            logger.info(f" Python setuptools version: {setuptools_version}")
         else:
-            logging.info(" Python setuptools not found.")
+            logger.info(" Python setuptools not found.")
             
             
-        logging.info("\nWindows Espeak-ng:")            
+        logger.info("\nWindows Espeak-ng:")            
         if espeak_ng_version:
-            logging.info(f" Espeak-ng version: {espeak_ng_version}")
+            logger.info(f" Espeak-ng version: {espeak_ng_version}")
         else:
-            logging.info(" Espeak-ng not found.")      
+            logger.info(" Espeak-ng not found.")      
            
-    logging.info("\nPYTHON & PYTORCH:")
-    logging.info(f" Torch Version: {torch_version}")
-    logging.info(f" Python Version: {python_version}")
-    logging.info(f" Python Version Info: {python_version_info}")
-    logging.info(f" Python Executable: {python_executable}")
-    logging.info(f" Python Virtual Environment: {python_virtual_env} (Should be N/A when in Text-generation-webui Conda Python environment)")
-    logging.info(f" Conda Environment: {conda_env}")
-    logging.info("\nPython Search Path:")
+    logger.info("\nPYTHON & PYTORCH:")
+    logger.info(f" Torch Version: {torch_version}")
+    logger.info(f" Python Version: {python_version}")
+    logger.info(f" Python Version Info: {python_version_info}")
+    logger.info(f" Python Executable: {python_executable}")
+    logger.info(f" Python Virtual Environment: {python_virtual_env} (Should be N/A when in Text-generation-webui Conda Python environment)")
+    logger.info(f" Conda Environment: {conda_env}")
+    logger.info("\nPython Search Path:")
     for path in search_path:
-        logging.info(f"  {path}")
-    logging.info("\nOS SEARCHPATH ENVIRONMENT:")
+        logger.info(f"  {path}")
+    logger.info("\nOS SEARCHPATH ENVIRONMENT:")
     for path in path_env.split(';'):
-        logging.info(f"  {path}")
-    logging.info("\nCONDA INFORMATION:")
+        logger.info(f"  {path}")
+    logger.info("\nCONDA INFORMATION:")
     if isinstance(conda_info, str):
-        logging.info(f" {conda_info}")
+        logger.info(f" {conda_info}")
     else:
-        logging.info(f" Conda Executable: {conda_info['conda_exe']}")
-        logging.info(f" Conda Version: {conda_info['version']}")
-        logging.info(f" Current Environment: {conda_info['current_env']}")
-        logging.info(" Conda Environments:")
+        logger.info(f" Conda Executable: {conda_info['conda_exe']}")
+        logger.info(f" Conda Version: {conda_info['version']}")
+        logger.info(f" Current Environment: {conda_info['current_env']}")
+        logger.info(" Conda Environments:")
         for env in conda_info['env_list']:
-            logging.info(f"  {env}")
+            logger.info(f"  {env}")
         
-        logging.info("\nCONDA PACKAGES IN CURRENT ENVIRONMENT:")
+        logger.info("\nCONDA PACKAGES IN CURRENT ENVIRONMENT:")
         for category in ['conda-forge', 'pkgs/main', 'pkgs/msys2', 'other']:
             if conda_info['packages'][category]:
-                logging.info(f"\n {category.upper()} PACKAGES:")
+                logger.info(f"\n {category.upper()} PACKAGES:")
                 for package, details in conda_info['packages'][category].items():
-                    logging.info(f"  {package:<30} Version: {details['version']:<15} Channel: {details['channel']}")    
+                    logger.info(f"  {package:<30} Version: {details['version']:<15} Channel: {details['channel']}")    
        
     if required_packages:
-        logging.info("\nPACKAGE VERSIONS vs REQUIREMENTS FILE:")
+        logger.info("\nPACKAGE VERSIONS vs REQUIREMENTS FILE:")
         max_package_length = max(len(package) for package in required_packages.keys())
         for package_name, (operator, required_version) in required_packages.items():
             installed_version = installed_packages.get(package_name, 'Not installed')
-            logging.info(f" {package_name.ljust(max_package_length)}  Required: {operator} {required_version.ljust(12)}  Installed: {installed_version}")
+            logger.info(f" {package_name.ljust(max_package_length)}  Required: {operator} {required_version.ljust(12)}  Installed: {installed_version}")
     
-    logging.info("\nPYTHON PACKAGES:")
+    logger.info("\nPYTHON PACKAGES:")
     package_versions = {d.metadata['Name']: d.version for d in distributions()}
     max_package_length = max(len(package) for package in package_versions.keys())
     for package, version in package_versions.items():
-        logging.info(f" {package:<{max_package_length}} = {version}")
+        logger.info(f" {package:<{max_package_length}} = {version}")
 
     deepspeed_requirements = (
         f"\nDeepSpeed Installation Requirements:\n"
@@ -544,7 +536,7 @@ def log_system_info():
         f"\nEnsure to choose the correct DeepSpeed version matching your environment."
     )
 
-    logging.info(deepspeed_requirements)
+    logger.info(deepspeed_requirements)
 
     print(f"\n\033[94mOS Version:\033[0m \033[92m{os_version}\033[0m")
     print(f"\033[94mOS Ver note:\033[0m \033[92m(Windows 11 will say build is 10.x.22xxx)\033[0m")
@@ -1018,7 +1010,7 @@ class PackageComparisonTool(QWidget):
                 print(f"Error executing {command}: {e}")        
 
 def cleanup_logging():
-    logging.shutdown()
+    # Loguru handles logging shutdown
 
 # Global flag to indicate if the application should exit
 should_exit = False

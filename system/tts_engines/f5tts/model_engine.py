@@ -6,10 +6,10 @@ import sys
 import json
 import time
 import torch
-import logging
+from loguru import logger
 from pathlib import Path
 from fastapi import (HTTPException)
-logging.disable(logging.WARNING)
+# Loguru handles logging levels via configuration
 #################################################################
 # DONT CHANGE # Get Pytorch & Python versions & setup DeepSpeed #
 #################################################################
@@ -25,8 +25,8 @@ deepspeed_available = False
 #############################################################################################################
 #############################################################################################################
 # In this section you will import any imports that your specific TTS Engine will use. You will provide any
-# start-up errors for those bits, as if you were starting up a normal Python script. Note the logging.disable
-# a few lines up from here, you may want to # that out while debugging!
+# start-up errors for those bits, as if you were starting up a normal Python script. Note the 
+# a few lines up from here, you may want to  that out while debugging!
 import soundfile as sf
 import tempfile
 from pydub import AudioSegment, silence

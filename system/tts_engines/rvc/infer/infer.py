@@ -2,7 +2,7 @@ import os
 import sys
 import time
 import torch
-import logging
+from loguru import logger
 import faiss
 import numpy as np
 import soundfile as sf
@@ -26,8 +26,7 @@ from ..lib.infer_pack.models import (
 from ..configs.config import Config
 from ..lib.utils import load_embedding
 
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
+# Loguru handles logging levels via configuration (httpx, httpcore suppressed)
 
 config = Config()
 

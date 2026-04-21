@@ -1,5 +1,5 @@
 import asyncio
-import logging
+from loguru import logger
 import platform
 import subprocess
 import sys
@@ -70,32 +70,23 @@ class AllTalkTester:
         """Configure logging to both file and console"""
         self.log_file = datetime.now().strftime('alltalk_test_%Y%m%d_%H%M%S.log')
         
-        # Configure logging with UTF-8 encoding
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(self.log_file, encoding='utf-8'),
-                logging.StreamHandler(sys.stdout)
-            ]
-        )
-        self.logger = logging.getLogger(__name__)
-        self.logger.info("AllTalk Testing Suite Started")
+        # Loguru handles logging configuration via system/logging_config.py
+        logger.info("AllTalk Testing Suite Started")
         
     async def setup(self):
         """Initial setup and configuration"""
         print(self.banner)
-        self.logger.info("Starting test suite setup")
+        logger.info("Starting test suite setup")
         
         try:
             self.host = input(f"Enter server IP/URL [{self.config['host']}]: ") or self.config['host']
             self.port = input(f"Enter port [{self.config['port']}]: ") or self.config['port']
             self.base_url = f"http://{self.host}:{self.port}"
             
-            self.logger.info(f"Configuration set - Host: {self.host}, Port: {self.port}")
+            logger.info(f"Configuration set - Host: {self.host}, Port: {self.port}")
             return True
         except Exception as e:
-            self.logger.error(f"Setup failed: {str(e)}")
+            logger.error(f"Setup failed: {str(e)}")
             return False
 
     async def menu(self):
@@ -126,13 +117,13 @@ class AllTalkTester:
                 elif choice == "6":
                     await self.individual_test_menu()
                 elif choice == "7":
-                    self.logger.info("Test suite shutting down")
+                    logger.info("Test suite shutting down")
                     break
                 else:
                     print("Invalid option. Please try again.")
                     
             except Exception as e:
-                self.logger.error(f"Menu operation failed: {str(e)}")
+                logger.error(f"Menu operation failed: {str(e)}")
 
     async def individual_test_menu(self):
         """Sub-menu for selecting individual tests"""
@@ -164,7 +155,7 @@ class AllTalkTester:
                     print("Invalid option. Please try again.")
                     
             except Exception as e:
-                self.logger.error(f"Individual test selection failed: {str(e)}")
+                logger.error(f"Individual test selection failed: {str(e)}")
 
     def log_result(self, category: str, test_name: str, status: str, details: str = ""):
         """Log a test result to both the results list and logger"""
@@ -178,15 +169,15 @@ class AllTalkTester:
         self.test_results.append(result)
         
         if status == "PASS":
-            self.logger.info(f"{category} - {test_name}: {status}")
+            logger.info(f"{category} - {test_name}: {status}")
         elif status == "WARNING":
-            self.logger.warning(f"{category} - {test_name}: {status} - {details}")
+            logger.warning(f"{category} - {test_name}: {status} - {details}")
         else:
-            self.logger.error(f"{category} - {test_name}: {status} - {details}")
+            logger.error(f"{category} - {test_name}: {status} - {details}")
 
     async def run_network_tests(self):
         """Perform network connectivity tests"""
-        self.logger.info("Starting network connectivity tests")
+        logger.info("Starting network connectivity tests")
         
         # Ping test
         await self._run_ping_test()
@@ -200,7 +191,7 @@ class AllTalkTester:
             param = '-n' if platform.system().lower() == 'windows' else '-c'
             command = ['ping', param, '4', self.host]
             
-            self.logger.info(f"Running ping test to {self.host}")
+            logger.info(f"Running ping test to {self.host}")
             output = subprocess.check_output(command, stderr=subprocess.STDOUT).decode()
             
             if "unreachable" in output.lower() or "timed out" in output.lower():
@@ -219,7 +210,7 @@ class AllTalkTester:
 
     async def _test_server_connection(self):
         """Test basic server connectivity using /api/ready endpoint"""
-        self.logger.info("Testing server API connectivity")
+        logger.info("Testing server API connectivity")
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -260,7 +251,7 @@ class AllTalkTester:
                                 )
                                 
                     except aiohttp.ClientError as e:
-                        self.logger.warning(f"Connection attempt {retries + 1} failed: {str(e)}")
+                        logger.warning(f"Connection attempt {retries + 1} failed: {str(e)}")
                         
                     retries += 1
                     if retries < self.config['retry_count']:
@@ -285,12 +276,12 @@ class AllTalkTester:
 
     async def run_core_api_tests(self):
         """Run tests for core API functionality"""
-        self.logger.info("Starting core API tests")
+        logger.info("Starting core API tests")
         
         # Test core endpoints
         settings = await self._test_current_settings()
         if not settings:
-            self.logger.error("Failed to get current settings, skipping dependent tests")
+            logger.error("Failed to get current settings, skipping dependent tests")
             return
             
         await self._test_voices()
@@ -299,7 +290,7 @@ class AllTalkTester:
         
     async def _test_current_settings(self) -> Optional[dict]:
         """Test /api/currentsettings endpoint"""
-        self.logger.info("Testing current settings endpoint")
+        logger.info("Testing current settings endpoint")
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -356,7 +347,7 @@ class AllTalkTester:
                 
     async def _test_voices(self):
         """Test /api/voices endpoint"""
-        self.logger.info("Testing voices endpoint")
+        logger.info("Testing voices endpoint")
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -402,7 +393,7 @@ class AllTalkTester:
                 
     async def _test_rvc_voices(self):
         """Test /api/rvcvoices endpoint"""
-        self.logger.info("Testing RVC voices endpoint")
+        logger.info("Testing RVC voices endpoint")
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -455,7 +446,7 @@ class AllTalkTester:
                 
     async def _test_root_endpoint(self):
         """Test root endpoint /"""
-        self.logger.info("Testing root endpoint")
+        logger.info("Testing root endpoint")
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -519,7 +510,7 @@ class AllTalkTester:
 
     async def run_tts_tests(self):
         """Run comprehensive TTS generation tests"""
-        self.logger.info("Starting TTS generation tests")
+        logger.info("Starting TTS generation tests")
         
         test_voice = await self._select_test_voice()
         if not test_voice:
@@ -547,7 +538,7 @@ class AllTalkTester:
 
     async def _test_standard_tts(self, text: str, voice: str):
         """Test standard TTS generation"""
-        self.logger.info("Testing standard TTS generation")
+        logger.info("Testing standard TTS generation")
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -600,7 +591,7 @@ class AllTalkTester:
 
     async def _test_narrator_tts(self, text: str, voice: str):
         """Test narrator mode TTS generation"""
-        self.logger.info("Testing narrator mode TTS generation")
+        logger.info("Testing narrator mode TTS generation")
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -656,7 +647,7 @@ class AllTalkTester:
            
     async def _test_streaming_tts(self, text: str, voice: str):
         """Test streaming TTS generation"""
-        self.logger.info("Testing streaming TTS generation")
+        logger.info("Testing streaming TTS generation")
         
         async with aiohttp.ClientSession() as session:
             try:
@@ -726,8 +717,8 @@ class AllTalkTester:
 
     async def _test_openai_tts(self, text: str):
         """Test OpenAI compatible endpoint"""
-        self.logger.info("Testing OpenAI compatible endpoint")
-        self.logger.info(f"Testing OpenAI generation with text: {text}")
+        logger.info("Testing OpenAI compatible endpoint")
+        logger.info(f"Testing OpenAI generation with text: {text}")
         
         test_voices = ["alloy", "echo", "fable", "nova", "onyx", "shimmer"]
         test_formats = ["wav", "mp3", "opus", "aac"]
@@ -738,8 +729,8 @@ class AllTalkTester:
 
     async def _test_openai_single_case(self, text: str, voice: str, format: str):
         """Test single case for OpenAI endpoint"""
-        self.logger.info(f"Testing OpenAI voice: {voice}, format: {format}")
-        self.logger.info(f"Testing OpenAI generation with text: {text}")
+        logger.info(f"Testing OpenAI voice: {voice}, format: {format}")
+        logger.info(f"Testing OpenAI generation with text: {text}")
         
         payload = {
             "model": "tts-1",  # Model name doesn't matter
@@ -817,7 +808,7 @@ class AllTalkTester:
         """
         
         print(summary)
-        self.logger.info(summary)                
+        logger.info(summary)                
 
     async def _select_two_voices(self) -> Optional[Tuple[str, str]]:
         """Select two different voices for narrator testing."""
@@ -833,17 +824,17 @@ class AllTalkTester:
 
     async def _test_narrator_modes(self):
         """Test various narrator mode combinations"""
-        self.logger.info("Testing narrator mode combinations")
+        logger.info("Testing narrator mode combinations")
         
         voices = await self._select_two_voices()
         if not voices:
             return
             
         character_voice, narrator_voice = voices
-        self.logger.info(f"Using character voice: {character_voice}, narrator voice: {narrator_voice}")
+        logger.info(f"Using character voice: {character_voice}, narrator voice: {narrator_voice}")
         
         for test_name, case in self.narrator_test_cases.items():
-            self.logger.info(f"Running narrator test case: {test_name}")
+            logger.info(f"Running narrator test case: {test_name}")
             
             data = {
                 "text_input": case["text"],
@@ -889,7 +880,7 @@ class AllTalkTester:
 
     async def _test_text_filtering(self):
         """Test different text filtering options"""
-        self.logger.info("Testing text filtering options")
+        logger.info("Testing text filtering options")
         
         test_voice = await self._select_test_voice()
         if not test_voice:
@@ -898,8 +889,8 @@ class AllTalkTester:
         test_text = self.filtering_test_cases["text"]
         
         for filter_type in self.filtering_test_cases["filters"]:
-            self.logger.info(f"Testing filter type: {filter_type}")
-            self.logger.info(f"Testing with text: {test_text}")
+            logger.info(f"Testing filter type: {filter_type}")
+            logger.info(f"Testing with text: {test_text}")
             
             data = {
                 "text_input": test_text,
@@ -943,7 +934,7 @@ class AllTalkTester:
 
     async def _test_autoplay(self):
         """Test autoplay functionality with different volumes"""
-        self.logger.info("Testing autoplay functionality")
+        logger.info("Testing autoplay functionality")
         
         try:
             test_voice = await self._select_test_voice()
@@ -953,7 +944,7 @@ class AllTalkTester:
             for test_case in self.volume_test_cases:
                 try:
                     volume = test_case["volume"]
-                    self.logger.info(f"Testing autoplay with volume: {volume}")
+                    logger.info(f"Testing autoplay with volume: {volume}")
 
                     data = {
                         "text_input": "Testing autoplay functionality with different volume levels.",
@@ -1005,7 +996,7 @@ class AllTalkTester:
                             )
                             
                 except asyncio.CancelledError:
-                    self.logger.warning("Autoplay test cancelled - cleaning up")
+                    logger.warning("Autoplay test cancelled - cleaning up")
                     raise
                 except Exception as e:
                     self.log_result(
@@ -1016,21 +1007,21 @@ class AllTalkTester:
                     )
                     
         except asyncio.CancelledError:
-            self.logger.warning("Autoplay tests cancelled")
+            logger.warning("Autoplay tests cancelled")
             raise
         except Exception as e:
-            self.logger.error(f"Autoplay testing failed: {str(e)}")                            
+            logger.error(f"Autoplay testing failed: {str(e)}")                            
 
     async def _test_error_cases(self):
         """Test various error cases to ensure proper error handling"""
-        self.logger.info("Testing error cases")
+        logger.info("Testing error cases")
         
         test_voice = await self._select_test_voice()
         if not test_voice:
             return
             
         for case in self.error_test_cases:
-            self.logger.info(f"Testing error case: {case['case']}")
+            logger.info(f"Testing error case: {case['case']}")
             
             # Build base data with known good values
             data = {
@@ -1091,7 +1082,7 @@ class AllTalkTester:
 
     async def _test_additional_language(self):
         """Test TTS generation with an additional language if supported"""
-        self.logger.info("Testing additional language support")
+        logger.info("Testing additional language support")
         
         # Check if multiple languages are supported
         if not hasattr(self, 'current_settings') or not self.current_settings.get('languages_capable'):
@@ -1159,7 +1150,7 @@ class AllTalkTester:
 
     async def run_all_tests(self):
         """Run all available tests in sequence"""
-        self.logger.info("Starting complete test suite")
+        logger.info("Starting complete test suite")
         
         # Network tests
         await self.run_network_tests()

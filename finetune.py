@@ -7,7 +7,7 @@ import argparse
 import datetime
 import gc
 import glob
-import logging
+from loguru import logger
 import math
 import os
 import re
@@ -209,13 +209,7 @@ def setup_logging():
     sys.stdout = Logger()
     sys.stderr = sys.stdout
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="[FINETUNE] %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
+    # Loguru handles logging configuration via system/logging_config.py
     
     _logging_setup_done = True
 

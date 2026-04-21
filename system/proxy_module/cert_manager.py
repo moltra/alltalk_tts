@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional
@@ -19,7 +19,7 @@ class CertificateInfo:
 class CertificateManager:
     def __init__(self, proxy_manager):
         self.proxy_manager = proxy_manager
-        self.logger = logging.getLogger("ProxyCertManager")
+# Loguru logger imported from loguru
         self.certs_path = proxy_manager.certs_path
 
     def validate_certificate(self, cert_path: Path) -> Optional[CertificateInfo]:
@@ -42,7 +42,7 @@ class CertificateManager:
                     is_valid=valid_from <= now <= valid_until
                 )
         except Exception as e:
-            self.logger.error(f"Certificate validation error: {e}")
+            logger.error(f"Certificate validation error: {e}")
             return None
 
     def install_certificate(self, cert_path: Path, key_path: Path, name: str) -> bool:
@@ -51,7 +51,7 @@ class CertificateManager:
             # Validate certificate first
             cert_info = self.validate_certificate(cert_path)
             if not cert_info or not cert_info.is_valid:
-                self.logger.error("Invalid or corrupt certificate")
+                logger.error("Invalid or corrupt certificate")
                 return False
 
             cert_dest = self.certs_path / f"{name}_cert.pem"
@@ -66,11 +66,11 @@ class CertificateManager:
             config.proxy_settings.api_endpoint.cert_name = name
             config.save()
             
-            self.logger.info(f"Certificate '{name}' installed successfully")
+            logger.info(f"Certificate '{name}' installed successfully")
             return True
                 
         except Exception as e:
-            self.logger.error(f"Certificate installation error: {e}")
+            logger.error(f"Certificate installation error: {e}")
             return False
 
     def remove_certificate(self, name: str) -> bool:
@@ -84,10 +84,10 @@ class CertificateManager:
             if key_path.exists():
                 key_path.unlink()
                 
-            self.logger.info(f"Certificate '{name}' removed successfully")
+            logger.info(f"Certificate '{name}' removed successfully")
             return True
         except Exception as e:
-            self.logger.error(f"Certificate removal error: {e}")
+            logger.error(f"Certificate removal error: {e}")
             return False
 
     def get_certificates_status(self) -> Dict[str, Any]:

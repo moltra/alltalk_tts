@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 import threading
 import time
 from typing import Dict, Any
@@ -19,7 +19,7 @@ class HealthMetrics:
 class HealthMonitor:
     def __init__(self, proxy_manager):
         self.proxy_manager = proxy_manager
-        self.logger = logging.getLogger("ProxyHealthMonitor")
+# Loguru logger imported from loguru
         self.metrics = HealthMetrics()
         self.monitoring = False
         self.monitor_thread = None
@@ -34,7 +34,7 @@ class HealthMonitor:
         self.metrics.uptime_start = time.time()
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)  # Make thread daemon
         self.monitor_thread.start()
-        self.logger.info("Health monitoring started")
+        logger.info("Health monitoring started")
 
     def stop_monitoring(self):
         """Stop health monitoring thread"""
@@ -47,11 +47,11 @@ class HealthMonitor:
                 # Give the thread a chance to finish naturally
                 self.monitor_thread.join(timeout=5)
             except Exception as e:
-                self.logger.warning(f"Could not gracefully stop monitoring thread: {e}")
+                logger.warning(f"Could not gracefully stop monitoring thread: {e}")
             finally:
                 self.monitor_thread = None
         
-        self.logger.info("Health monitoring stopped")
+        logger.info("Health monitoring stopped")
 
     def _monitor_loop(self):
         """Main monitoring loop"""
@@ -77,7 +77,7 @@ class HealthMonitor:
                     self.metrics.response_times['gradio'] = time.time() - start_time
                     self.metrics.gradio_endpoint_up = response.status_code == 200
                 except Exception as e:
-                    self.logger.debug(f"Gradio endpoint check failed: {e}")
+                    logger.debug(f"Gradio endpoint check failed: {e}")
                     self.metrics.gradio_endpoint_up = False
 
             if proxy_settings.api_endpoint.enabled == "Enabled":
@@ -90,7 +90,7 @@ class HealthMonitor:
                     self.metrics.response_times['api'] = time.time() - start_time
                     self.metrics.api_endpoint_up = response.status_code == 200
                 except Exception as e:
-                    self.logger.debug(f"API endpoint check failed: {e}")
+                    logger.debug(f"API endpoint check failed: {e}")
                     self.metrics.api_endpoint_up = False
 
             if not self.metrics.gradio_endpoint_up and not self.metrics.api_endpoint_up:
@@ -99,18 +99,18 @@ class HealthMonitor:
                 self.metrics.consecutive_failures = 0
                 
         except Exception as e:
-            self.logger.error(f"Health check failed: {str(e)}")
+            logger.error(f"Health check failed: {str(e)}")
             self.metrics.consecutive_failures += 1
         
         # Only attempt restart if we have multiple complete failures
         if self.metrics.consecutive_failures >= 3:
-            self.logger.warning("Too many consecutive failures, attempting restart")
+            logger.warning("Too many consecutive failures, attempting restart")
             try:
                 if self.proxy_manager.stop_proxy() and self.proxy_manager.start_proxy():
                     self.metrics.total_restarts += 1
                     self.metrics.consecutive_failures = 0
             except Exception as e:
-                self.logger.error(f"Failed to restart proxy: {e}")
+                logger.error(f"Failed to restart proxy: {e}")
 
     def get_health_status(self) -> Dict[str, Any]:
         """Get current health metrics"""

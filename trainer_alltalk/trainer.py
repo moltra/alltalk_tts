@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import gc
 import importlib
-import logging
+from loguru import logger
 import os
 import platform
 import shutil
@@ -59,7 +59,7 @@ from trainer.utils.distributed import (
 
 from trainer_alltalk.WarmUpScheduler import WarmUpScheduler
 
-logger = logging.getLogger("trainer")
+# Loguru logger imported from loguru
 
 if is_apex_available():
     from apex import amp  # pylint: disable=import-error
@@ -2193,16 +2193,7 @@ class Trainer:
 
     def _setup_logger_config(self, log_file: str) -> None:
         """Set up the logger based on the process rank in DDP."""
-
-        logger_new = logging.getLogger("trainer")
-        handler = logging.FileHandler(log_file, mode="a")
-        fmt = logging.Formatter("")
-        handler.setFormatter(fmt)
-        logger_new.addHandler(handler)
-
-        # only log to a file if rank > 0 in DDP
-        if self.args.rank > 0:
-            logger_new.handlers = [h for h in logger_new.handlers if not isinstance(h, logging.StreamHandler)]
+        # Loguru handles logging configuration via system/logging_config.py
 
     @staticmethod
     def _is_apex_available() -> bool:

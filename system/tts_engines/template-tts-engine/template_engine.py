@@ -27,10 +27,10 @@ import json
 import time
 import inspect
 import torch
-import logging
+from loguru import logger
 from pathlib import Path
 from fastapi import (HTTPException)
-logging.disable(logging.WARNING)
+# Loguru handles logging levels via configuration
 
 # Confguration file management for confignew.json 
 try:
@@ -633,12 +633,8 @@ class tts_class:
 
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
         # ↓↓↓ Keep everything below this line ↓↓↓
-        # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓  
-                else:
-                    self.available_models = {'No Models Available': self.model_folder_name}
-                    self.print_message(f"Model folder '{model_name}' is missing required files", message_type="warning")
-                    self.print_message("Required files or folder does not exist", message_type="warning")
-                    self.print_message("Please download some models/voices for this engine", message_type="warning")                
+        # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+        # TODO: Add model validation logic here
         return self.available_models
 
     ################################################################
@@ -780,11 +776,7 @@ class tts_class:
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
         # ↓↓↓ Keep everything below this line ↓↓↓
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-
-        else:
-            self.print_message(f"Unknown model type in: {tts_method}", message_type="error")
-            self.current_model_loaded = None
-            return False
+        # TODO: Add model loading logic here
 
         # Report loading time
         generate_end_time = time.time()
@@ -849,21 +841,21 @@ class tts_class:
             # ↑↑↑ Keep everything above this line ↑↑↑
             # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
-                # BUILD ANY SETTINGS NEEED FOR TTS HERE
-                # DO ANY LOGIC TESTS E.G. CHECK IF THE AUDIO FILE/MODEL EXISTS
+            # BUILD ANY SETTINGS NEEED FOR TTS HERE
+            # DO ANY LOGIC TESTS E.G. CHECK IF THE AUDIO FILE/MODEL EXISTS
 
-                # ALWAYS CHECK IF STREAMING FIRST THEN DO OTHER METHODS
-                if streaming:
-                    # PUT YOUR TTS ENGINE STREAMING GENERATION LOGIC IN HERE                    
-                    yield
-                else:
-                    self.print_message("Starting non-streaming generation", message_type="debug_tts")
+            # ALWAYS CHECK IF STREAMING FIRST THEN DO OTHER METHODS
+            if streaming:
+                # PUT YOUR TTS ENGINE STREAMING GENERATION LOGIC IN HERE
+                yield
+            else:
+                self.print_message("Starting non-streaming generation", message_type="debug_tts")
 
-                    # PUT YOUR TTS ENGINE STANDARD GENERATION LOGIC IN HERE
+                # PUT YOUR TTS ENGINE STANDARD GENERATION LOGIC IN HERE
 
-                    self.print_message(f"Saved audio to: {output_file}", message_type="debug_tts")
+                self.print_message(f"Saved audio to: {output_file}", message_type="debug_tts")
 
-                
+
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
         # ↓↓↓ Keep everything below this line ↓↓↓
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓

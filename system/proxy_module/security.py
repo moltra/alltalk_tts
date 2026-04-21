@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 from typing import Dict, Any, Set
 import time
 from collections import defaultdict
@@ -19,7 +19,7 @@ class SecurityMetrics:
 class SecurityManager:
     def __init__(self, proxy_manager):
         self.proxy_manager = proxy_manager
-        self.logger = logging.getLogger("ProxySecurityManager")
+# Loguru logger imported from loguru
         self.metrics = SecurityMetrics()
         self.rate_limits = defaultdict(lambda: {"count": 0, "reset_time": 0})
         self.rate_limit_lock = Lock()
@@ -41,13 +41,13 @@ class SecurityManager:
     def add_to_blacklist(self, ip: str, reason: str):
         """Add IP to blacklist"""
         self.metrics.blacklisted_ips.add(ip)
-        self.logger.warning(f"IP {ip} blacklisted: {reason}")
+        logger.warning(f"IP {ip} blacklisted: {reason}")
         self.metrics.last_incident = time.time()
 
     def remove_from_blacklist(self, ip: str):
         """Remove IP from blacklist"""
         self.metrics.blacklisted_ips.discard(ip)
-        self.logger.info(f"IP {ip} removed from blacklist")
+        logger.info(f"IP {ip} removed from blacklist")
 
     def get_security_status(self) -> Dict[str, Any]:
         """Get current security metrics"""

@@ -1,13 +1,13 @@
 import datetime
 import os
-import logging
+from loguru import logger
 
 from matplotlib import pyplot as plt
 from trainer import ConsoleLogger
 from trainer.logging.console_logger import tcolors
 from trainer.utils.distributed import rank_zero_only
 
-logger = logging.getLogger("trainer")
+# Loguru logger imported from loguru
 
 class MetricsLogger(ConsoleLogger):
     def __init__(self, ):

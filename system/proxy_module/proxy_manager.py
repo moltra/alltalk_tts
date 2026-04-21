@@ -1,14 +1,12 @@
 import os
-import logging
+from loguru import logger
 import subprocess
 import threading
 from pathlib import Path
 from typing import Optional, Dict, Any
 from dataclasses import asdict
 import psutil
-from logging.handlers import RotatingFileHandler
-import logging
-import os
+# Loguru handles logging configuration via system/logging_config.py
 from .security import SecurityManager
 from .health_monitor import HealthMonitor
 from .cert_manager import CertificateManager
@@ -28,9 +26,6 @@ class ProxyManager:
         for path in [self.certs_path, self.logs_path, self.config_path]:
             path.mkdir(parents=True, exist_ok=True)
         
-        # Setup logging before managers
-        self.setup_logging()
-        
         # Initialize managers after paths are created
         self.security = SecurityManager(self)
         self.health_monitor = HealthMonitor(self)
@@ -38,43 +33,11 @@ class ProxyManager:
         self.metrics = MetricsCollector(self)
         
         self.proxy_process = None
-        self.logger.info("Proxy manager initialized successfully")
+        logger.info("Proxy manager initialized successfully")
 
     def setup_logging(self):
-        """Setup logging configuration with customized format"""
-        config = self.config_manager.get_instance()
-        log_level = getattr(logging, config.proxy_settings.log_level, logging.INFO)
-        
-        # Configure rotating file handler
-        log_file = self.logs_path / "proxy.log"
-        file_handler = RotatingFileHandler(
-            log_file,
-            maxBytes=5*1024*1024,
-            backupCount=5,
-            encoding='utf-8'
-        )
-        
-        # Configure logging formats
-        file_format = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-        )
-        console_format = logging.Formatter(
-            '[AllTalk PRX] %(message)s'
-        )
-        
-        file_handler.setFormatter(file_format)
-        
-        # Setup logger
-        self.logger = logging.getLogger("ProxyManager")
-        self.logger.setLevel(log_level)
-        self.logger.addHandler(file_handler)
-        
-        # Only add console handler if proxy debugging is enabled
-        if config.debugging.debug_proxy:
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(console_format)
-            self.logger.addHandler(console_handler)
-            self.logger.info("Proxy debug logging enabled")
+        """Loguru handles logging configuration via system/logging_config.py"""
+        pass
 
     def _monitor_output(self, pipe, name):
         """Monitor subprocess output and redirect to logger"""
@@ -83,19 +46,19 @@ class ProxyManager:
                 line = line.strip()
                 if line:
                     if name == "stderr":
-                        self.logger.error(line)
+                        logger.error(line)
                     else:
                         # Pass through with our logging format
                         print(line)  # Direct print for formatted output
         except Exception as e:
-            self.logger.error(f"Error monitoring {name}: {e}")
+            logger.error(f"Error monitoring {name}: {e}")
         finally:
             pipe.close()
 
     def start_proxy(self) -> bool:
         """Start the proxy server with current configuration"""
         if self.proxy_process and self.proxy_process.poll() is None:
-            self.logger.warning("Proxy already running")
+            logger.warning("Proxy already running")
             return False
 
         config = self.config_manager.get_instance()
@@ -137,16 +100,16 @@ class ProxyManager:
                 self.health_monitor.start_monitoring()
                 self.metrics.start_collecting()
             
-            self.logger.info("Proxy server started successfully")
+            logger.info("Proxy server started successfully")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to start proxy: {e}")
+            logger.error(f"Failed to start proxy: {e}")
             return False
 
     def stop_proxy(self) -> bool:
         """Stop the proxy server and all monitoring"""
         if not self.proxy_process:
-            self.logger.warning("No proxy process running")
+            logger.warning("No proxy process running")
             return False
 
         try:
@@ -166,10 +129,10 @@ class ProxyManager:
                 process.kill()
             
             self.proxy_process = None
-            self.logger.info("Proxy server stopped successfully")
+            logger.info("Proxy server stopped successfully")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to stop proxy: {e}")
+            logger.error(f"Failed to stop proxy: {e}")
             return False
 
     def get_status(self) -> Dict[str, Any]:
@@ -226,10 +189,10 @@ class ProxyManager:
 
     def handle_security_event(self, event_type: str, details: Dict[str, Any]):
         """Handle security events from the SecurityManager"""
-        self.logger.warning(f"Security event: {event_type} - {details}")
+        logger.warning(f"Security event: {event_type} - {details}")
         # Implement security response logic here
 
     def cleanup(self):
         """Cleanup resources before shutdown"""
         self.stop_proxy()
-        self.logger.info("Proxy manager cleanup completed")
+        logger.info("Proxy manager cleanup completed")

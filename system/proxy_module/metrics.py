@@ -1,4 +1,4 @@
-import logging
+from loguru import logger
 import threading
 import time
 from typing import Dict, Any
@@ -19,7 +19,7 @@ class ProxyMetrics:
 class MetricsCollector:
     def __init__(self, proxy_manager):
         self.proxy_manager = proxy_manager
-        self.logger = logging.getLogger("ProxyMetrics")
+# Loguru logger imported from loguru
         self.metrics = ProxyMetrics()
         self.collecting = False
         self.collector_thread = None
@@ -36,14 +36,14 @@ class MetricsCollector:
         self.collector_thread = threading.Thread(target=self._collect_loop)
         self.collector_thread.daemon = True
         self.collector_thread.start()
-        self.logger.info("Metrics collection started")
+        logger.info("Metrics collection started")
 
     def stop_collecting(self):
         """Stop metrics collection"""
         self.collecting = False
         if self.collector_thread:
             self.collector_thread.join()
-        self.logger.info("Metrics collection stopped")
+        logger.info("Metrics collection stopped")
 
     def _collect_loop(self):
         """Main collection loop"""

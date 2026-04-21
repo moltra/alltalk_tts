@@ -28,7 +28,7 @@ import json
 import time
 import inspect
 import random
-import logging
+from loguru import logger
 import threading
 from pathlib import Path
 import requests
@@ -37,8 +37,7 @@ from modules import chat, shared, ui_chat
 from modules.utils import gradio
 from requests.exceptions import RequestException, ConnectionError
 
-# Store the current disable level
-current_disable_level = logging.getLogger().manager.disable
+# Loguru handles logging levels via configuration
 this_dir = Path(__file__).parent.resolve()
 
 

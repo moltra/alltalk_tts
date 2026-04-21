@@ -36,10 +36,10 @@ import json
 import time
 import inspect
 import torch
-import logging
+from loguru import logger
 from pathlib import Path
 from fastapi import (HTTPException)
-logging.disable(logging.WARNING)
+# Loguru handles logging levels via configuration
 
 # Confguration file management for confignew.json 
 try:
