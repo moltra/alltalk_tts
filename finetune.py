@@ -161,7 +161,7 @@ class Logger:
         try:
             self.log.write(filtered_message)
             self.log.flush()
-        except (IOError, OSError):
+        except OSError:
             pass
 
     def flush(self):
@@ -171,7 +171,7 @@ class Logger:
         self.terminal.flush()
         try:
             self.log.flush()
-        except (IOError, OSError):
+        except OSError:
             pass
 
     def isatty(self):

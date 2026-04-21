@@ -5,7 +5,6 @@ This module provides a decorator for consistent error handling across the applic
 """
 
 import asyncio
-
 from functools import wraps
 
 from loguru import logger
