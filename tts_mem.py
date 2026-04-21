@@ -56,6 +56,7 @@ import requests
 from flask import Flask, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS, cross_origin
 from gradio import routes
+from loguru import logger
 from requests.exceptions import RequestException
 from werkzeug.serving import WSGIRequestHandler, make_server
 
@@ -89,7 +90,7 @@ USE_GRADIO = AlltalkConfig.get_instance().gradio_interface
 
 
 def signal_handler(signum, frame):
-    print("[AllTalk MEM] Interrupt received, shutting down...")
+    logger.warning("[AllTalk MEM] Interrupt received, shutting down...")
     should_exit.set()
 
 
@@ -117,31 +118,25 @@ class MonitoringControl:
 ############################################
 # START-UP # Display initial splash screen #
 ############################################
-print("[AllTalk MEM]\033[94m     _    _ _ \033[1;35m_____     _ _     \033[0m  _____ _____ ____  ")
-print("[AllTalk MEM]\033[94m    / \\  | | |\033[1;35m_   _|_ _| | | __ \033[0m |_   _|_   _/ ___| ")
-print("[AllTalk MEM]\033[94m   / _ \\ | | |\033[1;35m | |/ _` | | |/ / \033[0m   | |   | | \\___ \\ ")
-print("[AllTalk MEM]\033[94m  / ___ \\| | |\033[1;35m | | (_| | |   <  \033[0m   | |   | |  ___) |")
-print("[AllTalk MEM]\033[94m /_/   \\_\\_|_|\033[1;35m |_|\\__,_|_|_|\\_\\ \033[0m   |_|   |_| |____/ ")
-print("[AllTalk MEM]\033[94m               __  __ \033[1;35m _____   __  __\033[0m")
-print("[AllTalk MEM]\033[94m              |  \\/  |\033[1;35m| ____| |  \\/  |\033[0m")
-print("[AllTalk MEM]\033[94m              | |\\/| |\033[1;35m|  _|   | |\\/| |\033[0m")
-print("[AllTalk MEM]\033[94m              | |  | |\033[1;35m| |___  | |  | |\033[0m")
-print("[AllTalk MEM]\033[94m              |_|  |_|\033[1;35m|_____| |_|  |_|\033[0m")
-print("[AllTalk MEM]")
-print("[AllTalk MEM] \033[93m     MEM is not intended for production use and\033[00m")
-print("[AllTalk MEM] \033[93m      there is NO support being offered on MEM\033[00m")
-print("[AllTalk MEM]")
-print(
-    f"[AllTalk MEM] \033[94mAPI/Queue   :\033[00m \033[92mhttp://127.0.0.1:{config.api_server_port}/api/tts-generate\033[00m"
-)
+logger.info("[AllTalk MEM]     _    _ _ _____     _ _      _____ _____ ____  ")
+logger.info("[AllTalk MEM]    / \\  | | |_   _|_ _| | | __  |_   _|_   _/ ___| ")
+logger.info("[AllTalk MEM]   / _ \\ | | | | |/ _` | | |/ /    | |   | | \\___ \\ ")
+logger.info("[AllTalk MEM]  / ___ \\| | | | | (_| | |   <     | |   | |  ___) |")
+logger.info("[AllTalk MEM] /_/   \\_\\_|_|_|\\__,_|_|_|\\_\\    |_|   |_| |____/ ")
+logger.info("[AllTalk MEM]               __  __ _____   __  __")
+logger.info("[AllTalk MEM]              |  \\/  | ____| |  \\/  |")
+logger.info("[AllTalk MEM]              | |\\/| |  _|   | |\\/| |")
+logger.info("[AllTalk MEM]              | |  | | |___  | |  | |")
+logger.info("[AllTalk MEM]              |_|  |_|_____| |_|  |_|")
+logger.info("[AllTalk MEM]")
+logger.warning("[AllTalk MEM]      MEM is not intended for production use and")
+logger.warning("[AllTalk MEM]       there is NO support being offered on MEM")
+logger.info("[AllTalk MEM]")
+logger.info(f"[AllTalk MEM] API/Queue   : http://127.0.0.1:{config.api_server_port}/api/tts-generate")
 if USE_GRADIO:
-    print(
-        f"[AllTalk MEM] \033[94mGradio Light:\033[00m \033[92mhttp://127.0.0.1:{config.gradio_interface_port}\033[00m"
-    )
-    print(
-        f"[AllTalk MEM] \033[94mGradio Dark :\033[00m \033[92mhttp://127.0.0.1:{config.gradio_interface_port}?__theme=dark\033[00m"
-    )
-print("[AllTalk MEM]")
+    logger.info(f"[AllTalk MEM] Gradio Light: http://127.0.0.1:{config.gradio_interface_port}")
+    logger.info(f"[AllTalk MEM] Gradio Dark : http://127.0.0.1:{config.gradio_interface_port}?__theme=dark")
+logger.info("[AllTalk MEM]")
 
 
 def is_port_in_use(port):
@@ -163,26 +158,26 @@ def start_subprocess(instance_id, port):
     if instance_id in processes and processes[instance_id].poll() is None:
         return f"✔️ Running on port {port}"
 
-    print("[AllTalk MEM] \033[94m********************************\033[00m")
-    print(f"[AllTalk MEM] \033[94mStarting TTS Engine on port {port}\033[00m")
-    print("[AllTalk MEM] \033[94m********************************\033[00m")
-    print(f"[AllTalk MEM] \033[92mEngine number     :\033[93m {instance_id}\033[00m")
-    print(f"[AllTalk MEM] \033[92mPort number       :\033[93m {port}\033[00m")
+    logger.info("[AllTalk MEM] ********************************")
+    logger.info(f"[AllTalk MEM] Starting TTS Engine on port {port}")
+    logger.info("[AllTalk MEM] ********************************")
+    logger.info(f"[AllTalk MEM] Engine number     : {instance_id}")
+    logger.info(f"[AllTalk MEM] Port number       : {port}")
     processes[instance_id] = subprocess.Popen([sys.executable, script_path, "--port", str(port)])
 
     # Wait for the server to be ready
     if is_server_ready(port):
-        print("[AllTalk MEM]")
-        print(f"[AllTalk MEM] Engine {instance_id} ready on port {port}")
+        logger.info("[AllTalk MEM]")
+        logger.info(f"[AllTalk MEM] Engine {instance_id} ready on port {port}")
         return f"✔️ Running on port {port}"
     else:
-        print(f"[AllTalk MEM] Warning: Engine {instance_id} may not be fully ready on port {port}")
+        logger.warning(f"[AllTalk MEM] Warning: Engine {instance_id} may not be fully ready on port {port}")
         return f"Warning: Engine {instance_id} may not be fully ready on port {port}."
 
 
 def stop_subprocess(instance_id):
     if instance_id in processes:
-        print(f"[AllTalk MEM] Terminating Engine {instance_id}")
+        logger.info(f"[AllTalk MEM] Terminating Engine {instance_id}")
         processes[instance_id].terminate()
         processes[instance_id].wait()
         del processes[instance_id]
@@ -191,11 +186,11 @@ def stop_subprocess(instance_id):
 
 
 def restart_subprocess(instance_id, port):
-    print(f"[AllTalk MEM] Re-starting Engine {instance_id}")
+    logger.info(f"[AllTalk MEM] Re-starting Engine {instance_id}")
     stop_result = stop_subprocess(instance_id)
     if "not running" in stop_result.lower():
         start_result = start_subprocess(instance_id, port)
-        print(f"[AllTalk MEM] Engine {instance_id} was not running so starting an instance")
+        logger.info(f"[AllTalk MEM] Engine {instance_id} was not running so starting an instance")
         return f"Engine {instance_id} was not running. {start_result}"
     else:
         return start_subprocess(instance_id, port)
@@ -215,17 +210,17 @@ def retry_with_backoff(func):
     while retries < config.max_retries:
         try:
             result = func()
-            print(f"[AllTalk MEM] Operation successful on attempt {retries + 1}") if config.debug_mode else None
+            logger.debug(f"[AllTalk MEM] Operation successful on attempt {retries + 1}")
             return result
         except RequestException:
             retries += 1
-            print(f"[AllTalk MEM] Attempt {retries}") if config.debug_mode else None
+            logger.debug(f"[AllTalk MEM] Attempt {retries}")
             if retries == config.max_retries:
-                print(
+                logger.debug(
                     f"[AllTalk MEM] All {config.max_retries} attempts failed waiting for this instance of the Engine to load."
-                ) if config.debug_mode else None
+                )
                 return False
-            print(f"[AllTalk MEM] Retrying in {wait_time} seconds...") if config.debug_mode else None
+            logger.debug(f"[AllTalk MEM] Retrying in {wait_time} seconds...")
             time.sleep(wait_time)
             wait_time = round(wait_time * config.backoff_factor, 1)
     return False
@@ -946,7 +941,7 @@ def create_gradio_interface():
                     await asyncio.sleep(0)  # Yield control to allow cancellation
                     return str(queue_size), str(running_engine_count), queue_data, engine_data
                 except Exception as e:
-                    print(f"Error in update_monitor_data: {e}")
+                    logger.error(f"Error in update_monitor_data: {e}")
                     return [None] * 4  # Return 4 None values instead of 3
 
             def start_monitoring():
@@ -1255,7 +1250,7 @@ def calculate_dynamic_timeout(text, concurrent_requests, queue_position, total_q
 @flask_app.route("/api/tts-generate", methods=["POST"])
 @cross_origin(origins="*", methods=["POST", "OPTIONS"], allow_headers=["Content-Type"])
 def tts_generate():
-    print("[AllTalk MEM] Received TTS generate request") if config.debug_mode else None
+    logger.debug("[AllTalk MEM] Received TTS generate request")
     start_time = datetime.now()
     request_data = request.form.to_dict()
 
@@ -1267,7 +1262,7 @@ def tts_generate():
         instance = get_available_instance()
         if instance:
             try:
-                print(f"[AllTalk MEM] Processing request with instance {instance}") if config.debug_mode else None
+                logger.debug(f"[AllTalk MEM] Processing request with instance {instance}")
 
                 # Update engine status
                 engine_statuses[instance] = EngineStatus()
@@ -1284,7 +1279,7 @@ def tts_generate():
                 )
 
                 result = process_tts_request(instance, request_data, dynamic_timeout)
-                print(f"[AllTalk MEM] Request processed, result: {result}") if config.debug_mode else None
+                logger.debug(f"[AllTalk MEM] Request processed, result: {result}")
 
                 # Remove request from queue
                 queue_items.popleft()
@@ -1294,7 +1289,7 @@ def tts_generate():
 
                 return jsonify(result)
             except Exception as e:
-                print(f"[AllTalk MEM] Error processing request: {e!s}")
+                logger.error(f"[AllTalk MEM] Error processing request: {e!s}")
                 release_instance(instance)
                 return jsonify({"status": "error", "message": str(e)})
         time.sleep(config.queue_check_interval)
@@ -1302,7 +1297,7 @@ def tts_generate():
     # Remove request from queue if it times out
     queue_items.popleft()
 
-    print("[AllTalk MEM] No instance available within queue timeout period")
+    logger.warning("[AllTalk MEM] No instance available within queue timeout period")
     return jsonify({"status": "error", "message": "No TTS instance available within the queue maximum wait time"})
 
 
@@ -1320,7 +1315,7 @@ def process_tts_request(instance, data, timeout):
 @flask_app.route("/v1/audio/speech", methods=["POST"])
 @cross_origin(origins="*", methods=["POST", "OPTIONS"], allow_headers=["Content-Type"])
 def openai_speech():
-    print("[AllTalk MEM] Received OpenAI-style TTS generate request") if config.debug_mode else None
+    logger.debug("[AllTalk MEM] Received OpenAI-style TTS generate request")
     start_time = datetime.now()
     request_data = request.json
 
@@ -1332,9 +1327,7 @@ def openai_speech():
         instance = get_available_instance()
         if instance:
             try:
-                print(
-                    f"[AllTalk MEM] Processing OpenAI-style request with instance {instance}"
-                ) if config.debug_mode else None
+                logger.debug(f"[AllTalk MEM] Processing OpenAI-style request with instance {instance}")
 
                 # Update engine status
                 engine_statuses[instance] = EngineStatus()
@@ -1351,7 +1344,7 @@ def openai_speech():
                 )
 
                 result = process_openai_tts_request(instance, request_data, dynamic_timeout)
-                print(f"[AllTalk MEM] OpenAI-style request processed, result: {result}") if config.debug_mode else None
+                logger.debug(f"[AllTalk MEM] OpenAI-style request processed, result: {result}")
 
                 # Remove request from queue
                 queue_items.popleft()
@@ -1370,7 +1363,7 @@ def openai_speech():
                     return jsonify({"error": "Failed to generate speech"}), 500
 
             except Exception as e:
-                print(f"[AllTalk MEM] Error processing OpenAI-style request: {e!s}")
+                logger.error(f"[AllTalk MEM] Error processing OpenAI-style request: {e!s}")
                 release_instance(instance)
                 return jsonify({"error": str(e)}), 500
 
@@ -1379,7 +1372,7 @@ def openai_speech():
     # Remove request from queue if it times out
     queue_items.popleft()
 
-    print("[AllTalk MEM] No instance available within queue timeout period for OpenAI-style request")
+    logger.warning("[AllTalk MEM] No instance available within queue timeout period for OpenAI-style request")
     return jsonify({"error": "No TTS instance available within the queue maximum wait time"}), 504
 
 
@@ -1475,13 +1468,13 @@ async def get_available_voices(port):
                     if data["status"] == "success":
                         return data["voices"]
                     else:
-                        print(f"Error fetching voices: {data.get('message', 'Unknown error')}")
+                        logger.error(f"Error fetching voices: {data.get('message', 'Unknown error')}")
                 else:
-                    print(f"Error fetching voices: HTTP {response.status}")
+                    logger.error(f"Error fetching voices: HTTP {response.status}")
     except aiohttp.ClientError as e:
-        print(f"Network error while fetching voices: {e!s}")
+        logger.error(f"Network error while fetching voices: {e!s}")
     except Exception as e:
-        print(f"Unexpected error while fetching voices: {e!s}")
+        logger.error(f"Unexpected error while fetching voices: {e!s}")
 
     return []  # Return an empty list if there's any error
 
@@ -1559,7 +1552,7 @@ async def send_tts_request(session, url, text, voice, request_id):
             result["time"] = end_time - start_time
             return result
     except Exception as e:
-        print(f"Request {request_id} failed: {e!s}")
+        logger.error(f"Request {request_id} failed: {e!s}")
         return None
 
 
@@ -1581,7 +1574,7 @@ class ServerThread(threading.Thread):
         self.ctx.push()
 
     def run(self):
-        print(f"[AllTalk MEM] Starting API server on port {config.api_server_port}") if config.debug_mode else None
+        logger.debug(f"[AllTalk MEM] Starting API server on port {config.api_server_port}")
         self.server.serve_forever()
 
     def shutdown(self):
@@ -1592,27 +1585,27 @@ def start_api_server():
     global server_thread
     server_thread = ServerThread(flask_app)  # Use flask_app here
     server_thread.start()
-    print(f"[AllTalk MEM] API server thread started on port {config.api_server_port}") if config.debug_mode else None
+    logger.debug(f"[AllTalk MEM] API server thread started on port {config.api_server_port}")
 
 
 def stop_api_server():
     global server_thread
     if server_thread:
-        print("[AllTalk MEM] Shutting down API server")
+        logger.info("[AllTalk MEM] Shutting down API server")
         server_thread.shutdown()
         server_thread.join()
-        print("[AllTalk MEM] API server shut down successfully")
+        logger.info("[AllTalk MEM] API server shut down successfully")
 
 
 ##########################
 ### Shutdown & Cleanup ###
 ##########################
 def graceful_shutdown():
-    print("[AllTalk MEM] Initiating graceful shutdown...")
+    logger.info("[AllTalk MEM] Initiating graceful shutdown...")
     # Stop all engine instances
-    print("[AllTalk MEM] Shutting down all engines...")
+    logger.info("[AllTalk MEM] Shutting down all engines...")
     stop_all_instances()
-    print("[AllTalk MEM] All engines stopped.")
+    logger.info("[AllTalk MEM] All engines stopped.")
     # Stop API server
     stop_api_server()
     # Set flags to stop ongoing processes
@@ -1622,42 +1615,42 @@ def graceful_shutdown():
     if "interface" in globals():
         interface.close()
     gr.close_all()
-    print("[AllTalk MEM] Graceful shutdown complete.")
+    logger.info("[AllTalk MEM] Graceful shutdown complete.")
 
 
 ######################
 ### INITIALISATION ###
 ######################
-print("[AllTalk MEM] Please use \033[91mCtrl+C\033[0m when exiting otherwise Python")
-print("[AllTalk MEM] subprocess's will continue running in the background.")
-print("[AllTalk MEM] ")
-print("[AllTalk MEM] Ensure you have configured AllTalk TTS engines in the")
-print("[AllTalk MEM] AllTalk interface before using MEM. MEM does not require")
-print("[AllTalk MEM] AllTalk to be running and should be used seperately.")
-print("[AllTalk MEM] ")
-print("[AllTalk MEM] MEM Server Ready")
+logger.info("[AllTalk MEM] Please use Ctrl+C when exiting otherwise Python")
+logger.info("[AllTalk MEM] subprocess's will continue running in the background.")
+logger.info("[AllTalk MEM] ")
+logger.info("[AllTalk MEM] Ensure you have configured AllTalk TTS engines in the")
+logger.info("[AllTalk MEM] AllTalk interface before using MEM. MEM does not require")
+logger.info("[AllTalk MEM] AllTalk to be running and should be used seperately.")
+logger.info("[AllTalk MEM] ")
+logger.info("[AllTalk MEM] MEM Server Ready")
 
 
 def auto_start_engines():
     num_engines = config.auto_start_engines
     if num_engines > 0:
-        print(f"[AllTalk MEM] Auto-starting {num_engines} engines...")
+        logger.info(f"[AllTalk MEM] Auto-starting {num_engines} engines...")
         results = start_MEMple_instances(num_engines)
         update_tts_instances()
-        print("[AllTalk MEM] Auto-start complete.")
-        print(f"[AllTalk MEM] {results}")
+        logger.info("[AllTalk MEM] Auto-start complete.")
+        logger.info(f"[AllTalk MEM] {results}")
 
 
 # Main execution
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
     if USE_GRADIO:
-        print("[AllTalk MEM] Starting gradio...")
+        logger.info("[AllTalk MEM] Starting gradio...")
         interface = create_gradio_interface()
         # Start the Gradio interface
         interface.launch(quiet=True, server_port=config.gradio_interface_port, prevent_thread_lock=True)
     else:
-        print("[AllTalk MEM] Skipping gradio start...")
+        logger.info("[AllTalk MEM] Skipping gradio start...")
     # Start the API server
     start_api_server()
     initialize_instances()
@@ -1667,10 +1660,10 @@ if __name__ == "__main__":
         while not should_exit.is_set():
             time.sleep(0.1)  # Short sleep to prevent high CPU usage
     except KeyboardInterrupt:
-        print("[AllTalk MEM] Keyboard interrupt received. Shutting down...")
+        logger.warning("[AllTalk MEM] Keyboard interrupt received. Shutting down...")
         should_exit.set()
     except Exception as e:
-        print(f"[AllTalk MEM] An error occurred: {e}")
+        logger.error(f"[AllTalk MEM] An error occurred: {e}")
     finally:
         graceful_shutdown()
         sys.exit(0)
