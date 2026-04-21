@@ -288,7 +288,7 @@ class TrainerArgs(Coqpit):
 
 
 class Trainer:
-    def __init__(  # pylint: disable=dangerous-default-value
+    def __init__(
         self,
         args: TrainerArgs,
         config: Coqpit,
@@ -303,9 +303,9 @@ class Trainer:
         test_samples: list = None,
         train_loader: DataLoader = None,
         eval_loader: DataLoader = None,
-        training_assets: dict = {},
+        training_assets: dict = None,
         parse_command_line_args: bool = True,
-        callbacks: dict[str, Callable] = {},
+        callbacks: dict[str, Callable] = None,
         gpu: int = None,
         warmup: bool = False,
     ) -> None:

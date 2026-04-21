@@ -241,7 +241,7 @@ else:
 # Run setup function in the model_engine #
 ##########################################
 @asynccontextmanager
-async def startup_shutdown(no_actual_value_it_demanded_something_be_here):  # pylint: disable=unused-argument
+async def startup_shutdown(_):
     """Initialize model engine and handle graceful shutdown. This is a context manager."""
     debug_func_entry()
     try:
@@ -2305,9 +2305,7 @@ async def tts_process_standard_mode(params: dict, text_input: str) -> StreamingR
 
     print_message("Standard generation mode", "debug_tts", "GEN")
 
-    output_file_path, output_file_url, output_cache_url = await tts_handle_output_paths(  # pylint: disable=unused-variable # Do not remove output_file_url, output_cache_url
-        params["output_file_name"], params["output_file_timestamp"]
-    )
+    output_file_path = await tts_handle_output_paths(params["output_file_name"], params["output_file_timestamp"])
 
     cleaned_text = tts_clean_text(text_input, params["text_filtering"])
 
@@ -2912,7 +2910,7 @@ def start_server():
     config_port = int(config.api_def.api_port_number)
     port_to_use = args.port if args.port is not None else config_port
     # Start Uvicorn Webserver
-    uvicorn_server = uvicorn.run(app, host="0.0.0.0", port=port_to_use, log_level="debug")  # pylint: disable=assignment-from-no-return
+    uvicorn.run(app, host="0.0.0.0", port=port_to_use, log_level="debug")
 
 
 if __name__ == "__main__":
