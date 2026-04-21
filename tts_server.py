@@ -223,13 +223,13 @@ async def startup_shutdown(no_actual_value_it_demanded_something_be_here): # pyl
 # Setup FastAPI with Lifespan #
 ###############################
 app = FastAPI(lifespan=startup_shutdown)
-# Allow all origins, and set other CORS options
+# Configure CORS using config settings for security
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Set this to the specific origins you want to allow
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=config.cors_settings.allowed_origins,
+    allow_credentials=config.cors_settings.allow_credentials,
+    allow_methods=config.cors_settings.allow_methods,
+    allow_headers=config.cors_settings.allow_headers,
 )
 
 # Global lock

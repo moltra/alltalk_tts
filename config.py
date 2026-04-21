@@ -118,6 +118,12 @@ class AlltalkConfigProxySettings(BaseModel):
     logging_enabled: bool = True
     log_level: str = "INFO"
 
+class AlltalkConfigCorsSettings(BaseModel):
+    allowed_origins: list[str] = ["http://localhost:7852", "http://localhost:3000", "http://127.0.0.1:7852", "http://127.0.0.1:3000"]
+    allow_credentials: bool = True
+    allow_methods: list[str] = ["*"]
+    allow_headers: list[str] = ["*"]
+
 class AbstractJsonConfig(ABC):
     def __init__(self, config_path: Path | str, file_check_interval: int):
         super().__init__()
@@ -332,6 +338,7 @@ class AlltalkConfigFields:
     debugging: AlltalkConfigDebug = AlltalkConfigDebug()
     gradio_pages: AlltalkConfigGradioPages = AlltalkConfigGradioPages()
     proxy_settings: AlltalkConfigProxySettings = AlltalkConfigProxySettings()
+    cors_settings: AlltalkConfigCorsSettings = AlltalkConfigCorsSettings()
 
 class AlltalkConfigModel(BaseModel, AlltalkConfigFields):
     __this_dir = Path(__file__).parent.resolve()
