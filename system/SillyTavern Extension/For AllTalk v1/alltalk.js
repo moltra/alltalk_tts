@@ -152,7 +152,7 @@ class AllTalkTtsProvider {
     </div>
 
     <div class="at-website-option">
-        <span>AllTalk <a target="_blank" href="https://github.com/erew123/alltalk_tts/">Website</a>.</span>
+        <span>AllTalk <a target="_blank" href="https://github.com/moltra/alltalk_tts/">Website</a>.</span>
     </div>
 </div>`;
 

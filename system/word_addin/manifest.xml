@@ -8,7 +8,7 @@
   <Description DefaultValue="Enhance your document creation with AllTalk TTS's advanced text-to-voice functionality. Requires connection to AllTalk server."/>
   <IconUrl DefaultValue="http://127.0.0.1:7851/api/word_addin/assets/icon-32.png"/>
   <HighResolutionIconUrl DefaultValue="http://127.0.0.1:7851/api/word_addin/assets/icon-64.png"/>
-  <SupportUrl DefaultValue="https://github.com/erew123/alltalk_tts/issues"/>
+  <SupportUrl DefaultValue="https://github.com/moltra/alltalk_tts/issues"/>
   <AppDomains>
     <AppDomain>https://www.contoso.com</AppDomain>
   </AppDomains>

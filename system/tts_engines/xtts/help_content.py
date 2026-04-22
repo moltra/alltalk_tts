@@ -279,7 +279,7 @@ class AllTalkHelpContent:
     - Essential for maintaining compatibility with OpenAI API calls
     - Each mapping can be customized to any available voice in the current engine
 
-    Information on the OpenAI Endpoint is available in the [Github Wiki](https://github.com/erew123/alltalk_tts/wiki)
+    Information on the OpenAI Endpoint is available in the [Github Wiki](https://github.com/moltra/alltalk_tts/wiki)
 
     ### Default Voices
     - **Default/Character Voice**: Used when no specific voice is specified in API calls

@@ -5,7 +5,7 @@ This script provides endpoints for generating TTS, handling voice configurations
 and managing audio processing, including RVC-based voice conversion and OpenAI-compatible APIs.
 It supports features like streaming, file format transcoding, and real-time configuration updates.
 
-Github: https://github.com/erew123/
+Github: https://github.com/moltra/
 """
 
 import argparse

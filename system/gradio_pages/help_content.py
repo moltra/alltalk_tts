@@ -168,34 +168,34 @@ class AllTalkHelpContent:
 
     WELCOME = """
     # Welcome to AllTalk
-    Thanks for trying out AllTalk! Below you'll find information about getting help, reporting issues, and contributing to the project. If you're just getting started, you might want to check out the [Quick Start Guide](https://github.com/erew123/alltalk_tts/wiki/AllTalk-V2-QuickStart-Guide).
+    Thanks for trying out AllTalk! Below you'll find information about getting help, reporting issues, and contributing to the project. If you're just getting started, you might want to check out the [Quick Start Guide](https://github.com/moltra/alltalk_tts/wiki/AllTalk-V2-QuickStart-Guide).
     """
 
     WELCOME1 = """
     ## 📚 Documentation and Features
-    The Gradio interface includes expandable accordions throughout, providing help for each page and its settings/features. For more detailed information about features, settings, setup, and third-party add-ons, check out the [GitHub Wiki](https://github.com/erew123/alltalk_tts/wiki).
+    The Gradio interface includes expandable accordions throughout, providing help for each page and its settings/features. For more detailed information about features, settings, setup, and third-party add-ons, check out the [GitHub Wiki](https://github.com/moltra/alltalk_tts/wiki).
 
     💡 Tip: Use the Light/Dark Mode button in the top right corner for easier reading.
 
     ## ⚠️ Errors and Issues
-    You can find solutions to all known errors and issues in the [Error Messages List](https://github.com/erew123/alltalk_tts/wiki/Error-Messages-List) on the GitHub Wiki. Also keep an eye on the terminal/console where AllTalk is running, as it provides detailed output for troubleshooting.
+    You can find solutions to all known errors and issues in the [Error Messages List](https://github.com/moltra/alltalk_tts/wiki/Error-Messages-List) on the GitHub Wiki. Also keep an eye on the terminal/console where AllTalk is running, as it provides detailed output for troubleshooting.
 
     ## 💡Support and Help
     If you need help, here's where to look:
         - The help sections within the interface
-        - The [GitHub Wiki](https://github.com/erew123/alltalk_tts/wiki)
-        - The [Discussion forums](https://github.com/erew123/alltalk_tts/discussions)
-        - Past solutions in [GitHub Issues](https://github.com/erew123/alltalk_tts/issues)
+        - The [GitHub Wiki](https://github.com/moltra/alltalk_tts/wiki)
+        - The [Discussion forums](https://github.com/moltra/alltalk_tts/discussions)
+        - Past solutions in [GitHub Issues](https://github.com/moltra/alltalk_tts/issues)
 
-    For detailed troubleshooting guidance and debugging tools, check out the [Support Section](https://github.com/erew123/alltalk_tts/wiki#-support--help).
+    For detailed troubleshooting guidance and debugging tools, check out the [Support Section](https://github.com/moltra/alltalk_tts/wiki#-support--help).
     """
 
     WELCOME2 = """
     ## 🚀 Feature Requests
-    I track feature requests in a dedicated thread in the [GitHub Discussions area](https://github.com/erew123/alltalk_tts/discussions/74). While I'm open to suggestions, I can't guarantee I'll implement every request. If you have a specific feature in mind, please add it to the discussion.
+    I track feature requests in a dedicated thread in the [GitHub Discussions area](https://github.com/moltra/alltalk_tts/discussions/74). While I'm open to suggestions, I can't guarantee I'll implement every request. If you have a specific feature in mind, please add it to the discussion.
 
     ## 🤝 Contributing to AllTalk
-    I welcome contributions to AllTalk and am grateful to anyone willing to contribute. While I don't have specific guidelines, I'd ask that you familiarize yourself with the [GitHub Wiki](https://github.com/erew123/alltalk_tts/wiki) to understand how AllTalk works. If you'd like to contribute, please drop me a message in the discussions area describing what you'd like to work on - this helps avoid duplicate efforts and lets me share any relevant development plans.
+    I welcome contributions to AllTalk and am grateful to anyone willing to contribute. While I don't have specific guidelines, I'd ask that you familiarize yourself with the [GitHub Wiki](https://github.com/moltra/alltalk_tts/wiki) to understand how AllTalk works. If you'd like to contribute, please drop me a message in the discussions area describing what you'd like to work on - this helps avoid duplicate efforts and lets me share any relevant development plans.
 
     ## 💖 Sponsor AllTalk
     I've developed AllTalk in my free time, handling everything from coding and documentation to testing and community support. It's grown far beyond what I initially imagined, requiring significant time and effort to maintain and improve. If you'd like to support my work, you can make a one-time or ongoing contribution through my [Ko-Fi page](https://ko-fi.com/erew123). Your support means a lot to me!

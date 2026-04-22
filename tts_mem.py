@@ -2,7 +2,7 @@
 AllTalk Multi Engine Manager (MEM)
 
 This script is part of the AllTalk project, written by Erew123.
-GitHub Repository: https://github.com/erew123/alltalk_tts
+GitHub Repository: https://github.com/moltra/alltalk_tts
 
 AllTalk MEM (Multi Engine Manager) is a research tool designed to manage and test
 multiple instances of different Text-to-Speech (TTS) engines being loaded simultaneously,
@@ -10,11 +10,12 @@ with a view to a centralized engine being able to handle multiple requests simul
 
 Attribution:
 - Original AllTalk project by Erew123 (https://github.com/erew123)
+- Forked and maintained by moltra (https://github.com/moltra)
 - MEM extension developed based on the AllTalk framework
 
 Licensing:
 This project is subject to the licensing terms specified in the AllTalk repository.
-Please refer to https://github.com/erew123/alltalk_tts for the most up-to-date
+Please refer to https://github.com/moltra/alltalk_tts for the most up-to-date
 licensing information.
 
 Code Usage and Modifications:
@@ -33,7 +34,7 @@ MEM is not intended for production use at this time and there is NO support
 being offered on MEM.
 
 For the latest updates and documentation, please visit:
-https://github.com/erew123/alltalk_tts
+https://github.com/moltra/alltalk_tts
 """
 
 import asyncio
