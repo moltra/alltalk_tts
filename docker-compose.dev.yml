@@ -31,10 +31,10 @@ services:
       - ./config:/home/alltalk/config
       # System directory (refactored code)
       - ./system:/home/alltalk/system
-      # Models and outputs (persistent data)
-      - ./models:/home/alltalk/models
-      - ./outputs:/home/alltalk/outputs
-      - ./voices:/home/alltalk/voices
+      # Models and outputs (persistent data - external volumes)
+      - /mnt/samsungssd/docker/appdata/alltalk/alltalk_test/models:/home/alltalk/models
+      - /mnt/samsungssd/docker/appdata/alltalk/alltalk_test/outputs:/home/alltalk/outputs
+      - /mnt/samsungssd/docker/appdata/alltalk/alltalk_test/voices:/home/alltalk/voices
       # Optional: mount other code directories as needed
       # - ./scripts:/home/alltalk/scripts
     deploy:
