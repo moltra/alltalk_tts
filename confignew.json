@@ -4,7 +4,7 @@
     "gradio_interface": true,
     "output_folder": "outputs",
     "gradio_port_number": 7852,
-    "firstrun_model": true,
+    "firstrun_model": false,
     "firstrun_splash": true,
     "launch_gradio": true,
     "transcode_audio_format": "Disabled",
@@ -66,19 +66,19 @@
         "api_autoplay_volume": 0.5
     },
     "debugging": {
-        "debug_transcode": false,
-        "debug_tts": false,
-        "debug_openai": false,
-        "debug_concat": false,
-        "debug_tts_variables": false,
-        "debug_rvc": false,
-        "debug_func": false,
-        "debug_api": false,
-        "debug_fullttstext": false,
-        "debug_narrator": false,
-        "debug_gradio_IP": false,
-        "debug_transcribe": false,
-        "debug_proxy": false
+        "debug_transcode": true,
+        "debug_tts": true,
+        "debug_openai": true,
+        "debug_concat": true,
+        "debug_tts_variables": true,
+        "debug_rvc": true,
+        "debug_func": true,
+        "debug_api": true,
+        "debug_fullttstext": true,
+        "debug_narrator": true,
+        "debug_gradio_IP": true,
+        "debug_transcribe": true,
+        "debug_proxy": true
     },
     "gradio_pages": {
         "Generate_Help_page": true,
@@ -115,7 +115,11 @@
             "http://127.0.0.1:3000"
         ],
         "allow_credentials": true,
-        "allow_methods": ["*"],
-        "allow_headers": ["*"]
+        "allow_methods": [
+            "*"
+        ],
+        "allow_headers": [
+            "*"
+        ]
     }
 }

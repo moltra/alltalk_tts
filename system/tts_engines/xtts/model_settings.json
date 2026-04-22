@@ -21,22 +21,22 @@
         "mac_capable": true
     },
     "settings": {
-        "def_character_voice": "female_01.wav",
-        "def_narrator_voice": "male_01.wav",
+        "def_character_voice": "David_Attenborough CC3.wav",
+        "def_narrator_voice": "James_Earl_Jones CC3.wav",
         "deepspeed_enabled": false,
         "engine_installed": true,
         "generationspeed_set": 1,
-        "lowvram_enabled": false,
+        "lowvram_enabled": true,
         "pitch_set": 0,
         "repetitionpenalty_set": 10,
         "temperature_set": 0.75
     },
     "openai_voices": {
-        "alloy": "female_01.wav",
-        "echo": "female_01.wav",
-        "fable": "female_01.wav",
-        "nova": "female_01.wav",
-        "onyx": "female_01.wav",
-        "shimmer": "female_01.wav"
+        "alloy": "male_03.wav",
+        "echo": "Sophie_Anderson CC3.wav",
+        "fable": "male_01.wav",
+        "nova": "female_04.wav",
+        "onyx": "Arnold.wav",
+        "shimmer": "female_05.wav"
     }
 }

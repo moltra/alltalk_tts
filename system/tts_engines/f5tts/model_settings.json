@@ -21,8 +21,8 @@
         "mac_capable": true
     },
     "settings": {
-        "def_character_voice": "female_01.wav",
-        "def_narrator_voice": "female_01.wav",
+        "def_character_voice": "male_01.wav",
+        "def_narrator_voice": "male_03.wav",
         "deepspeed_enabled": false,
         "engine_installed": true,
         "generationspeed_set": 1,
@@ -32,11 +32,11 @@
         "temperature_set": 0.75
     },
     "openai_voices": {
-        "alloy": "female_01.wav",
+        "alloy": "male_01.wav",
         "echo": "female_01.wav",
-        "fable": "female_01.wav",
+        "fable": "male_04.wav",
         "nova": "female_01.wav",
-        "onyx": "female_01.wav",
+        "onyx": "Clint_Eastwood CC3.wav",
         "shimmer": "female_01.wavf"
     }
 }
