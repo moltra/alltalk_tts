@@ -28,7 +28,7 @@ services:
       - ./script.py:/home/alltalk/script.py
       - ./start_dev.sh:/home/alltalk/start_dev.sh
       # Config directory (centralized configs)
-      - ./config:/home/alltalk/config
+      - /mnt/samsungssd/docker/appdata/alltalk/alltalk_test/config:/home/alltalk/config
       # System directory (refactored code)
       - ./system:/home/alltalk/system
       # Models and outputs (persistent data - external volumes)
