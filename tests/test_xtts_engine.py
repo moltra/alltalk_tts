@@ -119,9 +119,9 @@ class TestXTTSScanModelsFolder:
 
         # Mock the necessary config classes
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -144,9 +144,9 @@ class TestXTTSScanModelsFolder:
         (model_folder / "model.pth").write_text("{}")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -170,9 +170,9 @@ class TestXTTSScanModelsFolder:
                 (model_folder / file).write_text("{}")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -201,9 +201,9 @@ class TestXTTSVoicesFileList:
         (temp_voices_dir / "not_a_voice.txt").write_text("text")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -229,9 +229,9 @@ class TestXTTSVoicesFileList:
         (voice_set / "sample2.wav").write_bytes(b"RIFF" + b"\x00" * 100)
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -252,9 +252,9 @@ class TestXTTSVoicesFileList:
         (latents_dir / "latent2.json").write_text("{}")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -270,9 +270,9 @@ class TestXTTSVoicesFileList:
     def test_voices_list_no_voices_found(self, temp_voices_dir, temp_xtts_dir, temp_dir):
         """Test when no voices are available"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -291,9 +291,9 @@ class TestXTTSVoicesFileList:
         (latents_dir / "latent1.json").write_text("{}")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -321,9 +321,9 @@ class TestXTTSHandleTTSMethodChange:
             (model_folder / file).write_text("{}")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -353,9 +353,9 @@ class TestXTTSHandleTTSMethodChange:
             (model_folder / file).write_text("{}")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -379,9 +379,9 @@ class TestXTTSHandleTTSMethodChange:
     async def test_handle_invalid_method(self, temp_xtts_dir, temp_dir):
         """Test handling invalid model type"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -400,9 +400,9 @@ class TestXTTSInitMethods:
     def test_init_system_variables(self, temp_xtts_dir, temp_dir):
         """Test initialization of core system variables"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -423,9 +423,9 @@ class TestXTTSInitMethods:
     def test_load_configuration(self, temp_xtts_dir, temp_dir):
         """Test loading model_settings.json configuration"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -444,9 +444,9 @@ class TestXTTSInitMethods:
     def test_setup_model_details(self, temp_xtts_dir, temp_dir):
         """Test setting model details from configuration"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -466,9 +466,9 @@ class TestXTTSInitMethods:
     def test_setup_capabilities(self, temp_xtts_dir, temp_dir):
         """Test setting capability flags from configuration"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -506,9 +506,9 @@ class TestXTTSInitMethods:
     def test_setup_engine_settings(self, temp_xtts_dir, temp_dir):
         """Test setting engine settings from configuration"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -542,9 +542,9 @@ class TestXTTSInitMethods:
     def test_setup_openai_mappings(self, temp_xtts_dir, temp_dir):
         """Test setting OpenAI voice mappings from configuration"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -576,9 +576,9 @@ class TestXTTSHandleTTSMethodChangeHelpers:
     def test_validate_model_change_success(self, temp_xtts_dir, temp_dir):
         """Test validation when models are available"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -592,9 +592,9 @@ class TestXTTSHandleTTSMethodChangeHelpers:
     def test_validate_model_change_no_models(self, temp_xtts_dir, temp_dir):
         """Test validation when no models are available"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -609,9 +609,9 @@ class TestXTTSHandleTTSMethodChangeHelpers:
     async def test_execute_model_loader_xtts(self, temp_xtts_dir, temp_dir):
         """Test XTTS loader execution"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -629,9 +629,9 @@ class TestXTTSHandleTTSMethodChangeHelpers:
     async def test_execute_model_loader_apitts(self, temp_xtts_dir, temp_dir):
         """Test API TTS loader execution"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -649,9 +649,9 @@ class TestXTTSHandleTTSMethodChangeHelpers:
     async def test_execute_model_loader_invalid(self, temp_xtts_dir, temp_dir):
         """Test loader execution with invalid method type"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -665,9 +665,9 @@ class TestXTTSHandleTTSMethodChangeHelpers:
     def test_report_load_time(self, temp_xtts_dir, temp_dir):
         """Test load time reporting"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -691,9 +691,9 @@ class TestXTTSVoicesFileListHelpers:
         (temp_voices_dir / "not_a_voice.txt").write_text("text")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -716,9 +716,9 @@ class TestXTTSVoicesFileListHelpers:
         (voice_set / "sample2.wav").write_bytes(b"RIFF" + b"\x00" * 100)
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -738,9 +738,9 @@ class TestXTTSVoicesFileListHelpers:
         (voice_set / "not_a_wav.txt").write_text("text")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -759,9 +759,9 @@ class TestXTTSVoicesFileListHelpers:
         (latents_dir / "latent2.json").write_text("{}")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -780,9 +780,9 @@ class TestXTTSVoicesFileListHelpers:
         (latents_dir / "latent1.json").write_text("{}")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -799,9 +799,9 @@ class TestXTTSVoicesFileListHelpers:
         latents_dir = temp_voices_dir / "xtts_latents"
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -826,9 +826,9 @@ class TestXTTSSetupHelpers:
             (model_folder / file).write_text("{}")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -848,9 +848,9 @@ class TestXTTSSetupHelpers:
     async def test_load_initial_model_not_found(self, temp_xtts_dir, temp_dir):
         """Test loading initial model when selected_model is not available"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -866,9 +866,9 @@ class TestXTTSSetupHelpers:
     async def test_load_initial_model_no_selection(self, temp_xtts_dir, temp_dir):
         """Test loading initial model when no model is selected"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -894,9 +894,9 @@ class TestXTTSScanModelsFolderHelpers:
             (model_folder / file).write_text("{}")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -916,9 +916,9 @@ class TestXTTSScanModelsFolderHelpers:
         (model_folder / "model.pth").write_text("{}")
 
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -931,9 +931,9 @@ class TestXTTSScanModelsFolderHelpers:
     def test_register_model(self, temp_xtts_dir, temp_dir):
         """Test model registration in both formats"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -952,9 +952,9 @@ class TestXTTSHandleDeepSpeedChangeHelpers:
     def test_validate_deepspeed_change_apitts(self, temp_xtts_dir, temp_dir):
         """Test validation fails for API TTS mode"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -968,9 +968,9 @@ class TestXTTSHandleDeepSpeedChangeHelpers:
     def test_validate_deepspeed_change_no_model(self, temp_xtts_dir, temp_dir):
         """Test validation fails when no model is loaded"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -984,9 +984,9 @@ class TestXTTSHandleDeepSpeedChangeHelpers:
     def test_validate_deepspeed_change_valid(self, temp_xtts_dir, temp_dir):
         """Test validation succeeds for valid state"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -1002,9 +1002,9 @@ class TestXTTSHandleDeepSpeedChangeHelpers:
     async def test_reload_model_with_deepspeed_enable(self, temp_xtts_dir, temp_dir):
         """Test reloading model with DeepSpeed enabled"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -1022,9 +1022,9 @@ class TestXTTSHandleDeepSpeedChangeHelpers:
     async def test_reload_model_with_deepspeed_disable(self, temp_xtts_dir, temp_dir):
         """Test reloading model with DeepSpeed disabled"""
         with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 

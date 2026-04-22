@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from config import AlltalkAvailableEngine, AlltalkConfig, AlltalkTTSEnginesConfig
+from config.app.config import AlltalkAvailableEngine, AlltalkConfig, AlltalkTTSEnginesConfig
 
 
 class TestAlltalkConfig:

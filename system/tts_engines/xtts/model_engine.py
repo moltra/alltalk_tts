@@ -44,9 +44,9 @@ from fastapi import HTTPException
 
 # Confguration file management for confignew.json
 try:
-    from .config import AlltalkConfig, AlltalkNewEnginesConfig, AlltalkTTSEnginesConfig  # TGWUI import
+    from .config.app.config import AlltalkConfig, AlltalkNewEnginesConfig, AlltalkTTSEnginesConfig  # TGWUI import
 except ImportError:
-    from config import AlltalkConfig, AlltalkNewEnginesConfig, AlltalkTTSEnginesConfig  # Standalone import
+    from config.app.config import AlltalkConfig, AlltalkNewEnginesConfig, AlltalkTTSEnginesConfig  # Standalone import
 
 
 def initialize_configs():

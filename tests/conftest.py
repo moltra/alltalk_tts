@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 from loguru import logger
 
-from config import AlltalkConfig, AlltalkTTSEnginesConfig
+from config.app.config import AlltalkConfig, AlltalkTTSEnginesConfig
 
 
 @pytest.fixture

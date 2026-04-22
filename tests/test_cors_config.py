@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from config import AlltalkConfig, AlltalkConfigCorsSettings
+from config.app.config import AlltalkConfig, AlltalkConfigCorsSettings
 
 
 class TestCorsConfiguration:

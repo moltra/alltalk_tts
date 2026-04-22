@@ -279,7 +279,7 @@ class AlltalkNewEnginesConfig(AbstractJsonConfig, AlltalkNewEnginesConfigFields)
     __instance = None
     __this_dir = Path(__file__).parent.resolve()
 
-    def __init__(self, config_path: Path | str = os.path.join(__this_dir, "system", "tts_engines", "new_engines.json")):
+    def __init__(self, config_path: Path | str = os.path.join(__this_dir, "..", "system", "new_engines.json")):
         super().__init__(config_path, 5)
         self._load_config()
 
@@ -322,7 +322,7 @@ class AlltalkTTSEnginesConfig(AbstractJsonConfig, AlltalkTTSEnginesConfigFields)
     __instance = None
     __this_dir = Path(__file__).parent.resolve()
 
-    def __init__(self, config_path: Path | str = os.path.join(__this_dir, "system", "tts_engines", "tts_engines.json")):
+    def __init__(self, config_path: Path | str = os.path.join(__this_dir, "..", "system", "tts_engines.json")):
         super().__init__(config_path, 5)
         self._load_config()
 

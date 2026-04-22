@@ -7,7 +7,7 @@ instead of using global variables, improving testability and thread safety.
 
 from asyncio import Lock
 
-from config import AlltalkConfig, AlltalkTTSEnginesConfig
+from config.app.config import AlltalkConfig, AlltalkTTSEnginesConfig
 
 
 class StateManager:
