@@ -1,0 +1,119 @@
+##############################################################################
+# Multi-stage build for minimal production image
+##############################################################################
+
+##############################################################################
+# Stage 1: Base environment with dependencies
+##############################################################################
+FROM continuumio/miniconda3:24.7.1-0 AS base
+
+ARG CUDA_VERSION=12.8.1
+ARG PYTHON_VERSION=3.11.11
+ENV CUDA_VERSION=$CUDA_VERSION
+ENV PYTHON_VERSION=$PYTHON_VERSION
+ENV ALLTALK_DIR=/home/alltalk
+ENV DEBIAN_FRONTEND=noninteractive
+
+SHELL ["/bin/bash", "-l", "-c"]
+
+# Install only essential system packages
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y \
+      espeak-ng \
+      curl \
+      jq && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -ms /bin/bash alltalk
+USER alltalk
+
+# Create conda environment with minimal dependencies
+RUN CUDA_SHORT_VERSION=${CUDA_VERSION%.*} && \
+    conda create -y -n alltalk python=${PYTHON_VERSION} && \
+    conda activate alltalk && \
+    conda install -y \
+      cuda=${CUDA_VERSION} \
+      cudnn=9.10 \
+      conda-forge::ffmpeg=7.1.0 \
+      -c nvidia \
+      -c conda-forge && \
+    conda clean -a -y
+
+# Install PyTorch
+RUN CUDA_SHORT_VERSION=${CUDA_VERSION%.*} && \
+    CUDA_SHORT_VERSION_NO_DOT=${CUDA_SHORT_VERSION//./} && \
+    conda activate alltalk && \
+    pip install --no-cache-dir \
+      torch==2.7.1 \
+      torchvision==0.22.1 \
+      torchaudio==2.7.1 \
+      --index-url https://download.pytorch.org/whl/cu${CUDA_SHORT_VERSION_NO_DOT}
+
+##############################################################################
+# Stage 2: Application layer
+##############################################################################
+FROM base AS app
+
+ARG TTS_MODEL="xtts"
+ARG DEEPSPEED_VERSION=0.17.2
+ENV TTS_MODEL=$TTS_MODEL
+ENV DEEPSPEED_VERSION=$DEEPSPEED_VERSION
+ENV GRADIO_SERVER_NAME="0.0.0.0"
+
+WORKDIR ${ALLTALK_DIR}
+
+# Copy only requirements first (for layer caching)
+COPY --chown=alltalk:alltalk system/requirements/requirements_standalone.txt system/requirements/
+COPY --chown=alltalk:alltalk system/requirements/requirements_parler.txt system/requirements/
+
+# Install Python dependencies
+RUN conda activate alltalk && \
+    pip install --no-cache-dir -r system/requirements/requirements_standalone.txt && \
+    pip install --no-cache-dir --upgrade gradio>=6.0.0 && \
+    pip install --no-cache-dir local-attention==1.11.1 && \
+    pip install --no-cache-dir -r system/requirements/requirements_parler.txt && \
+    pip cache purge
+
+# Install DeepSpeed
+RUN conda activate alltalk && \
+    curl -fLO "https://github.com/erew123/alltalk_tts/releases/download/DeepSpeed-for-docker/deepspeed-0.17.2+15f054d9-cp311-cp311-linux_x86_64.whl" && \
+    pip install --no-cache-dir deepspeed-*.whl && \
+    rm deepspeed-*.whl && \
+    pip cache purge
+
+# Copy application code
+COPY --chown=alltalk:alltalk . .
+
+# Create conda activation script
+RUN <<EOR
+cat << 'EOF' > ${ALLTALK_DIR}/conda_env.sh
+#!/usr/bin/env bash
+source ~/.bashrc
+__conda_setup="\$('/opt/conda/bin/conda' 'shell.bash' 'hook' 2> /dev/null)"
+eval "\$__conda_setup"
+unset __conda_setup
+conda activate alltalk
+EOF
+EOR
+
+# Create startup script
+RUN <<EOR
+cat << 'EOF' > start_alltalk.sh
+#!/usr/bin/env bash
+source ${ALLTALK_DIR}/conda_env.sh
+python tts_server.py
+EOF
+chmod +x start_alltalk.sh
+EOR
+
+# Create directories
+RUN mkdir -p outputs models .triton/autotune
+
+# Enable deepspeed
+RUN find . -name model_settings.json -exec sed -i -e 's/"deepspeed_enabled": false/"deepspeed_enabled": true/g' {} \;
+
+EXPOSE 7851 7852
+
+ENTRYPOINT ["bash", "-c", "./start_alltalk.sh"]

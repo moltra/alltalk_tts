@@ -1,0 +1,136 @@
+ARG DOCKER_REPOSITORY
+ARG DOCKER_TAG=latest
+FROM ${DOCKER_REPOSITORY}alltalk_tts_environment:${DOCKER_TAG}
+
+ARG TTS_MODEL="xtts"
+ENV TTS_MODEL=$TTS_MODEL
+
+ARG DEEPSPEED_VERSION=0.17.2
+ENV DEEPSPEED_VERSION=$DEEPSPEED_VERSION
+
+ENV GRADIO_SERVER_NAME="0.0.0.0"
+
+# Development-specific settings
+ENV ALLTALK_ENABLE_MULTI_ENGINE_MANAGER=false
+ENV ALLTALK_DELETE_OUTPUT_WAVS="0"
+ENV ALLTALK_GRADIO_INTERFACE=true
+ENV ALLTALK_RVC_ENABLED=true
+ENV ALLTALK_RVC_F0METHOD="rmvpe"
+
+WORKDIR ${ALLTALK_DIR}
+
+##############################################################################
+# Install development tools and dependencies:
+##############################################################################
+COPY system/config/*.whl system/config/
+COPY system/requirements/requirements_standalone.txt system/requirements/
+COPY system/requirements/requirements_parler.txt system/requirements/
+COPY requirements-dev.txt ./
+ENV PIP_CACHE_DIR=${ALLTALK_DIR}/pip_cache
+RUN <<EOR
+    conda activate alltalk
+
+    mkdir -p ${ALLTALK_DIR}/pip_cache
+
+    # Install production dependencies
+    pip install --no-cache-dir --cache-dir=${ALLTALK_DIR}/pip_cache -r system/requirements/requirements_standalone.txt
+
+    # Update to Gradio 6.0+ for refactored code compatibility
+    pip install --no-cache-dir --cache-dir=${ALLTALK_DIR}/pip_cache --upgrade gradio>=6.0.0
+
+    # Install development dependencies
+    pip install --no-cache-dir --cache-dir=${ALLTALK_DIR}/pip_cache -r requirements-dev.txt
+
+    # Install debugging tools
+    pip install --no-cache-dir --cache-dir=${ALLTALK_DIR}/pip_cache \
+        ipdb \
+        ipython \
+        pytest \
+        pytest-cov \
+        pytest-asyncio \
+        pytest-loguru
+
+    # By default, version 1.9.10 is used causing this warning on startup: 'FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated'
+    pip install --no-cache-dir --cache-dir=${ALLTALK_DIR}/pip_cache local-attention==1.11.1
+
+    # Parler:
+    pip install --no-cache-dir --cache-dir=${ALLTALK_DIR}/pip_cache -r system/requirements/requirements_parler.txt
+
+    conda clean --all --force-pkgs-dirs -y && pip cache purge
+EOR
+
+##############################################################################
+# Install DeepSpeed
+##############################################################################
+RUN mkdir -p /tmp/deepspeed
+RUN <<EOR
+    DEEPSPEED_WHEEL=$(realpath -q /tmp/deepspeed/*.whl 2>/dev/null)
+    conda activate alltalk
+
+    # Download DeepSpeed wheel if it was not built locally:
+    if [ -z "${DEEPSPEED_WHEEL}" ] || [ ! -f $DEEPSPEED_WHEEL ] ; then
+      echo "Downloading pre-built DeepSpeed wheel"
+      CURL_ERROR=$( { curl --output-dir /tmp/deepspeed -fLO "https://github.com/erew123/alltalk_tts/releases/download/DeepSpeed-for-docker/deepspeed-0.17.2+15f054d9-cp311-cp311-linux_x86_64.whl" ; } 2>&1 )
+      if [ $? -ne 0 ] ; then
+        echo "Failed to download DeepSpeed: $CURL_ERROR"
+        exit 1
+      fi
+      DEEPSPEED_WHEEL=$(realpath -q /tmp/deepspeed/*.whl)
+    fi
+
+    echo "Using precompiled DeepSpeed wheel at ${DEEPSPEED_WHEEL}"
+    CFLAGS="-I$CONDA_PREFIX/include/" LDFLAGS="-L$CONDA_PREFIX/lib/" \
+      pip install --no-cache-dir ${DEEPSPEED_WHEEL}
+
+    if [ $? -ne 0 ] ; then
+      echo "Failed to install pip dependencies: $RESULT"
+      exit 1
+    fi
+
+    rm ${DEEPSPEED_WHEEL}
+    conda clean --all --force-pkgs-dirs -y && pip cache purge
+EOR
+
+##############################################################################
+# Create development startup script:
+##############################################################################
+RUN <<EOR
+    cat << EOF > start_dev.sh
+#!/usr/bin/env bash
+source ~/.bashrc
+source ${ALLTALK_DIR}/conda_env.sh
+
+echo "Starting AllTalk in development mode..."
+echo "Code is mounted from host - changes reflect immediately"
+echo "Gradio will be available on port 7852"
+echo "API will be available on port 7851"
+echo ""
+echo "To run with debugger: python -m ipdb tts_server.py"
+echo "To run tests: pytest"
+echo ""
+
+# Download models at runtime if not present
+if [ ! -d "models/${TTS_MODEL}" ]; then
+  echo "Downloading TTS models..."
+  python ./system/config/firstrun.py --tts_model ${TTS_MODEL}
+fi
+
+python tts_server.py
+EOF
+    chmod +x start_dev.sh
+EOR
+
+##############################################################################
+# Create directories for outputs and models:
+##############################################################################
+RUN mkdir -p ${ALLTALK_DIR}/outputs ${ALLTALK_DIR}/.triton/autotune ${ALLTALK_DIR}/models
+
+##############################################################################
+# Expose ports for development:
+##############################################################################
+EXPOSE 7851 7852
+
+##############################################################################
+# Default command (can be overridden):
+##############################################################################
+CMD ["bash", "-c", "./start_dev.sh"]
