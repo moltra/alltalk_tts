@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   alltalk-dev:
     build:
@@ -21,6 +19,10 @@ services:
       - TZ=${TZ:-UTC}
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
+      # Model download configuration
+      - ALLTALK_AUTO_DOWNLOAD_MODEL=${ALLTALK_AUTO_DOWNLOAD_MODEL:-false}
+      - ALLTALK_DEFAULT_MODEL=${ALLTALK_DEFAULT_MODEL:-none}
+      - TTS_MODEL=${TTS_MODEL:-xtts}
     volumes:
       # Mount only specific files/directories to preserve container environment
       # Main application files
@@ -28,7 +30,9 @@ services:
       - ./script.py:/home/alltalk/script.py
       - ./start_dev.sh:/home/alltalk/start_dev.sh
       # Config directory (centralized configs)
-      - /mnt/samsungssd/docker/appdata/alltalk/alltalk_test/config:/home/alltalk/config
+      - ./config:/home/alltalk/config
+      # Config file (persistent)
+      - /mnt/samsungssd/docker/appdata/alltalk/alltalk_test/confignew.json:/home/alltalk/config/app/confignew.json
       # System directory (refactored code)
       - ./system:/home/alltalk/system
       # Models and outputs (persistent data - external volumes)

@@ -70,7 +70,7 @@ from tqdm import tqdm
 
 # Setting the module search path:
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.resolve()))
-from config import AlltalkConfig, AlltalkTTSEnginesConfig  # pylint: disable=wrong-import-position
+from config.app.config import AlltalkConfig, AlltalkTTSEnginesConfig  # pylint: disable=wrong-import-position
 
 this_dir = Path(__file__).parent.resolve().parent.resolve().parent.resolve()
 
@@ -191,37 +191,60 @@ def unzip_compressed_files(downloaded_files: []):
             os.remove(file)
 
 
-def setup_tts(tts_model: str, on_download_completed=unzip_compressed_files):
-    download_tts_model(tts_model, on_download_completed)
+def setup_tts(tts_model: str, on_download_completed=unzip_compressed_files, skip_download=False):
+    """Setup TTS engine. If skip_download=True, only creates directories and updates config."""
+    if not skip_download:
+        success = download_tts_model(tts_model, on_download_completed)
+        if not success:
+            print(f"[AllTalk] Model download skipped or failed for {tts_model}")
+    
+    # Create model directories even if download is skipped
+    os.makedirs(this_dir / f"models/{tts_model}", exist_ok=True)
+    
     update_tts_engines(tts_model)
     set_firstrun_model_false()
 
 
 def download_tts_model(tts_model: str, on_download_completed=None):
-    with open(os.path.join(this_dir, "system", "tts_engines", tts_model, "available_models.json")) as f:
-        available_models = json.load(f)
-        first_start_model = available_models["first_start_model"]
-        model = next(m for m in available_models["models"] if m["model_name"] == first_start_model)
+    """Download TTS model files. Returns True if successful, False otherwise."""
+    # Check if available_models.json exists
+    available_models_path = os.path.join(this_dir, "system", "tts_engines", tts_model, "available_models.json")
+    if not os.path.exists(available_models_path):
+        print(f"[AllTalk] Warning: available_models.json not found for {tts_model}")
+        print(f"[AllTalk] Skipping model download. Models can be downloaded via Gradio UI or CLI.")
+        # Create model directory structure
+        os.makedirs(this_dir / f"models/{tts_model}", exist_ok=True)
+        return False
+    
+    try:
+        with open(available_models_path) as f:
+            available_models = json.load(f)
+            first_start_model = available_models["first_start_model"]
+            model = next(m for m in available_models["models"] if m["model_name"] == first_start_model)
 
-        # folder_path: Special case for vits: firstrun.py expects the ZIP download directly in the model folder.
-        # When firstrun.py unzips the file, the correct folder will be created automatically.
-        folder_path = "" if tts_model == "vits" else model.get("folder_path", "")
-        files_to_download = model.get("files_to_download", []) or [model.get("github_rls_url", None)]
-        target_dir = this_dir / f"models/{tts_model}/{folder_path}"
+            # folder_path: Special case for vits: firstrun.py expects the ZIP download directly in the model folder.
+            # When firstrun.py unzips the file, the correct folder will be created automatically.
+            folder_path = "" if tts_model == "vits" else model.get("folder_path", "")
+            files_to_download = model.get("files_to_download", []) or [model.get("github_rls_url", None)]
+            target_dir = this_dir / f"models/{tts_model}/{folder_path}"
 
-        if type(files_to_download) == dict:
-            files_to_download = list(files_to_download.values())
+            if type(files_to_download) == dict:
+                files_to_download = list(files_to_download.values())
 
-        downloaded_files = []
-        for file_download in files_to_download:
-            urlpath = urlsplit(file_download).path
-            file_name = os.path.basename(urlpath)
-            target_file = target_dir / file_name
-            download_file(file_download, target_file)
-            downloaded_files.append(target_file)
+            downloaded_files = []
+            for file_download in files_to_download:
+                urlpath = urlsplit(file_download).path
+                file_name = os.path.basename(urlpath)
+                target_file = target_dir / file_name
+                download_file(file_download, target_file)
+                downloaded_files.append(target_file)
 
-        if on_download_completed:
-            on_download_completed(downloaded_files)
+            if on_download_completed:
+                on_download_completed(downloaded_files)
+            return True
+    except Exception as e:
+        print(f"[AllTalk] Error downloading model {tts_model}: {e}")
+        return False
 
 
 def update_tts_engines(engine):
@@ -309,22 +332,46 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+# Check environment variable for auto-download preference
+auto_download = os.getenv("ALLTALK_AUTO_DOWNLOAD_MODEL", "false").lower() == "true"
+default_model = os.getenv("ALLTALK_DEFAULT_MODEL", "none").lower()
+
 # Check if firstrun_model is true
 if config.firstrun_model:
     # Handle command-line argument for tts_model
     if args.tts_model:
         if args.tts_model in {"piper", "vits", "xtts"}:
             print(f"[{branding}TTS] Setting up model '{args.tts_model}'.")
-            setup_tts(args.tts_model)
+            setup_tts(args.tts_model, skip_download=not auto_download)
         elif args.tts_model == "none":
-            print(f"[{branding}TTS] No TTS model setup requested.")
+            print(f"[{branding}TTS] No TTS model setup requested. Creating directory structure.")
+            # Create all model directories
+            os.makedirs(this_dir / "models/piper", exist_ok=True)
+            os.makedirs(this_dir / "models/vits", exist_ok=True)
+            os.makedirs(this_dir / "models/xtts", exist_ok=True)
+            os.makedirs(this_dir / "models/f5-tts", exist_ok=True)
+            os.makedirs(this_dir / "models/rvc_voices", exist_ok=True)
+            update_tts_engines("piper")  # Set default engine
+            set_firstrun_model_false()
         print(f"[{branding}TTS] Setup completed for {args.tts_model}. Exiting.")
         sys.exit()
 
     # Check for Colab or Docker environment first
     if is_running_in_colab() or is_running_in_docker():
-        print(f"[{branding}TTS] Detected Colab/Docker environment - automatically selecting Piper")
-        setup_tts("piper")
+        if default_model != "none" and auto_download:
+            print(f"[{branding}TTS] Detected Colab/Docker environment - downloading {default_model}")
+            setup_tts(default_model if default_model in ["piper", "vits", "xtts"] else "piper")
+        else:
+            print(f"[{branding}TTS] Detected Colab/Docker environment - skipping auto-download")
+            print(f"[{branding}TTS] Models can be downloaded via Gradio UI or CLI")
+            # Create directory structure
+            os.makedirs(this_dir / "models/piper", exist_ok=True)
+            os.makedirs(this_dir / "models/vits", exist_ok=True)
+            os.makedirs(this_dir / "models/xtts", exist_ok=True)
+            os.makedirs(this_dir / "models/f5-tts", exist_ok=True)
+            os.makedirs(this_dir / "models/rvc_voices", exist_ok=True)
+            update_tts_engines("piper")  # Set default engine
+            set_firstrun_model_false()
         warning_message()
         sys.exit()
 

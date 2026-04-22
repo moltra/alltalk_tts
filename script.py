@@ -4612,6 +4612,36 @@ if gradio_enabled is True:
                                         globals()[f"{engine_name}_model_config_data"]
                                     )
 
+            with gr.Tab("Model Downloads"):
+                from system.model_download_ui import create_model_download_tab
+                create_model_download_tab()
+                with gr.Accordion("📖 HELP - Model Download Guide", open=False):
+                    gr.Markdown(
+                        """
+                        ## 📥 Model Download Guide
+                        
+                        ### Why Download Models Separately?
+                        - **Smaller Docker Images**: Base image is only ~2-4GB instead of 16GB+
+                        - **Faster Deployment**: Only download what you need
+                        - **Easier Updates**: Update code without re-downloading models
+                        
+                        ### How to Use:
+                        1. **Select Engine**: Choose the TTS engine you want to use
+                        2. **Check Status**: See if the model is already downloaded
+                        3. **Download**: Click the download button to get the model
+                        
+                        ### Available Methods:
+                        - **Gradio UI** (this page): User-friendly interface
+                        - **CLI Script**: `python download_model.py --model xtts`
+                        - **Docker CLI**: `docker exec alltalk-dev python download_model.py --model xtts`
+                        - **Environment Variables**: Set `ALLTALK_AUTO_DOWNLOAD_MODEL=true` and `ALLTALK_DEFAULT_MODEL=xtts`
+                        
+                        ### Model Storage:
+                        Models are stored in the persistent volume at `/home/alltalk/models/` and will survive container restarts.
+                        """,
+                        elem_classes="custom-markdown"
+                    )
+
             if config.gradio_pages.alltalk_documentation_page:
                 with gr.Tab("Documentation"):
                     with gr.Accordion("📖 HELP - Narrator Function", open=False):

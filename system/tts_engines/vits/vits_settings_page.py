@@ -36,11 +36,17 @@ main_dir = Path(
 #
 # After making the necessary changes, this function should return a list of available voices that can be used
 # in your TTS engine's settings page.
-# Load the available models from the JSON file
-with open(os.path.join(this_dir, "available_models.json")) as f:
-    available_models = json.load(f)
-# Extract the model names for the dropdown
-model_names = [model["model_name"] for model in available_models["models"]]
+# Load the available models from the JSON file (if it exists)
+available_models_path = os.path.join(this_dir, "available_models.json")
+if os.path.exists(available_models_path):
+    with open(available_models_path) as f:
+        available_models = json.load(f)
+    # Extract the model names for the dropdown
+    model_names = [model["model_name"] for model in available_models["models"]]
+else:
+    # No available_models.json - models must be downloaded manually
+    available_models = {"models": []}
+    model_names = []
 
 
 def vits_voices_file_list():
