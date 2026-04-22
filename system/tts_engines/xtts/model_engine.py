@@ -570,17 +570,41 @@ class tts_class:
         in the `model_settings.json` file
         """
         self.debug_func_entry()
-        # Initial validation
+
+        # Validate DeepSpeed change is allowed
+        if not self._validate_deepspeed_change():
+            self.deepspeed_enabled = False
+            return False
+
+        # Reload model with new DeepSpeed setting
+        await self._reload_model_with_deepspeed(value)
+        return value
+
+    def _validate_deepspeed_change(self):
+        """
+        Validate that DeepSpeed change is allowed.
+
+        Returns:
+            bool: True if DeepSpeed change is allowed, False otherwise
+        """
         if self.current_model_loaded.startswith("apitts"):  # Specific only to the XTTS engine
             self.print_message("\033[93mDeepSpeed not supported in API mode\033[0m", message_type="error")
-            self.deepspeed_enabled = False
             return False
 
         if not self.is_tts_model_loaded:
             self.print_message("No model is currently loaded. Please select a model to load.", message_type="error")
             raise HTTPException(status_code=400, detail="No model is currently loaded. Please select a model to load.")
 
-        if value:
+        return True
+
+    async def _reload_model_with_deepspeed(self, enable_deepspeed):
+        """
+        Reload model with new DeepSpeed setting.
+
+        Args:
+            enable_deepspeed (bool): True to enable DeepSpeed, False to disable
+        """
+        if enable_deepspeed:
             self.print_message("\033[93mDeepSpeed Activating\033[0m", message_type="standard")
             await self.unload_model()
             self.deepspeed_enabled = True
@@ -590,7 +614,6 @@ class tts_class:
             self.deepspeed_enabled = False
             await self.unload_model()
             await self.setup()
-        return value
 
     ################################################################
     # Unload models from VRAM/RAM if possible # Do not change this #
@@ -661,23 +684,35 @@ class tts_class:
         # ↑↑↑ Keep everything above this line ↑↑↑
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
+        await self._load_initial_model()
+
+        # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+        # ↓↓↓ Keep everything below this line ↓↓↓
+        # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+        self.setup_has_run = True
+
+    async def _load_initial_model(self):
+        """
+        Load the initial model if selected_model is set.
+
+        This helper method separates the model loading logic from the setup
+        initialization, improving separation of concerns.
+
+        States Affected:
+        - self.current_model_loaded: Set to loaded model name or "No Models Available"
+        """
         if self.selected_model:
             tts_model = f"{self.selected_model}"
             if tts_model in self.available_models:
                 self.print_message(f"Loading selected model: {tts_model}", message_type="debug_tts")
                 await self.handle_tts_method_change(tts_model)
                 self.current_model_loaded = tts_model
-
-            # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-            # ↓↓↓ Keep everything below this line ↓↓↓
-            # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
             else:
                 self.current_model_loaded = "No Models Available"
                 self.print_message(
                     f"Selected model '{self.selected_model}' not found in models folder.", message_type="error"
                 )
                 self.print_message("Please download a model or select a different model file.", message_type="error")
-        self.setup_has_run = True
 
     ###########################################################################
     # Scan your models folder for models OR voice files # Change as necessary #
@@ -729,20 +764,39 @@ class tts_class:
                 model_name = subfolder.name
                 self.print_message(f"Checking model folder: {model_name}", message_type="debug_tts")
 
-                if all(subfolder.joinpath(file).exists() for file in required_files):
-                    self.print_message(f"Found valid model: {model_name}", message_type="debug_tts")
-                    self.available_models[f"xtts - {model_name}"] = "xtts"
-                    self.available_models[f"apitts - {model_name}"] = "apitts"
-
-                # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
-                # ↓↓↓ Keep everything below this line ↓↓↓
-                # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
+                if self._validate_model_folder(subfolder, required_files):
+                    self._register_model(model_name)
                 else:
                     self.available_models = {"No Models Available": self.model_folder_name}
                     self.print_message(f"Model folder '{model_name}' is missing required files", message_type="warning")
                     self.print_message("Required files or folder does not exist", message_type="warning")
                     self.print_message("Please download some models/voices for this engine", message_type="warning")
+                    return self.available_models
         return self.available_models
+
+    def _validate_model_folder(self, subfolder, required_files):
+        """
+        Validate that a model folder contains all required files.
+
+        Args:
+            subfolder (Path): Path to the model folder
+            required_files (list): List of required file names
+
+        Returns:
+            bool: True if all required files exist, False otherwise
+        """
+        return all(subfolder.joinpath(file).exists() for file in required_files)
+
+    def _register_model(self, model_name):
+        """
+        Register a model in both XTTS and API TTS formats.
+
+        Args:
+            model_name (str): Name of the model to register
+        """
+        self.print_message(f"Found valid model: {model_name}", message_type="debug_tts")
+        self.available_models[f"xtts - {model_name}"] = "xtts"
+        self.available_models[f"apitts - {model_name}"] = "apitts"
 
     ################################################################
     # Scan your voice folder for voice files # Change as necessary #

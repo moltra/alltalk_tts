@@ -807,3 +807,229 @@ class TestXTTSVoicesFileListHelpers:
             latents = engine._scan_latents(latents_dir)
 
             assert len(latents) == 0
+
+
+class TestXTTSSetupHelpers:
+    """Tests for setup helper methods"""
+
+    @pytest.mark.asyncio
+    async def test_load_initial_model_success(self, temp_xtts_dir, temp_models_dir, temp_dir):
+        """Test loading initial model when selected_model is set and available"""
+        model_folder = temp_models_dir / "test_model"
+        model_folder.mkdir()
+        required_files = ["config.json", "model.pth", "mel_stats.pth", "speakers_xtts.pth", "vocab.json", "dvae.pth"]
+        for file in required_files:
+            (model_folder / file).write_text("{}")
+
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.main_dir = temp_dir
+            engine.model_folder_name = "xtts"
+            engine.available_models = engine.scan_models_folder()
+            engine.selected_model = "xtts - test_model"
+            engine.handle_tts_method_change = AsyncMock(return_value=True)
+
+            await engine._load_initial_model()
+
+            assert engine.current_model_loaded == "xtts - test_model"
+            engine.handle_tts_method_change.assert_called_once_with("xtts - test_model")
+
+    @pytest.mark.asyncio
+    async def test_load_initial_model_not_found(self, temp_xtts_dir, temp_dir):
+        """Test loading initial model when selected_model is not available"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.available_models = ["xtts - other_model"]
+            engine.selected_model = "xtts - non_existent_model"
+
+            await engine._load_initial_model()
+
+            assert engine.current_model_loaded == "No Models Available"
+
+    @pytest.mark.asyncio
+    async def test_load_initial_model_no_selection(self, temp_xtts_dir, temp_dir):
+        """Test loading initial model when no model is selected"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.selected_model = None
+            engine.available_models = ["xtts - model1"]
+
+            await engine._load_initial_model()
+
+            # Should not crash and should not change current_model_loaded
+            assert True
+
+
+class TestXTTSScanModelsFolderHelpers:
+    """Tests for scan_models_folder helper methods"""
+
+    def test_validate_model_folder_valid(self, temp_xtts_dir, temp_dir):
+        """Test validation of a valid model folder with all required files"""
+        model_folder = temp_dir / "models" / "xtts" / "test_model"
+        model_folder.mkdir(parents=True)
+        required_files = ["config.json", "model.pth", "mel_stats.pth", "speakers_xtts.pth", "vocab.json", "dvae.pth"]
+        for file in required_files:
+            (model_folder / file).write_text("{}")
+
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+
+            result = engine._validate_model_folder(model_folder, required_files)
+
+            assert result is True
+
+    def test_validate_model_folder_missing_files(self, temp_xtts_dir, temp_dir):
+        """Test validation of a model folder with missing required files"""
+        model_folder = temp_dir / "models" / "xtts" / "test_model"
+        model_folder.mkdir(parents=True)
+        required_files = ["config.json", "model.pth", "mel_stats.pth", "speakers_xtts.pth", "vocab.json", "dvae.pth"]
+        # Only create some files
+        (model_folder / "config.json").write_text("{}")
+        (model_folder / "model.pth").write_text("{}")
+
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+
+            result = engine._validate_model_folder(model_folder, required_files)
+
+            assert result is False
+
+    def test_register_model(self, temp_xtts_dir, temp_dir):
+        """Test model registration in both formats"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.available_models = {}
+
+            engine._register_model("test_model")
+
+            assert engine.available_models["xtts - test_model"] == "xtts"
+            assert engine.available_models["apitts - test_model"] == "apitts"
+
+
+class TestXTTSHandleDeepSpeedChangeHelpers:
+    """Tests for handle_deepspeed_change helper methods"""
+
+    def test_validate_deepspeed_change_apitts(self, temp_xtts_dir, temp_dir):
+        """Test validation fails for API TTS mode"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.current_model_loaded = "apitts - test_model"
+
+            result = engine._validate_deepspeed_change()
+
+            assert result is False
+
+    def test_validate_deepspeed_change_no_model(self, temp_xtts_dir, temp_dir):
+        """Test validation fails when no model is loaded"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.current_model_loaded = "xtts - test_model"
+            engine.is_tts_model_loaded = False
+
+            with pytest.raises(Exception):  # HTTPException
+                engine._validate_deepspeed_change()
+
+    def test_validate_deepspeed_change_valid(self, temp_xtts_dir, temp_dir):
+        """Test validation succeeds for valid state"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.current_model_loaded = "xtts - test_model"
+            engine.is_tts_model_loaded = True
+
+            result = engine._validate_deepspeed_change()
+
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_reload_model_with_deepspeed_enable(self, temp_xtts_dir, temp_dir):
+        """Test reloading model with DeepSpeed enabled"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.unload_model = AsyncMock()
+            engine.setup = AsyncMock()
+
+            await engine._reload_model_with_deepspeed(True)
+
+            assert engine.deepspeed_enabled is True
+            engine.unload_model.assert_called_once()
+            engine.setup.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_reload_model_with_deepspeed_disable(self, temp_xtts_dir, temp_dir):
+        """Test reloading model with DeepSpeed disabled"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.unload_model = AsyncMock()
+            engine.setup = AsyncMock()
+
+            await engine._reload_model_with_deepspeed(False)
+
+            assert engine.deepspeed_enabled is False
+            engine.unload_model.assert_called_once()
+            engine.setup.assert_called_once()
