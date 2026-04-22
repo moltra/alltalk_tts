@@ -22,13 +22,19 @@ services:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
     volumes:
-      # Mount local code for live development
-      - .:/home/alltalk
-      # Persist models and outputs
+      # Mount only specific files/directories to preserve container environment
+      # Main application files
+      - ./tts_server.py:/home/alltalk/tts_server.py
+      - ./config.py:/home/alltalk/config.py
+      - ./confignew.json:/home/alltalk/confignew.json
+      # System directory (refactored code)
+      - ./system:/home/alltalk/system
+      # Models and outputs (persistent data)
       - ./models:/home/alltalk/models
       - ./outputs:/home/alltalk/outputs
-      # Persist pip cache for faster rebuilds
-      - pip_cache:/home/alltalk/pip_cache
+      - ./voices:/home/alltalk/voices
+      # Optional: mount other code directories as needed
+      # - ./scripts:/home/alltalk/scripts
     deploy:
       resources:
         reservations:

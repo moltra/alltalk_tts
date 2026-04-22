@@ -271,7 +271,7 @@ model_change_lock = Lock()
 ##############################
 # API Endpoint - /api/reload #
 ##############################
-@app.route("/api/reload", methods=["POST"])
+@app.post("/api/reload")
 async def apifunction_reload(request: Request):
     """Handle API request to change TTS model."""
     debug_func_entry()
