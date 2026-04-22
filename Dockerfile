@@ -29,11 +29,11 @@ WORKDIR ${ALLTALK_DIR}
 ##############################################################################
 # Download TTS models:
 ##############################################################################
-COPY system/tts_engines/piper/available_models.json system/tts_engines/piper/
-COPY system/tts_engines/vits/available_models.json system/tts_engines/vits/
-COPY system/tts_engines/xtts/available_models.json system/tts_engines/xtts/
+COPY config/engines/piper/available_models.json config/engines/piper/
+COPY config/engines/vits/available_models.json config/engines/vits/
+COPY config/engines/xtts/available_models.json config/engines/xtts/
 RUN <<EOR
-    available_models="system/tts_engines/${TTS_MODEL}/available_models.json"
+    available_models="config/engines/${TTS_MODEL}/available_models.json"
     first_start_model=$(cat ${available_models} | jq -r '.first_start_model')
     model=$(cat ${available_models} | jq ".models[] | select(.model_name==\"${first_start_model}\")")
     folder_path=$( echo "${model}" | jq -r '.folder_path // empty' )
@@ -136,8 +136,8 @@ merge_json_files() {
   mv \$1.tmp \$1
 }
 
-replace_env_vars docker_default_confignew.json
-merge_json_files confignew.json
+replace_env_vars config/docker/docker_default_confignew.json
+merge_json_files config/app/confignew.json
 
 # Script for deleting WAV files that are older than 1 minute:
 cat << EOF2 > ${ALLTALK_DIR}/cleanup-wavs.sh
@@ -153,8 +153,8 @@ source ${ALLTALK_DIR}/conda_env.sh
 
 if [ "\$ALLTALK_ENABLE_MULTI_ENGINE_MANAGER" = "true" ] ; then
   echo "Starting alltalk using multi engine manager"
-  replace_env_vars docker_default_mem_config.json
-  merge_json_files mem_config.json
+  replace_env_vars config/docker/docker_default_mem_config.json
+  merge_json_files config/app/mem_config.json
   python tts_mem.py
 else
   echo "Starting alltalk"

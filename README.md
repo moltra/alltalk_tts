@@ -151,7 +151,7 @@ If you are having issues with starting AllTalk, it may well be because some of t
 Whilst its impossible to constantly ensure that everything is going to work perfectly, after installation, you can use the diagnostics tool to:
 
 1) Generate a `diagnostics.log` file which contains information about your Python environment setup and performs various checks to ensure everything is installed.
-2) Identify possible issues by comparing **your** `diagnostics.log` file to the **AllTalk base** `basediagnostics.log` stored in the `alltalk_tts/system/config/` folder.
+2) Identify possible issues by comparing **your** `diagnostics.log` file to the **AllTalk base** `basediagnostics.log` stored in the `alltalk_tts/config/system/` folder.
 3) Provide some semi-automated repair of your Python environment.
 
 ---
