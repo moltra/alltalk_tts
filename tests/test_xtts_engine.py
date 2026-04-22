@@ -28,7 +28,10 @@ sys_modules = [
 
 for module in sys_modules:
     if module not in sys.modules:
-        sys.modules[module] = Mock()
+        mock = Mock()
+        if module == "torch":
+            mock.__version__ = "2.0.0"
+        sys.modules[module] = mock
 
 
 @pytest.fixture
@@ -384,3 +387,179 @@ class TestXTTSHandleTTSMethodChange:
 
             assert result is False
             assert engine.current_model_loaded is None
+
+
+class TestXTTSInitMethods:
+    """Tests for __init__ helper methods"""
+
+    def test_init_system_variables(self, temp_xtts_dir, temp_dir):
+        """Test initialization of core system variables"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine._init_system_variables()
+
+            assert engine.this_dir is not None
+            assert engine.main_dir is not None
+            assert engine.device in ["cuda", "cpu"]
+            assert engine.tts_generating_lock is False
+            assert engine.tts_stop_generation is False
+            assert engine.model is None
+            assert engine.is_tts_model_loaded is False
+            assert engine.current_model_loaded is None
+            assert engine.available_models is None
+            assert engine.setup_has_run is False
+
+    def test_load_configuration(self, temp_xtts_dir, temp_dir):
+        """Test loading model_settings.json configuration"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.main_dir = temp_dir
+            engine.this_dir = temp_xtts_dir
+
+            config = engine._load_configuration()
+
+            assert isinstance(config, dict)
+            assert "model_details" in config
+            assert "model_capabilties" in config
+            assert "settings" in config
+            assert "openai_voices" in config
+
+    def test_setup_model_details(self, temp_xtts_dir, temp_dir):
+        """Test setting model details from configuration"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            model_settings = {
+                "model_details": {
+                    "manufacturer_name": "Test Manufacturer",
+                    "manufacturer_website": "https://test.com",
+                }
+            }
+
+            engine._setup_model_details(model_settings)
+
+            assert engine.manufacturer_name == "Test Manufacturer"
+            assert engine.manufacturer_website == "https://test.com"
+
+    def test_setup_capabilities(self, temp_xtts_dir, temp_dir):
+        """Test setting capability flags from configuration"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            model_settings = {
+                "model_capabilties": {
+                    "audio_format": "wav",
+                    "deepspeed_capable": True,
+                    "generationspeed_capable": True,
+                    "languages_capable": True,
+                    "lowvram_capable": True,
+                    "multimodel_capable": True,
+                    "repetitionpenalty_capable": True,
+                    "streaming_capable": True,
+                    "temperature_capable": True,
+                    "multivoice_capable": True,
+                    "pitch_capable": False,
+                }
+            }
+
+            engine._setup_capabilities(model_settings)
+
+            assert engine.audio_format == "wav"
+            assert engine.deepspeed_capable is True
+            assert engine.generationspeed_capable is True
+            assert engine.languages_capable is True
+            assert engine.lowvram_capable is True
+            assert engine.multimodel_capable is True
+            assert engine.repetitionpenalty_capable is True
+            assert engine.streaming_capable is True
+            assert engine.temperature_capable is True
+            assert engine.multivoice_capable is True
+            assert engine.pitch_capable is False
+
+    def test_setup_engine_settings(self, temp_xtts_dir, temp_dir):
+        """Test setting engine settings from configuration"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            model_settings = {
+                "settings": {
+                    "def_character_voice": "test_voice",
+                    "def_narrator_voice": "test_narrator",
+                    "deepspeed_enabled": False,
+                    "engine_installed": True,
+                    "generationspeed_set": 1.0,
+                    "lowvram_enabled": False,
+                    "repetitionpenalty_set": 7.0,
+                    "temperature_set": 0.75,
+                    "pitch_set": 1.0,
+                }
+            }
+
+            engine._setup_engine_settings(model_settings)
+
+            assert engine.def_character_voice == "test_voice"
+            assert engine.def_narrator_voice == "test_narrator"
+            assert engine.deepspeed_enabled is False
+            assert engine.engine_installed is True
+            assert engine.generationspeed_set == 1.0
+            assert engine.lowvram_enabled is False
+            assert engine.repetitionpenalty_set == 7.0
+            assert engine.temperature_set == 0.75
+            assert engine.pitch_set == 1.0
+
+    def test_setup_openai_mappings(self, temp_xtts_dir, temp_dir):
+        """Test setting OpenAI voice mappings from configuration"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            model_settings = {
+                "openai_voices": {
+                    "alloy": "alloy_voice",
+                    "echo": "echo_voice",
+                    "fable": "fable_voice",
+                    "nova": "nova_voice",
+                    "onyx": "onyx_voice",
+                    "shimmer": "shimmer_voice",
+                }
+            }
+
+            engine._setup_openai_mappings(model_settings)
+
+            assert engine.openai_alloy == "alloy_voice"
+            assert engine.openai_echo == "echo_voice"
+            assert engine.openai_fable == "fable_voice"
+            assert engine.openai_nova == "nova_voice"
+            assert engine.openai_onyx == "onyx_voice"
+            assert engine.openai_shimmer == "shimmer_voice"
