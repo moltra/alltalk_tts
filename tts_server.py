@@ -43,7 +43,7 @@ from langdetect.lang_detect_exception import LangDetectException
 from loguru import logger
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
-from config import AlltalkConfig, AlltalkTTSEnginesConfig
+from config.app.config import AlltalkConfig, AlltalkTTSEnginesConfig
 
 # Loguru handles logging levels via configuration
 

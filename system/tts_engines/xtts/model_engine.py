@@ -384,7 +384,9 @@ class tts_class:
             dict: Parsed configuration data from model_settings.json
         """
         # DO NOT MODIFY - Load in the current TTS Engines model_settings.json file
-        with open(os.path.join(self.this_dir, "model_settings.json")) as f:
+        with open(
+            os.path.join(self.this_dir, "..", "..", "..", "config", "engines", "xtts", "model_settings.json")
+        ) as f:
             return json.load(f)
 
     def _setup_model_details(self, model_settings_file):

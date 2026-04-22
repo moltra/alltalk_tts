@@ -190,7 +190,7 @@ class tts_class:
         # DONT CHANGE #  Load params and api_defaults from confignew.json #
         ###################################################################
         # Define the path to the confignew.json file
-        configfile_path = self.main_dir / "confignew.json"
+        configfile_path = self.main_dir / "config" / "app" / "confignew.json"
         # Load config file and get settings
         with open(configfile_path) as configfile:
             configfile_data = json.load(configfile)

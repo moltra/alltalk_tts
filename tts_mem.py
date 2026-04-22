@@ -60,7 +60,7 @@ from loguru import logger
 from requests.exceptions import RequestException
 from werkzeug.serving import WSGIRequestHandler, make_server
 
-from config import AlltalkConfig, AlltalkMultiEngineManagerConfig
+from config.app.config import AlltalkConfig, AlltalkMultiEngineManagerConfig
 
 # Setup config file
 CONFIG_FILE = "mem_config.json"

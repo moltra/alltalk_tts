@@ -75,7 +75,7 @@ def xtts_model_update_settings(
     shimmer_gr,
 ):
     # Load the model_config_data from the JSON file
-    with open(os.path.join(this_dir, "model_settings.json")) as f:
+    with open(os.path.join(this_dir, "..", "..", "..", "config", "engines", "xtts", "model_settings.json")) as f:
         model_config_data = json.load(f)
 
     # Update the settings and openai_voices dictionaries with the new values
@@ -95,7 +95,7 @@ def xtts_model_update_settings(
     model_config_data["settings"]["generationspeed_set"] = generationspeed_set_gr
 
     # Save the updated model_config_data to the JSON file
-    settings_file = os.path.join(this_dir, "model_settings.json")
+    settings_file = os.path.join(this_dir, "..", "..", "..", "config", "engines", "xtts", "model_settings.json")
     with open(settings_file, "w") as f:
         json.dump(model_config_data, f, indent=4)
 

@@ -309,7 +309,11 @@ class tts_class:
         self.selected_model = tts_engines_config.selected_model
 
         # DO NOT MODIFY - Load in the current TTS Engines model_settings.json file
-        with open(os.path.join(self.this_dir, "model_settings.json")) as f:
+        with open(
+            os.path.join(
+                self.this_dir, "..", "..", "..", "config", "engines", "template-tts-engine", "model_settings.json"
+            )
+        ) as f:
             model_settings_file = json.load(f)
 
         # DO NOT MODIFY - Model details from model_settings.json

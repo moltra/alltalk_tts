@@ -86,7 +86,9 @@ class tts_class:
         ############################################################################
         # DONT CHANGE # Pull out all the settings for the currently set TTS engine #
         ############################################################################
-        with open(os.path.join(self.this_dir, "model_settings.json")) as f:
+        with open(
+            os.path.join(self.this_dir, "..", "..", "..", "config", "engines", "piper", "model_settings.json")
+        ) as f:
             tts_model_loaded = json.load(f)
         # Access the model details
         self.manufacturer_name = tts_model_loaded["model_details"][
@@ -191,7 +193,7 @@ class tts_class:
         # DONT CHANGE #  Load params and api_defaults from confignew.json #
         ###################################################################
         # Define the path to the confignew.json file
-        configfile_path = self.main_dir / "confignew.json"
+        configfile_path = self.main_dir / "config" / "app" / "confignew.json"
         # Load config file and get settings
         with open(configfile_path) as configfile:
             configfile_data = json.load(configfile)

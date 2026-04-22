@@ -236,7 +236,7 @@ except ImportError:
 #########################
 # Confguration file management for confignew.json
 try:
-    from .config import (
+    from .config.app.config import (
         AlltalkConfig,
         AlltalkNewEnginesConfig,
         AlltalkTTSEnginesConfig,
@@ -246,7 +246,7 @@ try:
     from .system.proxy_module.interface import create_proxy_interface
     from .system.proxy_module.proxy_manager import ProxyManager
 except ImportError:
-    from config import (
+    from config.app.config import (
         AlltalkConfig,
         AlltalkNewEnginesConfig,
         AlltalkTTSEnginesConfig,
@@ -2537,7 +2537,7 @@ if gradio_enabled is True:
             module = dynamic_import(module_name, base_package)
             if module:
                 # Load the engine's config from its JSON file
-                json_file_path = os.path.join(this_dir, "system", "tts_engines", engine_name, "model_settings.json")
+                json_file_path = os.path.join(this_dir, "config", "engines", engine_name, "model_settings.json")
                 try:
                     with open(json_file_path, encoding="utf-8") as config_file:
                         globals()[f"{engine_name}_model_config_data"] = json.load(config_file)

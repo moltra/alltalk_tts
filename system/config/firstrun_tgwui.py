@@ -214,7 +214,7 @@ def main():
             backup_path = AlltalkConfig.default_config_path() + ".backup"
             shutil.copyfile(AlltalkConfig.default_config_path(), backup_path)
 
-            new_config_template_path = this_dir / "system/config/confignew.json"
+            new_config_template_path = this_dir / "config/app/confignew.json"
             shutil.copyfile(new_config_template_path, AlltalkConfig.default_config_path())
 
             print(f"[{branding}TTS] Configuration file upgraded successfully.")

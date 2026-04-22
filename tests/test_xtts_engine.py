@@ -38,8 +38,8 @@ for module in sys_modules:
 @pytest.fixture
 def temp_xtts_dir(temp_dir):
     """Create temporary XTTS engine directory structure"""
-    xtts_dir = temp_dir / "system" / "tts_engines" / "xtts"
-    xtts_dir.mkdir(parents=True, exist_ok=True)
+    xtts_config_dir = temp_dir / "config" / "engines" / "xtts"
+    xtts_config_dir.mkdir(parents=True, exist_ok=True)
 
     # Create model_settings.json
     model_settings = {
@@ -78,7 +78,11 @@ def temp_xtts_dir(temp_dir):
         },
     }
 
-    (xtts_dir / "model_settings.json").write_text(json.dumps(model_settings))
+    (xtts_config_dir / "model_settings.json").write_text(json.dumps(model_settings))
+
+    # Also create the old-style directory for compatibility
+    xtts_dir = temp_dir / "system" / "tts_engines" / "xtts"
+    xtts_dir.mkdir(parents=True, exist_ok=True)
 
     return xtts_dir
 
