@@ -2976,7 +2976,6 @@ if gradio_enabled is True:
                         // localStorage.setItem('darkMode', 'enabled');
                     }
                 }""",
-                    show_api=False,
                 )
             if config.firstrun_splash:
                 with gr.Tab("AllTalk v2 Welcome page"):
@@ -3335,7 +3334,6 @@ if gradio_enabled is True:
                                 // localStorage.setItem('darkMode', 'enabled');
                             }
                         }""",
-                    show_api=False,
                 )
                 refresh_button.click(
                     at_update_dropdowns,
@@ -3751,7 +3749,6 @@ if gradio_enabled is True:
                     waveform_opts = gr.WaveformOptions(
                         sample_rate=16000,  # Set to Whisper's expected rate
                         show_recording_waveform=True,
-                        show_controls=False,
                         waveform_color="#1f77b4",
                         waveform_progress_color="#2ecc71",
                     )
@@ -3778,7 +3775,6 @@ if gradio_enabled is True:
                         label="Live Transcription",
                         lines=10,
                         placeholder="Transcription will appear here as you speak...",
-                        show_copy_button=True,
                     )
 
                 # Dictatation Button click handlers

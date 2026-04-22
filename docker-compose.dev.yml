@@ -26,6 +26,8 @@ services:
       # Main application files
       - ./tts_server.py:/home/alltalk/tts_server.py
       - ./config.py:/home/alltalk/config.py
+      - ./script.py:/home/alltalk/script.py
+      - ./start_dev.sh:/home/alltalk/start_dev.sh
       - ./confignew.json:/home/alltalk/confignew.json
       # System directory (refactored code)
       - ./system:/home/alltalk/system

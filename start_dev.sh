@@ -17,4 +17,17 @@ if [ ! -d "models/${TTS_MODEL}" ]; then
   python ./system/config/firstrun.py --tts_model ${TTS_MODEL}
 fi
 
-python tts_server.py
+# Start API server in background
+echo "Starting API server on port 7851..."
+python tts_server.py &
+API_PID=$!
+
+# Wait for API server to be ready
+sleep 5
+
+# Start Gradio UI
+echo "Starting Gradio UI on port 7852..."
+python script.py
+
+# If Gradio exits, kill API server
+kill $API_PID 2>/dev/null
