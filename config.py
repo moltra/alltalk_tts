@@ -186,7 +186,11 @@ class AbstractJsonConfig(ABC):
 
         def __save():
             with open(file_path, "w") as file:
-                file.write(self.__delegate.model_dump_json(indent=indent, by_alias=True))
+                json_data = self.__delegate.model_dump_json(indent=indent, by_alias=True)
+                file.write(json_data)
+                # Debug: Show what file and data was saved
+                print(f"[DEBUG] Save completed - File: {file_path}")
+                print(f"[DEBUG] Save completed - Data: {json_data[:500]}...")
 
         self.__with_lock_and_backup(file_path, True, __save)
 

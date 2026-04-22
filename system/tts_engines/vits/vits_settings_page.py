@@ -275,8 +275,14 @@ def vits_model_update_settings(
     model_config_data["settings"]["pitch_set"] = pitch_set_gr
     model_config_data["settings"]["generationspeed_set"] = generationspeed_set_gr
     # Save the updated model_config_data to the JSON file
-    with open(os.path.join(this_dir, "model_settings.json"), "w") as f:
+    settings_file = os.path.join(this_dir, "model_settings.json")
+    with open(settings_file, "w") as f:
         json.dump(model_config_data, f, indent=4)
+
+    # Debug: Show what file and data was saved
+    print(f"[DEBUG] VITS Settings saved - File: {settings_file}")
+    print(f"[DEBUG] VITS Settings saved - Data: {json.dumps(model_config_data, indent=2)[:500]}...")
+
     return "Settings updated successfully!"
 
 

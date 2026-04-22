@@ -230,6 +230,10 @@ class TTSApp(QSystemTrayIcon):
         with open(SETTINGS_FILE, "w") as f:
             json.dump(self.settings, f)
 
+        # Debug: Show what file and data was saved
+        print(f"[DEBUG] Clipboard TTS Settings saved - File: {SETTINGS_FILE}")
+        print(f"[DEBUG] Clipboard TTS Settings saved - Data: {json.dumps(self.settings, indent=2)[:500]}...")
+
     def init_ui(self):
         self.tts_worker = TTSWorker(self.settings["api_url"], self.settings["params"])
         self.tts_worker.error_occurred.connect(self.show_error_message)

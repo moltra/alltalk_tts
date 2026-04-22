@@ -1395,6 +1395,10 @@ def update_docker_address(new_url):
     Used within the gradio interface to update the IP/URL
     when running inside a docker environment.
     """
+    # When running in Docker, automatically correct the port to internal port
+    if _state["running_in_docker"]:
+        # Replace external port 7855 with internal port 7851
+        new_url = new_url.replace(":7855", ":7851")
     _state["docker_url"] = new_url
     print_message(f"\033[94mDocker IP/URL for API set to: \033[0m{new_url}")
     return f"Docker IP/URL for API set to: {new_url}"
@@ -1847,8 +1851,11 @@ def process_audio_files(
             print_message(msg, "error")
             return None, msg
 
-        # Load model
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Load model - use CPU when running in Docker to save GPU memory for XTTS
+        if _state.get("running_in_docker", False):
+            device = "cpu"
+        else:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
         print_message(f"Loading Whisper model {model_size} on {device}", "debug_transcribe")
         _state["whisper_model"] = whisper.load_model(model_size, device=device)
 
@@ -2037,7 +2044,11 @@ def load_whisper_model(model_name):
     """Load the Whisper model"""
     debug_func_entry()
     print_message(f"Loading Whisper model: {model_name}", "debug_transcribe")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    # Use CPU when running in Docker to save GPU memory for XTTS
+    if _state.get("running_in_docker", False):
+        device = "cpu"
+    else:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
     _state["whisper_model"] = whisper.load_model(model_name, device=device)
     print_message(f"Model loaded on {device}", "debug_transcribe")
     return _state["whisper_model"]
@@ -2953,8 +2964,6 @@ if gradio_enabled is True:
             return "Unable to retrieve the domain name."
 
         with gr.Blocks(
-            css=AllTalkHelpContent.custom_css,
-            theme=selected_theme,
             title="AllTalk",
             analytics_enabled=False,
         ) as app:  # pylint: disable=redefined-outer-name
@@ -3081,7 +3090,7 @@ if gradio_enabled is True:
                             step=1,
                             label="RVC Character Pitch",
                             info="Corrects the Character input TTS pitch to match the desired RVC voice output pitch.",
-                            value=config.rvc_settings.pitch,
+                            value=float(config.rvc_settings.pitch),
                             interactive=True,
                             visible=False,
                         )
@@ -3091,7 +3100,7 @@ if gradio_enabled is True:
                             step=1,
                             label="RVC Narrator Pitch",
                             info="Corrects the Narrator input TTS pitch to match the desired RVC voice output pitch.",
-                            value=config.rvc_settings.pitch,
+                            value=float(config.rvc_settings.pitch),
                             interactive=True,
                             visible=False,
                         )
@@ -3228,7 +3237,7 @@ if gradio_enabled is True:
                             maximum=2.00,
                             step=0.25,
                             label="Speed",
-                            value="1.00",
+                            value=1.00,
                             interactive=_state["srv_settings_capabilities"]["generationspeed_capable"],
                         )
                         gen_pitch = gr.Slider(
@@ -3236,7 +3245,7 @@ if gradio_enabled is True:
                             maximum=10,
                             step=1,
                             label="Pitch",
-                            value="1",
+                            value=1.0,
                             interactive=_state["srv_settings_capabilities"]["pitch_capable"],
                         )
                         gen_temperature = gr.Slider(
@@ -4353,7 +4362,7 @@ if gradio_enabled is True:
                                 step=1,
                                 label="Pitch",
                                 info="Set the pitch of the audio, the higher the value, the higher the pitch.",
-                                value=config.rvc_settings.pitch,
+                                value=float(config.rvc_settings.pitch),
                                 interactive=True,
                             )
                         with gr.Column():
@@ -4386,7 +4395,7 @@ if gradio_enabled is True:
                                 maximum=1,
                                 label="Index Influence Ratio",
                                 info="Sets the influence exerted by the index file on the final output. A higher value increases the impact of the index, potentially enhancing detail but also increasing the risk of artifacts.",
-                                value=config.rvc_settings.index_rate,
+                                value=float(config.rvc_settings.index_rate),
                                 interactive=True,
                             )
                     with gr.Row(equal_height=True):
@@ -4397,7 +4406,7 @@ if gradio_enabled is True:
                                 maximum=1,
                                 label="Volume Envelope",
                                 info="Substitute or blend with the volume envelope of the output. The closer the ratio is to 1, the more the output envelope is employed.",
-                                value=config.rvc_settings.rms_mix_rate,
+                                value=float(config.rvc_settings.rms_mix_rate),
                                 interactive=True,
                             )
                         with gr.Column():
@@ -4407,7 +4416,7 @@ if gradio_enabled is True:
                                 maximum=0.5,
                                 label="Protect Voiceless Consonants/Breath sounds",
                                 info="Prevents sound artifacts. Higher values (up to 0.5) provide stronger protection but may affect indexing.",
-                                value=config.rvc_settings.protect,
+                                value=float(config.rvc_settings.protect),
                                 interactive=True,
                             )
                         with gr.Column():
@@ -4417,7 +4426,7 @@ if gradio_enabled is True:
                                 maximum=7,
                                 label="Filter Radius",
                                 info="If the number is greater than or equal to three, employing median filtering on the collected tone results has the potential to decrease respiration.",
-                                value=config.rvc_settings.filter_radius,
+                                value=float(config.rvc_settings.filter_radius),
                                 step=1,
                                 interactive=True,
                             )
@@ -4657,6 +4666,8 @@ if gradio_enabled is True:
             server_port=config.gradio_port_number,
             prevent_thread_lock=True,
             quiet=True,
+            css=AllTalkHelpContent.custom_css,
+            theme=selected_theme,
         )
 
     if not running_in_standalone:
@@ -4666,6 +4677,8 @@ if gradio_enabled is True:
             server_port=config.gradio_port_number,
             prevent_thread_lock=True,
             quiet=True,
+            css=AllTalkHelpContent.custom_css,
+            theme=selected_theme,
         )
 
 #########################################
