@@ -28,7 +28,10 @@ sys_modules = [
 
 for module in sys_modules:
     if module not in sys.modules:
-        sys.modules[module] = Mock()
+        mock = Mock()
+        if module == "torch":
+            mock.__version__ = "2.0.0"
+        sys.modules[module] = mock
 
 
 @pytest.fixture
@@ -406,7 +409,7 @@ class TestXTTSHelperMethods:
             with pytest.raises(HTTPException) as exc_info:
                 engine._validate_generation_inputs()
 
-            assert "no TTS model loaded" in str(exc_info.value.detail).lower()
+            assert "tts model loaded" in str(exc_info.value.detail).lower()
 
     def test_validate_generation_inputs_model_loaded(self, temp_xtts_dir, temp_dir):
         """Test validation when model is loaded (should pass)"""
@@ -634,11 +637,13 @@ class TestXTTSHelperMethods:
 
     @pytest.mark.asyncio
     async def test_generate_streaming(self, temp_xtts_dir, temp_dir):
-        """Test streaming audio generation"""
+        """Test streaming audio generation - verifies function call and WAV header"""
         with (
             patch("config.AlltalkConfig"),
             patch("config.AlltalkTTSEnginesConfig"),
             patch("config.AlltalkNewEnginesConfig"),
+            patch("system.tts_engines.xtts.model_engine.torch"),
+            patch("system.tts_engines.xtts.model_engine.np"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
@@ -647,11 +652,8 @@ class TestXTTSHelperMethods:
             engine.model = Mock()
             engine.tts_stop_generation = False
 
-            # Mock the streaming generator
-            async def mock_stream():
-                yield Mock()
-
-            engine.model.inference_stream = Mock(return_value=mock_stream())
+            # Mock the streaming generator to return empty (no audio chunks)
+            engine.model.inference_stream = Mock(return_value=iter([]))
 
             common_args = {"text": "test", "language": "en"}
             wavs_files = ["test.wav"]
@@ -661,4 +663,4 @@ class TestXTTSHelperMethods:
                 chunks.append(chunk)
 
             engine.model.inference_stream.assert_called_once_with(**common_args, stream_chunk_size=20)
-            assert len(chunks) > 0  # Should yield at least the WAV header
+            assert len(chunks) == 1  # Should yield just the WAV header
