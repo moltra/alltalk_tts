@@ -73,10 +73,12 @@ Extracted into focused methods:
 - Improved maintainability and extensibility
 - Preserved all original functionality
 
-### 3. `handle_tts_method_change` Method (Lines 925-992)
-**Severity**: Medium
-**Lines**: 67 lines
-**Responsibilities**:
+### 3. `handle_tts_method_change` Method (Lines 974-1020) ✅ **REFACTORED**
+**Severity**: Medium (Resolved)
+**Lines**: 46 lines (reduced from 67 lines)
+**Status**: **COMPLETED** - Refactored on 2025-04-22
+
+**Original Responsibilities**:
 - Model availability validation
 - Model unloading
 - Method string parsing
@@ -85,76 +87,97 @@ Extracted into focused methods:
 - Performance timing
 - State tracking
 
-**Issues**:
-- Mixes validation with execution
-- Handles both loader types in one method
-- Timing logic mixed with business logic
+**Refactoring Applied**:
+Extracted into focused methods:
+- ✅ `_validate_model_change()` - Model availability validation (6 lines)
+- ✅ `_execute_model_loader()` - Parse method string and execute appropriate loader (33 lines)
+- ✅ `_report_load_time()` - Report model loading time (4 lines)
 
-**Recommendation**:
-- Extract validation to `_validate_model_change()`
-- Extract loader selection to `_select_model_loader()`
-- Keep timing but separate from core logic
+**Result**:
+- Main function reduced from 67 lines to 46 lines (31% reduction)
+- Separated validation from execution logic
+- Timing logic isolated in dedicated method
+- Easier to test individual concerns
+- Improved maintainability
 
-### 4. `setup` Method (Lines 582-631)
-**Severity**: Medium
-**Lines**: 49 lines
-**Responsibilities**:
+### 4. `setup` Method (Lines 631-669) ✅ **REFACTORED**
+**Severity**: Medium (Resolved)
+**Lines**: 38 lines (reduced from 49 lines)
+**Status**: **COMPLETED** - Refactored on 2025-04-22
+
+**Original Responsibilities**:
 - Version printing
 - Model scanning
 - Initial model loading
 - Error handling
 - State tracking
 
-**Issues**:
-- Mixes initialization with loading
-- Version printing is a side effect
+**Refactoring Applied**:
+Extracted into focused method:
+- ✅ `_load_initial_model()` - Load initial model if selected_model is set (21 lines)
 
-**Recommendation**:
-- Extract version printing to separate method
-- Separate scanning from loading logic
+**Result**:
+- Main function reduced from 49 lines to 38 lines (22% reduction)
+- Separated model loading logic from initialization
+- Improved separation of concerns
+- Added 3 tests for helper method
 
 ## Moderate SRP Violations
 
-### 5. `voices_file_list` Method (Lines 701-777)
-**Severity**: Medium
-**Lines**: 76 lines
-**Responsibilities**:
+### 5. `voices_file_list` Method (Lines 757-809) ✅ **REFACTORED**
+**Severity**: Medium (Resolved)
+**Lines**: 52 lines (reduced from 76 lines)
+**Status**: **COMPLETED** - Refactored on 2025-04-22
+
+**Original Responsibilities**:
 - Directory scanning (3 locations)
 - File filtering
 - Voice type classification
 - Sorting
 - Error handling
 
-**Issues**:
-- Scans multiple directories in one method
-- Complex branching for different voice types
-- Error handling mixed with scanning logic
+**Refactoring Applied**:
+Extracted into focused methods:
+- ✅ `_scan_individual_wavs()` - Scan for individual WAV files (3 lines)
+- ✅ `_scan_voice_sets()` - Scan for voice sets in multi_voice_sets directory (9 lines)
+- ✅ `_scan_latents()` - Scan for JSON latent files (10 lines)
 
-**Recommendation**:
-- Extract directory scanners: `_scan_individual_wavs()`, `_scan_voice_sets()`, `_scan_latents()`
-- Combine results in main method
+**Result**:
+- Main function reduced from 76 lines to 52 lines (32% reduction)
+- Each directory scanner has single, clear responsibility
+- Easier to test individual scanning logic
+- Improved maintainability and extensibility
+- Preserved all original functionality
 
-### 6. `scan_models_folder` Method (Lines 636-696)
-**Severity**: Low-Medium
-**Lines**: 60 lines
-**Responsibilities**:
+### 6. `scan_models_folder` Method (Lines 697-752) ✅ **REFACTORED**
+**Severity**: Low-Medium (Resolved)
+**Lines**: 55 lines (reduced from 60 lines)
+**Status**: **COMPLETED** - Refactored on 2025-04-22
+
+**Original Responsibilities**:
 - Directory scanning
 - File validation (6 required files)
 - Model registration (2 formats per model)
 - Error reporting
 
-**Issues**:
-- Validation logic mixed with scanning
-- Dual registration (xtts and apitts) in one place
+**Refactoring Applied**:
+Extracted into focused methods:
+- ✅ `_validate_model_folder()` - Check if all required files exist (2 lines)
+- ✅ `_register_model()` - Register model in both XTTS and API TTS formats (4 lines)
 
-**Recommendation**:
-- Extract `_validate_model_folder()` for file checking
-- Extract `_register_model()` for registration logic
+**Result**:
+- Main function reduced from 60 lines to 55 lines (8% reduction)
+- Validation logic separated from scanning
+- Registration logic isolated in dedicated method
+- Easier to test individual concerns
+- Added 3 tests for helper methods
 
-### 7. `handle_deepspeed_change` Method (Lines 496-544)
-**Severity**: Low
-**Lines**: 48 lines
-**Responsibilities**:
+### 7. `handle_deepspeed_change` Method (Lines 545-593) ✅ **REFACTORED**
+**Severity**: Low (Resolved)
+**Lines**: 38 lines (reduced from 48 lines)
+**Status**: **COMPLETED** - Refactored on 2025-04-22
+
+**Original Responsibilities**:
 - DeepSpeed availability check
 - API mode validation
 - Model unloading
@@ -162,68 +185,61 @@ Extracted into focused methods:
 - Model reloading
 - Error handling
 
-**Issues**:
-- Mixes validation with state changes
-- Reload logic could be extracted
+**Refactoring Applied**:
+Extracted into focused methods:
+- ✅ `_validate_deepspeed_change()` - Validate DeepSpeed change is allowed (7 lines)
+- ✅ `_reload_model_with_deepspeed()` - Reload model with new DeepSpeed setting (10 lines)
 
-**Recommendation**:
-- Extract validation logic
-- Consider using a state machine pattern for DeepSpeed transitions
+**Result**:
+- Main function reduced from 48 lines to 38 lines (21% reduction)
+- Validation logic separated from state changes
+- Reload logic isolated in dedicated method
+- Improved testability
+- Added 5 tests for helper methods
 
-## Minor Issues
+## Minor Issues (Core System Functions - Do Not Refactor)
 
 ### 8. `print_message` Method (Lines 182-232)
 **Severity**: Low
 **Lines**: 50 lines
-**Responsibilities**:
-- Color code management
-- Message formatting
-- Debug flag checking
-- Component prefixing
-- Console output
+**Status**: **NOT REFACTORED** - Core system function
 
-**Issues**:
-- Handles multiple message types in one method
-- Color codes hardcoded
+**Reason for No Refactoring**:
+This function contains explicit warning: "WARNING: This is a core system function. Do not modify its implementation as it provides standardized version reporting across all engines."
 
-**Recommendation**:
-- Extract color management to constants
-- Consider separate formatters for different message types
+While the SRP analysis identified potential improvements (extract color management, separate formatters), the function is marked as a core system component that should not be modified to maintain standardized behavior across all TTS engines.
 
-### 9. `printout_versions` Method (Lines 410-439)
+### 9. `printout_versions` Method (Lines 460-488)
 **Severity**: Low
 **Lines**: 29 lines
-**Responsibilities**:
-- Version checking
-- Conditional printing
-- String formatting
+**Status**: **NOT REFACTORED** - Core system function
 
-**Issues**:
-- Multiple conditional branches for different versions
-- Could be simplified with a version formatter
+**Reason for No Refactoring**:
+This function contains explicit warning: "WARNING: This is a core system function. Do not modify its implementation as it provides standardized version reporting across all engines."
 
-**Recommendation**:
-- Extract version formatting logic
-- Use a data-driven approach for version display
+While the SRP analysis identified potential improvements (extract version formatting, data-driven approach), the function is marked as a core system component that should not be modified to maintain standardized behavior across all TTS engines.
 
 ## Code Quality Metrics
 
-### Function Length Analysis
-| Function | Lines | Status |
-|----------|-------|--------|
-| `__init__` | 163 | 🔴 Too long (>50) |
-| `generate_tts` | 199 | 🔴 Too long (>50) |
-| `handle_tts_method_change` | 67 | 🔴 Too long (>50) |
-| `setup` | 49 | ⚠️ Borderline |
-| `voices_file_list` | 76 | 🔴 Too long (>50) |
-| `scan_models_folder` | 60 | 🔴 Too long (>50) |
-| `handle_deepspeed_change` | 48 | ⚠️ Borderline |
-| `print_message` | 50 | 🔴 Too long (>50) |
+### Function Length Analysis (After Refactoring)
+| Function | Original Lines | Current Lines | Status |
+|----------|---------------|---------------|--------|
+| `__init__` | 163 | 120 | ✅ Refactored (26% reduction) |
+| `generate_tts` | 199 | 150 | ✅ Refactored (25% reduction) |
+| `handle_tts_method_change` | 67 | 46 | ✅ Refactored (31% reduction) |
+| `setup` | 49 | 38 | ✅ Refactored (22% reduction) |
+| `voices_file_list` | 76 | 52 | ✅ Refactored (32% reduction) |
+| `scan_models_folder` | 60 | 55 | ✅ Refactored (8% reduction) |
+| `handle_deepspeed_change` | 48 | 38 | ✅ Refactored (21% reduction) |
+| `print_message` | 50 | 50 | ⏭️ Core system function (do not modify) |
+| `printout_versions` | 29 | 29 | ⏭️ Core system function (do not modify) |
 
-### Complexity Indicators
-- **Nesting Depth**: Some functions have 3-4 levels of nesting (generate_tts)
-- **Branching**: generate_tts has complex conditional logic for voice types
-- **Side Effects**: Many functions modify multiple instance variables
+### Overall Refactoring Summary
+- **Total functions refactored**: 7
+- **Total lines reduced**: 662 lines → 499 lines (25% average reduction)
+- **Total helper methods extracted**: 18
+- **Total tests added**: 27
+- **Core system functions preserved**: 2 (print_message, printout_versions)
 
 ## Refactoring Priority
 
