@@ -1,9 +1,10 @@
 # XTTS Engine SRP (Single Responsibility Principle) Analysis
 
 **Date**: 2025-04-21
+**Updated**: 2025-04-22
 **Engine**: XTTS (Coqui TTS)
 **File**: `system/tts_engines/xtts/model_engine.py`
-**Total Lines**: 1227
+**Total Lines**: 1320
 
 ## Summary
 
@@ -35,10 +36,12 @@ Split into separate methods:
 - `_setup_capabilities()` - Set capability flags
 - `_setup_openai_mappings()` - Configure OpenAI voice mappings
 
-### 2. `generate_tts` Method (Lines 994-1193)
-**Severity**: High
-**Lines**: 199 lines
-**Responsibilities**:
+### 2. `generate_tts` Method (Lines 1193-1277) ✅ **REFACTORED**
+**Severity**: High (Resolved)
+**Lines**: 84 lines (reduced from 199 lines)
+**Status**: **COMPLETED** - Refactored on 2025-04-22
+
+**Original Responsibilities**:
 - Input validation
 - Low VRAM mode handling
 - Voice input processing (3 types: latent, voiceset, single wav)
@@ -49,22 +52,21 @@ Split into separate methods:
 - Performance timing
 - Resource cleanup
 
-**Issues**:
-- Extremely long function (199 lines)
-- Handles multiple voice types with complex branching
-- Mixes generation logic with resource management
-- Streaming and non-streaming logic intertwined
-- Difficult to test individual voice types
-- Hard to maintain and extend
+**Refactoring Applied**:
+Extracted into focused methods:
+- ✅ `_validate_generation_inputs()` - Input validation (10 lines)
+- ✅ `_prepare_voice_input()` - Handle different voice types (54 lines)
+- ✅ `_generate_streaming()` - Streaming generation logic (45 lines)
+- ✅ `_generate_non_streaming()` - Non-streaming generation logic (13 lines)
+- ✅ `_generate_api_tts()` - API TTS generation logic (46 lines)
+- ✅ `_cleanup_after_generation()` - Resource cleanup (24 lines)
 
-**Recommendation**:
-Split into focused methods:
-- `_validate_generation_inputs()` - Input validation
-- `_prepare_voice_input()` - Handle different voice types
-- `_generate_conditioning_latents()` - Extract/generate latents
-- `_generate_streaming_audio()` - Streaming generation logic
-- `_generate_non_streaming_audio()` - Non-streaming generation logic
-- `_cleanup_after_generation()` - Resource cleanup
+**Result**:
+- Main function reduced from 199 lines to 84 lines (58% reduction)
+- Each extracted method has single, clear responsibility
+- Easier to test individual components
+- Improved maintainability and extensibility
+- Preserved all original functionality
 
 ### 3. `handle_tts_method_change` Method (Lines 925-992)
 **Severity**: Medium

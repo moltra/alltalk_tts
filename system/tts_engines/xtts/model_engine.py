@@ -991,6 +991,206 @@ class tts_class:
         self.print_message(f"\033[94mModel Loadtime: \033[93m{generate_elapsed_time:.2f}\033[94m seconds\033[0m")
         return True
 
+    def _prepare_voice_input(self, voice):
+        """
+        Prepare voice input by processing different voice types and extracting conditioning latents.
+
+        Handles three voice input types:
+        - latent: Pre-computed latents from JSON files
+        - voiceset: Multiple WAV files for voice cloning
+        - single: Single WAV file reference
+
+        Args:
+            voice (str): Voice identifier
+
+        Returns:
+            tuple: (wavs_files, gpt_cond_latent, speaker_embedding)
+
+        Raises:
+            HTTPException: If voice set has no WAV files
+        """
+        self.print_message(f"Processing voice input: {voice}", message_type="debug_tts")
+        gpt_cond_latent = None
+        speaker_embedding = None
+        wavs_files = []
+
+        if voice.startswith("latent:"):
+            if self.current_model_loaded.startswith("xtts"):
+                gpt_cond_latent, speaker_embedding = self._load_latents(voice)
+
+        elif voice.startswith("voiceset:"):
+            voice_set = voice.replace("voiceset:", "")
+            voice_set_path = os.path.join(self.main_dir, "voices", "xtts_multi_voice_sets", voice_set)
+            self.print_message(f"Processing voice set from: {voice_set_path}", message_type="debug_tts")
+
+            wavs_files = glob.glob(os.path.join(voice_set_path, "*.wav"))
+            if not wavs_files:
+                self.print_message(f"No WAV files found in voice set: {voice_set}", message_type="error")
+                raise HTTPException(status_code=400, detail=f"No WAV files found in voice set: {voice_set}")
+
+            if len(wavs_files) > 5:
+                wavs_files = random.sample(wavs_files, 5)
+                self.print_message("Using 5 random samples from voice set", message_type="debug_tts")
+
+            if self.current_model_loaded.startswith("xtts"):
+                self.print_message("Generating conditioning latents from voice set", message_type="debug_tts")
+                gpt_cond_latent, speaker_embedding = self._generate_conditioning_latents(wavs_files)
+
+        else:
+            normalized_path = os.path.normpath(os.path.join(self.main_dir, "voices", voice))
+            wavs_files = [normalized_path]
+            self.print_message(f"Using single voice sample: {normalized_path}", message_type="debug_tts")
+
+            if self.current_model_loaded.startswith("xtts"):
+                self.print_message("Generating conditioning latents from single sample", message_type="debug_tts")
+                gpt_cond_latent, speaker_embedding = self._generate_conditioning_latents(wavs_files)
+
+        return wavs_files, gpt_cond_latent, speaker_embedding
+
+    async def _generate_streaming(self, common_args, wavs_files):
+        """
+        Generate audio using streaming inference for XTTS model.
+
+        Yields audio chunks as they are generated, allowing for real-time playback.
+
+        Args:
+            common_args (dict): Common inference arguments
+            wavs_files (list): Voice reference files
+
+        Yields:
+            bytes: Audio chunks in WAV format
+        """
+        self.print_message("Starting streaming generation", message_type="debug_tts")
+        self.print_message(f"Using streaming-based generation and files {wavs_files}")
+        output = self.model.inference_stream(**common_args, stream_chunk_size=20)
+
+        # Yield empty WAV header first
+        file_chunks = []
+        wav_buf = io.BytesIO()
+        with wave.open(wav_buf, "wb") as vfout:
+            vfout.setnchannels(1)
+            vfout.setsampwidth(2)
+            vfout.setframerate(24000)
+            vfout.writeframes(b"")
+        wav_buf.seek(0)
+        yield wav_buf.read()
+
+        # Process and yield audio chunks
+        for i, chunk in enumerate(output):
+            if self.tts_stop_generation:
+                self.print_message("Generation stopped by user", message_type="debug_tts")
+                self.tts_stop_generation = False
+                self.tts_generating_lock = False
+                break
+
+            self.print_message(f"Processing chunk {i+1}", message_type="debug_tts")
+            file_chunks.append(chunk)
+            if isinstance(chunk, list):
+                chunk = torch.cat(chunk, dim=0)
+            chunk = chunk.clone().detach().cpu().numpy()
+            chunk = chunk[None, : int(chunk.shape[0])]
+            chunk = np.clip(chunk, -1, 1)
+            chunk = (chunk * 32767).astype(np.int16)
+            yield chunk.tobytes()
+
+    def _generate_non_streaming(self, common_args, output_file):
+        """
+        Generate audio using non-streaming inference for XTTS model.
+
+        Saves the complete audio to a file after generation completes.
+
+        Args:
+            common_args (dict): Common inference arguments
+            output_file (str): Path to save output audio
+        """
+        self.print_message("Starting non-streaming generation", message_type="debug_tts")
+        output = self.model.inference(**common_args)
+        torchaudio.save(str(output_file), torch.tensor(output["wav"]).unsqueeze(0), 24000)
+        self.print_message(f"Saved audio to: {output_file}", message_type="debug_tts")
+
+    async def _cleanup_after_generation(self, generate_start_time):
+        """
+        Perform cleanup operations after TTS generation completes.
+
+        Handles timing reporting, low VRAM mode cleanup, and lock release.
+
+        Args:
+            generate_start_time (float): Timestamp when generation started
+        """
+        generate_end_time = time.time()
+        generate_elapsed_time = generate_end_time - generate_start_time
+
+        # Standard output message (not debug)
+        self.print_message(
+            f"\033[94mTTS Generate: \033[93m{generate_elapsed_time:.2f} seconds. \033[94mLowVRAM: \033[33m{self.lowvram_enabled} \033[94mDeepSpeed: \033[33m{self.deepspeed_enabled}\033[0m",
+            message_type="standard",
+        )
+
+        # Handle low VRAM cleanup
+        if self.lowvram_enabled and self.device == "cuda" and not self.tts_narrator_generatingtts:
+            self.print_message("Low VRAM mode: Moving model back to CPU", message_type="debug_tts")
+            await self.handle_lowvram_change()
+
+        self.tts_generating_lock = False
+
+    def _validate_generation_inputs(self):
+        """
+        Validate that the TTS model is loaded and ready for generation.
+
+        Raises:
+            HTTPException: If no TTS model is loaded
+        """
+        if not self.is_tts_model_loaded:
+            self.print_message("No TTS model loaded", message_type="error")
+            raise HTTPException(status_code=400, detail="You currently have no TTS model loaded.")
+
+    def _generate_api_tts(self, text, voice, wavs_files, language, temperature, repetition_penalty, speed, output_file):
+        """
+        Generate audio using API TTS method.
+
+        Handles the API-based TTS generation which has different requirements
+        than local XTTS generation.
+
+        Args:
+            text (str): Text to convert to speech
+            voice (str): Voice identifier
+            wavs_files (list): Voice reference files
+            language (str): Target language code
+            temperature (float): Generation temperature
+            repetition_penalty (float): Penalty for repetitive generation
+            speed (float): Speech speed multiplier
+            output_file (str): Path to save output audio
+
+        Raises:
+            ValueError: If voice is a latent file (not supported by API TTS)
+        """
+        common_args = {
+            "file_path": output_file,
+            "language": language,
+            "temperature": temperature,
+            "length_penalty": self.model.config.length_penalty,
+            "repetition_penalty": repetition_penalty,
+            "top_k": self.model.config.top_k,
+            "top_p": self.model.config.top_p,
+            "speed": speed,
+        }
+
+        if voice.startswith("latent:"):
+            self.print_message(
+                "API TTS method does not support latent files - Please use an audio reference file",
+                message_type="error",
+            )
+            self.model.tts_to_file(
+                text="The API TTS method only supports audio files not latents. Please select an audio reference file instead.",
+                speaker="Ana Florence",
+                **common_args,
+            )
+        else:
+            self.print_message("Using API-based generation", message_type="debug_tts")
+            self.model.tts_to_file(text=text, speaker_wav=wavs_files, **common_args)
+
+        self.print_message(f"API generation completed, saved to: {output_file}", message_type="debug_tts")
+
     async def generate_tts(
         self, text, voice, language, temperature, repetition_penalty, speed, pitch, output_file, streaming
     ):
@@ -1025,9 +1225,7 @@ class tts_class:
         self.debug_func_entry()
 
         # Initial validation
-        if not self.is_tts_model_loaded:
-            self.print_message("No TTS model loaded", message_type="error")
-            raise HTTPException(status_code=400, detail="You currently have no TTS model loaded.")
+        self._validate_generation_inputs()
 
         # Lock generation and track start time
         self.tts_generating_lock = True
@@ -1046,41 +1244,7 @@ class tts_class:
 
         try:
             # Voice input processing
-            self.print_message(f"Processing voice input: {voice}", message_type="debug_tts")
-            gpt_cond_latent = None
-            speaker_embedding = None
-
-            # Handle different voice types
-            if voice.startswith("latent:"):
-                if self.current_model_loaded.startswith("xtts"):
-                    gpt_cond_latent, speaker_embedding = self._load_latents(voice)
-
-            elif voice.startswith("voiceset:"):
-                voice_set = voice.replace("voiceset:", "")
-                voice_set_path = os.path.join(self.main_dir, "voices", "xtts_multi_voice_sets", voice_set)
-                self.print_message(f"Processing voice set from: {voice_set_path}", message_type="debug_tts")
-
-                wavs_files = glob.glob(os.path.join(voice_set_path, "*.wav"))
-                if not wavs_files:
-                    self.print_message(f"No WAV files found in voice set: {voice_set}", message_type="error")
-                    raise HTTPException(status_code=400, detail=f"No WAV files found in voice set: {voice_set}")
-
-                if len(wavs_files) > 5:
-                    wavs_files = random.sample(wavs_files, 5)
-                    self.print_message("Using 5 random samples from voice set", message_type="debug_tts")
-
-                if self.current_model_loaded.startswith("xtts"):
-                    self.print_message("Generating conditioning latents from voice set", message_type="debug_tts")
-                    gpt_cond_latent, speaker_embedding = self._generate_conditioning_latents(wavs_files)
-
-            else:
-                normalized_path = os.path.normpath(os.path.join(self.main_dir, "voices", voice))
-                wavs_files = [normalized_path]
-                self.print_message(f"Using single voice sample: {normalized_path}", message_type="debug_tts")
-
-                if self.current_model_loaded.startswith("xtts"):
-                    self.print_message("Generating conditioning latents from single sample", message_type="debug_tts")
-                    gpt_cond_latent, speaker_embedding = self._generate_conditioning_latents(wavs_files)
+            wavs_files, gpt_cond_latent, speaker_embedding = self._prepare_voice_input(voice)
 
             # Generate speech
             if self.current_model_loaded.startswith("xtts"):
@@ -1108,89 +1272,18 @@ class tts_class:
 
                 # Handle streaming vs non-streaming
                 if streaming:
-                    self.print_message("Starting streaming generation", message_type="debug_tts")
-                    self.print_message(f"Using streaming-based generation and files {wavs_files}")
-                    output = self.model.inference_stream(**common_args, stream_chunk_size=20)
-
-                    file_chunks = []
-                    wav_buf = io.BytesIO()
-                    with wave.open(wav_buf, "wb") as vfout:
-                        vfout.setnchannels(1)
-                        vfout.setsampwidth(2)
-                        vfout.setframerate(24000)
-                        vfout.writeframes(b"")
-                    wav_buf.seek(0)
-                    yield wav_buf.read()
-
-                    for i, chunk in enumerate(output):
-                        if self.tts_stop_generation:
-                            self.print_message("Generation stopped by user", message_type="debug_tts")
-                            self.tts_stop_generation = False
-                            self.tts_generating_lock = False
-                            break
-
-                        self.print_message(f"Processing chunk {i+1}", message_type="debug_tts")
-                        file_chunks.append(chunk)
-                        if isinstance(chunk, list):
-                            chunk = torch.cat(chunk, dim=0)
-                        chunk = chunk.clone().detach().cpu().numpy()
-                        chunk = chunk[None, : int(chunk.shape[0])]
-                        chunk = np.clip(chunk, -1, 1)
-                        chunk = (chunk * 32767).astype(np.int16)
-                        yield chunk.tobytes()
+                    async for chunk in self._generate_streaming(common_args, wavs_files):
+                        yield chunk
                 else:
-                    self.print_message("Starting non-streaming generation", message_type="debug_tts")
-                    output = self.model.inference(**common_args)
-                    torchaudio.save(str(output_file), torch.tensor(output["wav"]).unsqueeze(0), 24000)
-                    self.print_message(f"Saved audio to: {output_file}", message_type="debug_tts")
+                    self._generate_non_streaming(common_args, output_file)
 
             elif self.current_model_loaded.startswith("apitts"):
                 if streaming:
                     raise ValueError("Streaming is only supported in XTTSv2 local mode")
-                # Common arguments for both error and normal cases
-                common_args = {
-                    "file_path": output_file,
-                    "language": language,
-                    "temperature": temperature,
-                    "length_penalty": self.model.config.length_penalty,
-                    "repetition_penalty": repetition_penalty,
-                    "top_k": self.model.config.top_k,
-                    "top_p": self.model.config.top_p,
-                    "speed": speed,
-                }
-                if voice.startswith("latent:"):
-                    self.print_message(
-                        "API TTS method does not support latent files - Please use an audio reference file",
-                        message_type="error",
-                    )
-                    self.model.tts_to_file(
-                        text="The API TTS method only supports audio files not latents. Please select an audio reference file instead.",
-                        speaker="Ana Florence",
-                        **common_args,
-                    )
-                else:
-                    self.print_message("Using API-based generation", message_type="debug_tts")
-                    self.model.tts_to_file(text=text, speaker_wav=wavs_files, **common_args)
-
-                self.print_message(f"API generation completed, saved to: {output_file}", message_type="debug_tts")
+                self._generate_api_tts(text, voice, wavs_files, language, temperature, repetition_penalty, speed, output_file)
 
         finally:
-            # Generation complete
-            generate_end_time = time.time()
-            generate_elapsed_time = generate_end_time - generate_start_time
-
-            # Standard output message (not debug)
-            self.print_message(
-                f"\033[94mTTS Generate: \033[93m{generate_elapsed_time:.2f} seconds. \033[94mLowVRAM: \033[33m{self.lowvram_enabled} \033[94mDeepSpeed: \033[33m{self.deepspeed_enabled}\033[0m",
-                message_type="standard",
-            )
-
-            # Handle low VRAM cleanup
-            if self.lowvram_enabled and self.device == "cuda" and not self.tts_narrator_generatingtts:
-                self.print_message("Low VRAM mode: Moving model back to CPU", message_type="debug_tts")
-                await self.handle_lowvram_change()
-
-            self.tts_generating_lock = False
+            await self._cleanup_after_generation(generate_start_time)
 
     ##############################################################################
     # Helper Functions that are specific to this script & not generically needed #
