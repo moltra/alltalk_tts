@@ -834,7 +834,7 @@ async def transcode_audio(input_file, output_format, output_file=None):
     output_format = output_format.strip("'\"")
     print_message("\033[94mTranscode Function Entry > transcode_audio > tts_server.py\033[0m", "debug_transcode")
     print_message(f"├─ Input file    : {input_file_str}", "debug_transcode")
-    print_message(f"└─ Output format : {output_format} (repr: {repr(output_format)})", "debug_transcode")
+    print_message(f"└─ Output format : {output_format} (repr: {output_format!r})", "debug_transcode")
     if output_file is None:
         output_file = os.path.splitext(input_file_str)[0] + f".{output_format}"
     print_message(f"└─ Output file : {output_file}", "debug_transcode")
@@ -1177,6 +1177,18 @@ class OpenAIInput(BaseModel):
     )
     speed: float = Field(default=1.0, ge=0.25, le=4.0, description="The speed of the generated audio.")
 
+    @field_validator("response_format", mode="before")
+    @classmethod
+    def validate_response_format(cls, value):
+        """Validate and clean response_format input."""
+        if not isinstance(value, str):
+            raise ValueError("response_format must be a string")
+        cleaned = value.lower().strip('"').strip("'")
+        supported_formats = ["wav", "mp3", "opus", "flac", "aac", "m4a", "ogg"]
+        if cleaned not in supported_formats:
+            raise ValueError(f"response_format must be one of {supported_formats}")
+        return cleaned
+
     @field_validator("voice", mode="before")
     @classmethod
     def validate_voice(cls, value):
@@ -1241,9 +1253,9 @@ async def openai_tts_generate(request: Request):
         # Extract and validate parameters
         input_text = json_data["input"]
         voice = json_data["voice"]
-        response_format = json_data.get("response_format", "wav").lower()
-        print_message(f"DEBUG response_format raw: {repr(json_data.get('response_format', 'wav'))}", "debug_openai")
-        print_message(f"DEBUG response_format lower: {repr(response_format)}", "debug_openai")
+        response_format = json_data.get("response_format", "wav")
+        print_message(f"DEBUG response_format raw: {json_data.get('response_format', 'wav')!r}", "debug_openai")
+        print_message(f"DEBUG response_format lower: {response_format!r}", "debug_openai")
         speed = json_data.get("speed", 1.0)
 
         print_message(f"Input text: {input_text}", "debug_openai", "TTS")
@@ -1271,7 +1283,10 @@ async def openai_tts_generate(request: Request):
         # Generate audio
         unique_id = uuid.uuid4()
         timestamp = int(time.time())
-        print_message(f"DEBUG model_engine.audio_format: '{model_engine.audio_format}' (repr: {repr(model_engine.audio_format)})", "debug_transcode")
+        print_message(
+            f"DEBUG model_engine.audio_format: '{model_engine.audio_format}' (repr: {model_engine.audio_format!r})",
+            "debug_transcode",
+        )
         output_file_path = f'{this_dir / config.get_output_directory() / f"openai_output_{unique_id}_{timestamp}.{model_engine.audio_format}"}'
 
         if config.debugging.debug_fullttstext:
@@ -2379,11 +2394,11 @@ async def tts_handle_rvc_processing(output_file_path: Path, params: dict):
 async def tts_handle_audio_output(output_file_path: Path, autoplay: bool, volume: float) -> tuple[Path, str, str]:
     """Handle audio transcoding and playback."""
     debug_func_entry()
-    print_message(f"DEBUG config.transcode_audio_format raw: {repr(config.transcode_audio_format)}", "debug_transcode")
+    print_message(f"DEBUG config.transcode_audio_format raw: {config.transcode_audio_format!r}", "debug_transcode")
     model_format = str(model_engine.audio_format).lower().strip("'\"")
     output_format = str(config.transcode_audio_format).lower().strip("'\"")
-    print_message(f"DEBUG audio_format: '{model_format}' (repr: {repr(model_format)})", "debug_transcode")
-    print_message(f"DEBUG transcode_audio_format: '{output_format}' (repr: {repr(output_format)})", "debug_transcode")
+    print_message(f"DEBUG audio_format: '{model_format}' (repr: {model_format!r})", "debug_transcode")
+    print_message(f"DEBUG transcode_audio_format: '{output_format}' (repr: {output_format!r})", "debug_transcode")
 
     output_file_url = f"/audio/{output_file_path.name}"
     output_cache_url = f"/audiocache/{output_file_path.name}"
