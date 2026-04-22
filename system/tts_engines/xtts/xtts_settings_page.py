@@ -390,14 +390,24 @@ def xtts_model_alltalk_settings(model_config_data):
 
         with gr.Tab("Models/Voices Download"):
             with gr.Row():
-                # Load the available models from the JSON file
-                with open(os.path.join(this_dir, "available_models.json")) as f:
-                    available_models = json.load(f)
-                # Extract the model names for the dropdown
-                model_names = [model["model_name"] for model in available_models["models"]]
-                # Create the dropdown
-                model_dropdown = gr.Dropdown(choices=sorted(model_names), label="Select Model", value=model_names[0])
-                download_button = gr.Button("Download Model/Missing Files")
+                # Load the available models from the JSON file (if it exists)
+                try:
+                    with open(os.path.join(this_dir, "available_models.json")) as f:
+                        available_models = json.load(f)
+                    # Extract the model names for the dropdown
+                    model_names = [model["model_name"] for model in available_models["models"]]
+                except FileNotFoundError:
+                    gr.Markdown("⚠️ **Model download not available**: `available_models.json` not found. Please use the main 'Model Downloads' tab or CLI script.")
+                    available_models = {"models": []}
+                    model_names = []
+                
+                if model_names:
+                    # Create the dropdown
+                    model_dropdown = gr.Dropdown(choices=sorted(model_names), label="Select Model", value=model_names[0])
+                    download_button = gr.Button("Download Model/Missing Files")
+                else:
+                    model_dropdown = gr.Dropdown(choices=[], label="Select Model (No models available)")
+                    download_button = gr.Button("Download Model/Missing Files", interactive=False)
 
             with gr.Row():
                 download_status = gr.Textbox(label="Download Status")

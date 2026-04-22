@@ -554,10 +554,17 @@ def piper_model_alltalk_settings(model_config_data):
                         for code, info in sorted(language_groups.items())
                     ]
 
-                    lang_pack_dropdown = gr.Dropdown(
-                        choices=language_choices, label="Select Language Pack", value=language_choices[0]
-                    )
-                    lang_pack_download_button = gr.Button("Download Language Pack")
+                    if language_choices:
+                        lang_pack_dropdown = gr.Dropdown(
+                            choices=language_choices, label="Select Language Pack", value=language_choices[0]
+                        )
+                        lang_pack_download_button = gr.Button("Download Language Pack")
+                    else:
+                        gr.Markdown("⚠️ **No language packs available**: Models must be downloaded first. Please use the main 'Model Downloads' tab or CLI script.")
+                        lang_pack_dropdown = gr.Dropdown(
+                            choices=[], label="Select Language Pack (No packs available)"
+                        )
+                        lang_pack_download_button = gr.Button("Download Language Pack", interactive=False)
 
                 with gr.Row():
                     lang_pack_status = gr.Textbox(label="Language Pack Download Status")
@@ -572,10 +579,17 @@ def piper_model_alltalk_settings(model_config_data):
 
             with gr.Tab("Individual Voice Download"):
                 with gr.Row():
-                    model_dropdown = gr.Dropdown(
-                        choices=sorted(model_names), label="Select Individual Voice", value=model_names[0]
-                    )
-                    download_button = gr.Button("Download Selected Voice")
+                    if model_names:
+                        model_dropdown = gr.Dropdown(
+                            choices=sorted(model_names), label="Select Individual Voice", value=model_names[0]
+                        )
+                        download_button = gr.Button("Download Selected Voice")
+                    else:
+                        gr.Markdown("⚠️ **No voices available**: Models must be downloaded first. Please use the main 'Model Downloads' tab or CLI script.")
+                        model_dropdown = gr.Dropdown(
+                            choices=[], label="Select Individual Voice (No voices available)"
+                        )
+                        download_button = gr.Button("Download Selected Voice", interactive=False)
 
                 with gr.Row():
                     download_status = gr.Textbox(label=" Individual Voice Download Status")

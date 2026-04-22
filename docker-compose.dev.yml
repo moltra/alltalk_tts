@@ -29,6 +29,7 @@ services:
       - ./tts_server.py:/home/alltalk/tts_server.py
       - ./script.py:/home/alltalk/script.py
       - ./start_dev.sh:/home/alltalk/start_dev.sh
+      - ./download_model.py:/home/alltalk/download_model.py
       # Config directory (centralized configs)
       - ./config:/home/alltalk/config
       # Config file (persistent)

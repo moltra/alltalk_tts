@@ -46,7 +46,7 @@ def download_model_async(engine: str, progress_callback=None) -> str:
         
         # Run the download script
         result = subprocess.run(
-            ["python", str(script_path), "--model", engine, "--force"],
+            ["python", str(script_path), "--tts_model", engine],
             capture_output=True,
             text=True,
             cwd=str(this_dir)
@@ -66,7 +66,25 @@ def get_model_info(engine: str) -> str:
     available_models_path = this_dir / "system" / "tts_engines" / engine / "available_models.json"
     
     if not available_models_path.exists():
-        return f"ℹ️ No automatic download available for {engine}.\nModels must be downloaded manually."
+        # Provide helpful information even without JSON file
+        model_info = f"📦 **{engine.upper()} Models**\n\n"
+        model_info += f"ℹ️ The `available_models.json` file for {engine} is not present.\n\n"
+        model_info += f"**Alternative download methods:**\n"
+        model_info += f"• Use the CLI: `python download_model.py --tts_model {engine}`\n"
+        model_info += f"• Use Docker CLI: `docker exec alltalk-dev python download_model.py --tts_model {engine}`\n"
+        model_info += f"• Download models manually from the official repository\n\n"
+        model_info += f"**Model sizes (approximate):**\n"
+        if engine == "xtts":
+            model_info += f"• XTTS v2.0.3: ~1.8GB\n"
+        elif engine == "piper":
+            model_info += f"• Piper models: ~50-100MB each\n"
+        elif engine == "vits":
+            model_info += f"• VITS models: ~100-200MB each\n"
+        elif engine == "f5tts":
+            model_info += f"• F5-TTS: ~500MB\n"
+        elif engine == "parler":
+            model_info += f"• Parler: ~1GB\n"
+        return model_info
     
     try:
         import json

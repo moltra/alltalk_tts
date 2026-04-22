@@ -585,10 +585,17 @@ def vits_model_alltalk_settings(model_config_data):
                         for code, info in sorted(language_groups.items())
                     ]
 
-                    lang_pack_dropdown = gr.Dropdown(
-                        choices=language_choices, label="Select Language Pack", value=language_choices[0]
-                    )
-                    lang_pack_download_button = gr.Button("Download Language Pack")
+                    if language_choices:
+                        lang_pack_dropdown = gr.Dropdown(
+                            choices=language_choices, label="Select Language Pack", value=language_choices[0]
+                        )
+                        lang_pack_download_button = gr.Button("Download Language Pack")
+                    else:
+                        gr.Markdown("⚠️ **No language packs available**: Models must be downloaded first. Please use the main 'Model Downloads' tab or CLI script.")
+                        lang_pack_dropdown = gr.Dropdown(
+                            choices=[], label="Select Language Pack (No packs available)"
+                        )
+                        lang_pack_download_button = gr.Button("Download Language Pack", interactive=False)
 
                 with gr.Row():
                     lang_pack_status = gr.Textbox(label="Language Pack Download Status")
@@ -604,10 +611,17 @@ def vits_model_alltalk_settings(model_config_data):
             with gr.Tab("Individual Voice Download"):
                 with gr.Row():
                     # Create the dropdown
-                    model_dropdown = gr.Dropdown(
-                        choices=sorted(model_names), label="Select Model", value=model_names[0]
-                    )
-                    download_button = gr.Button("Download Model/Missing Files")
+                    if model_names:
+                        model_dropdown = gr.Dropdown(
+                            choices=sorted(model_names), label="Select Model", value=model_names[0]
+                        )
+                        download_button = gr.Button("Download Model/Missing Files")
+                    else:
+                        gr.Markdown("⚠️ **No models available**: Models must be downloaded first. Please use the main 'Model Downloads' tab or CLI script.")
+                        model_dropdown = gr.Dropdown(
+                            choices=[], label="Select Model (No models available)"
+                        )
+                        download_button = gr.Button("Download Model/Missing Files", interactive=False)
 
                 with gr.Row():
                     download_status = gr.Textbox(label="Download Status")
