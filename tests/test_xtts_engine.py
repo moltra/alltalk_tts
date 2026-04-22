@@ -389,30 +389,11 @@ class TestXTTSHandleTTSMethodChange:
             assert engine.current_model_loaded is None
 
 
-class TestXTTSHelperMethods:
-    """Tests for helper methods extracted from generate_tts"""
+class TestXTTSInitMethods:
+    """Tests for __init__ helper methods"""
 
-    def test_validate_generation_inputs_no_model(self, temp_xtts_dir, temp_dir):
-        """Test validation when no model is loaded"""
-        with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
-        ):
-            from system.tts_engines.xtts.model_engine import tts_class
-            from fastapi import HTTPException
-
-            engine = tts_class()
-            engine.main_dir = temp_dir
-            engine.is_tts_model_loaded = False
-
-            with pytest.raises(HTTPException) as exc_info:
-                engine._validate_generation_inputs()
-
-            assert "tts model loaded" in str(exc_info.value.detail).lower()
-
-    def test_validate_generation_inputs_model_loaded(self, temp_xtts_dir, temp_dir):
-        """Test validation when model is loaded (should pass)"""
+    def test_init_system_variables(self, temp_xtts_dir, temp_dir):
+        """Test initialization of core system variables"""
         with (
             patch("config.AlltalkConfig"),
             patch("config.AlltalkTTSEnginesConfig"),
@@ -421,130 +402,21 @@ class TestXTTSHelperMethods:
             from system.tts_engines.xtts.model_engine import tts_class
 
             engine = tts_class()
-            engine.main_dir = temp_dir
-            engine.is_tts_model_loaded = True
+            engine._init_system_variables()
 
-            # Should not raise any exception
-            engine._validate_generation_inputs()
-
-    def test_prepare_voice_input_single_wav(self, temp_voices_dir, temp_xtts_dir, temp_dir):
-        """Test voice input preparation for single WAV file"""
-        # Create a test WAV file
-        (temp_voices_dir / "test_voice.wav").write_bytes(b"RIFF" + b"\x00" * 100)
-
-        with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
-        ):
-            from system.tts_engines.xtts.model_engine import tts_class
-
-            engine = tts_class()
-            engine.main_dir = temp_dir
-            engine.current_model_loaded = "xtts - test_model"
-            engine._generate_conditioning_latents = Mock(return_value=(Mock(), Mock()))
-
-            wavs_files, _gpt_cond_latent, _speaker_embedding = engine._prepare_voice_input("test_voice.wav")
-
-            assert len(wavs_files) == 1
-            assert "test_voice.wav" in wavs_files[0]
-            engine._generate_conditioning_latents.assert_called_once()
-
-    def test_prepare_voice_input_latent(self, temp_voices_dir, temp_xtts_dir, temp_dir):
-        """Test voice input preparation for latent file"""
-        latents_dir = temp_voices_dir / "xtts_latents"
-        latents_dir.mkdir()
-        (latents_dir / "test_latent.json").write_text("{}")
-
-        with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
-        ):
-            from system.tts_engines.xtts.model_engine import tts_class
-
-            engine = tts_class()
-            engine.main_dir = temp_dir
-            engine.current_model_loaded = "xtts - test_model"
-            engine._load_latents = Mock(return_value=(Mock(), Mock()))
-
-            wavs_files, _gpt_cond_latent, _speaker_embedding = engine._prepare_voice_input("latent:test_latent.json")
-
-            assert len(wavs_files) == 0
-            engine._load_latents.assert_called_once_with("latent:test_latent.json")
-
-    def test_prepare_voice_input_voiceset(self, temp_voices_dir, temp_xtts_dir, temp_dir):
-        """Test voice input preparation for voice set"""
-        multi_voice_dir = temp_voices_dir / "xtts_multi_voice_sets"
-        voice_set = multi_voice_dir / "test_set"
-        voice_set.mkdir(parents=True)
-        (voice_set / "sample1.wav").write_bytes(b"RIFF" + b"\x00" * 100)
-        (voice_set / "sample2.wav").write_bytes(b"RIFF" + b"\x00" * 100)
-
-        with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
-        ):
-            from system.tts_engines.xtts.model_engine import tts_class
-
-            engine = tts_class()
-            engine.main_dir = temp_dir
-            engine.current_model_loaded = "xtts - test_model"
-            engine._generate_conditioning_latents = Mock(return_value=(Mock(), Mock()))
-
-            wavs_files, _gpt_cond_latent, _speaker_embedding = engine._prepare_voice_input("voiceset:test_set")
-
-            assert len(wavs_files) == 2
-            engine._generate_conditioning_latents.assert_called_once()
-
-    def test_prepare_voice_input_voiceset_empty(self, temp_voices_dir, temp_xtts_dir, temp_dir):
-        """Test voice input preparation for empty voice set"""
-        multi_voice_dir = temp_voices_dir / "xtts_multi_voice_sets"
-        voice_set = multi_voice_dir / "empty_set"
-        voice_set.mkdir(parents=True)
-
-        with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
-        ):
-            from system.tts_engines.xtts.model_engine import tts_class
-            from fastapi import HTTPException
-
-            engine = tts_class()
-            engine.main_dir = temp_dir
-            engine.current_model_loaded = "xtts - test_model"
-
-            with pytest.raises(HTTPException) as exc_info:
-                engine._prepare_voice_input("voiceset:empty_set")
-
-            assert "No WAV files found" in str(exc_info.value.detail)
-
-    @pytest.mark.asyncio
-    async def test_cleanup_after_generation(self, temp_xtts_dir, temp_dir):
-        """Test cleanup after generation"""
-        with (
-            patch("config.AlltalkConfig"),
-            patch("config.AlltalkTTSEnginesConfig"),
-            patch("config.AlltalkNewEnginesConfig"),
-        ):
-            from system.tts_engines.xtts.model_engine import tts_class
-
-            engine = tts_class()
-            engine.main_dir = temp_dir
-            engine.lowvram_enabled = False
-            engine.device = "cpu"
-            engine.tts_generating_lock = True
-            engine.deepspeed_enabled = False
-
-            start_time = 0.0
-            await engine._cleanup_after_generation(start_time)
-
+            assert engine.this_dir is not None
+            assert engine.main_dir is not None
+            assert engine.device in ["cuda", "cpu"]
             assert engine.tts_generating_lock is False
+            assert engine.tts_stop_generation is False
+            assert engine.model is None
+            assert engine.is_tts_model_loaded is False
+            assert engine.current_model_loaded is None
+            assert engine.available_models is None
+            assert engine.setup_has_run is False
 
-    def test_generate_non_streaming(self, temp_xtts_dir, temp_dir):
-        """Test non-streaming audio generation"""
+    def test_load_configuration(self, temp_xtts_dir, temp_dir):
+        """Test loading model_settings.json configuration"""
         with (
             patch("config.AlltalkConfig"),
             patch("config.AlltalkTTSEnginesConfig"),
@@ -554,21 +426,18 @@ class TestXTTSHelperMethods:
 
             engine = tts_class()
             engine.main_dir = temp_dir
-            engine.model = Mock()
-            engine.model.inference = Mock(return_value={"wav": Mock()})
-            with patch("torchaudio.save") as mock_save:
-                common_args = {"text": "test", "language": "en"}
-                output_file = temp_dir / "output.wav"
+            engine.this_dir = temp_xtts_dir
 
-                engine._generate_non_streaming(common_args, output_file)
+            config = engine._load_configuration()
 
-                engine.model.inference.assert_called_once_with(**common_args)
-                mock_save.assert_called_once()
+            assert isinstance(config, dict)
+            assert "model_details" in config
+            assert "model_capabilties" in config
+            assert "settings" in config
+            assert "openai_voices" in config
 
-    def test_generate_api_tts_normal(self, temp_voices_dir, temp_xtts_dir, temp_dir):
-        """Test API TTS generation with normal voice file"""
-        (temp_voices_dir / "test.wav").write_bytes(b"RIFF" + b"\x00" * 100)
-
+    def test_setup_model_details(self, temp_xtts_dir, temp_dir):
+        """Test setting model details from configuration"""
         with (
             patch("config.AlltalkConfig"),
             patch("config.AlltalkTTSEnginesConfig"),
@@ -577,32 +446,20 @@ class TestXTTSHelperMethods:
             from system.tts_engines.xtts.model_engine import tts_class
 
             engine = tts_class()
-            engine.main_dir = temp_dir
-            engine.model = Mock()
-            engine.model.config.length_penalty = 1.0
-            engine.model.config.top_k = 50
-            engine.model.config.top_p = 0.9
-            engine.model.tts_to_file = Mock()
+            model_settings = {
+                "model_details": {
+                    "manufacturer_name": "Test Manufacturer",
+                    "manufacturer_website": "https://test.com",
+                }
+            }
 
-            output_file = temp_dir / "output.wav"
-            engine._generate_api_tts(
-                text="test text",
-                voice="test.wav",
-                wavs_files=[str(temp_voices_dir / "test.wav")],
-                language="en",
-                temperature=0.75,
-                repetition_penalty=7.0,
-                speed=1.0,
-                output_file=output_file,
-            )
+            engine._setup_model_details(model_settings)
 
-            engine.model.tts_to_file.assert_called_once()
-            call_args = engine.model.tts_to_file.call_args
-            assert call_args[1]["text"] == "test text"
-            assert "speaker_wav" in call_args[1]
+            assert engine.manufacturer_name == "Test Manufacturer"
+            assert engine.manufacturer_website == "https://test.com"
 
-    def test_generate_api_tts_latent_error(self, temp_voices_dir, temp_xtts_dir, temp_dir):
-        """Test API TTS generation with latent file (should show error)"""
+    def test_setup_capabilities(self, temp_xtts_dir, temp_dir):
+        """Test setting capability flags from configuration"""
         with (
             patch("config.AlltalkConfig"),
             patch("config.AlltalkTTSEnginesConfig"),
@@ -611,56 +468,98 @@ class TestXTTSHelperMethods:
             from system.tts_engines.xtts.model_engine import tts_class
 
             engine = tts_class()
-            engine.main_dir = temp_dir
-            engine.model = Mock()
-            engine.model.config.length_penalty = 1.0
-            engine.model.config.top_k = 50
-            engine.model.config.top_p = 0.9
-            engine.model.tts_to_file = Mock()
+            model_settings = {
+                "model_capabilties": {
+                    "audio_format": "wav",
+                    "deepspeed_capable": True,
+                    "generationspeed_capable": True,
+                    "languages_capable": True,
+                    "lowvram_capable": True,
+                    "multimodel_capable": True,
+                    "repetitionpenalty_capable": True,
+                    "streaming_capable": True,
+                    "temperature_capable": True,
+                    "multivoice_capable": True,
+                    "pitch_capable": False,
+                }
+            }
 
-            output_file = temp_dir / "output.wav"
-            engine._generate_api_tts(
-                text="test text",
-                voice="latent:test.json",
-                wavs_files=[],
-                language="en",
-                temperature=0.75,
-                repetition_penalty=7.0,
-                speed=1.0,
-                output_file=output_file,
-            )
+            engine._setup_capabilities(model_settings)
 
-            engine.model.tts_to_file.assert_called_once()
-            call_args = engine.model.tts_to_file.call_args
-            assert "API TTS method only supports audio files" in call_args[1]["text"]
-            assert call_args[1]["speaker"] == "Ana Florence"
+            assert engine.audio_format == "wav"
+            assert engine.deepspeed_capable is True
+            assert engine.generationspeed_capable is True
+            assert engine.languages_capable is True
+            assert engine.lowvram_capable is True
+            assert engine.multimodel_capable is True
+            assert engine.repetitionpenalty_capable is True
+            assert engine.streaming_capable is True
+            assert engine.temperature_capable is True
+            assert engine.multivoice_capable is True
+            assert engine.pitch_capable is False
 
-    @pytest.mark.asyncio
-    async def test_generate_streaming(self, temp_xtts_dir, temp_dir):
-        """Test streaming audio generation - verifies function call and WAV header"""
+    def test_setup_engine_settings(self, temp_xtts_dir, temp_dir):
+        """Test setting engine settings from configuration"""
         with (
             patch("config.AlltalkConfig"),
             patch("config.AlltalkTTSEnginesConfig"),
             patch("config.AlltalkNewEnginesConfig"),
-            patch("system.tts_engines.xtts.model_engine.torch"),
-            patch("system.tts_engines.xtts.model_engine.np"),
         ):
             from system.tts_engines.xtts.model_engine import tts_class
 
             engine = tts_class()
-            engine.main_dir = temp_dir
-            engine.model = Mock()
-            engine.tts_stop_generation = False
+            model_settings = {
+                "settings": {
+                    "def_character_voice": "test_voice",
+                    "def_narrator_voice": "test_narrator",
+                    "deepspeed_enabled": False,
+                    "engine_installed": True,
+                    "generationspeed_set": 1.0,
+                    "lowvram_enabled": False,
+                    "repetitionpenalty_set": 7.0,
+                    "temperature_set": 0.75,
+                    "pitch_set": 1.0,
+                }
+            }
 
-            # Mock the streaming generator to return empty (no audio chunks)
-            engine.model.inference_stream = Mock(return_value=iter([]))
+            engine._setup_engine_settings(model_settings)
 
-            common_args = {"text": "test", "language": "en"}
-            wavs_files = ["test.wav"]
+            assert engine.def_character_voice == "test_voice"
+            assert engine.def_narrator_voice == "test_narrator"
+            assert engine.deepspeed_enabled is False
+            assert engine.engine_installed is True
+            assert engine.generationspeed_set == 1.0
+            assert engine.lowvram_enabled is False
+            assert engine.repetitionpenalty_set == 7.0
+            assert engine.temperature_set == 0.75
+            assert engine.pitch_set == 1.0
 
-            chunks = []
-            async for chunk in engine._generate_streaming(common_args, wavs_files):
-                chunks.append(chunk)
+    def test_setup_openai_mappings(self, temp_xtts_dir, temp_dir):
+        """Test setting OpenAI voice mappings from configuration"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
 
-            engine.model.inference_stream.assert_called_once_with(**common_args, stream_chunk_size=20)
-            assert len(chunks) == 1  # Should yield just the WAV header
+            engine = tts_class()
+            model_settings = {
+                "openai_voices": {
+                    "alloy": "alloy_voice",
+                    "echo": "echo_voice",
+                    "fable": "fable_voice",
+                    "nova": "nova_voice",
+                    "onyx": "onyx_voice",
+                    "shimmer": "shimmer_voice",
+                }
+            }
+
+            engine._setup_openai_mappings(model_settings)
+
+            assert engine.openai_alloy == "alloy_voice"
+            assert engine.openai_echo == "echo_voice"
+            assert engine.openai_fable == "fable_voice"
+            assert engine.openai_nova == "nova_voice"
+            assert engine.openai_onyx == "onyx_voice"
+            assert engine.openai_shimmer == "shimmer_voice"

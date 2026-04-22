@@ -12,10 +12,12 @@ The XTTS engine implementation is generally well-structured but has several func
 
 ## Critical SRP Violations
 
-### 1. `__init__` Method (Lines 243-405)
-**Severity**: High
-**Lines**: 163 lines
-**Responsibilities**:
+### 1. `__init__` Method (Lines 243-353) ✅ **REFACTORED**
+**Severity**: High (Resolved)
+**Lines**: 110 lines (reduced from 163 lines)
+**Status**: **COMPLETED** - Refactored on 2025-04-22
+
+**Original Responsibilities**:
 - Variable initialization (system, configuration, model settings)
 - Path resolution
 - Configuration file loading
@@ -23,18 +25,21 @@ The XTTS engine implementation is generally well-structured but has several func
 - Capability flag setting
 - Debug logging
 
-**Issues**:
-- Too many initialization concerns in one method
-- Mixes system setup with configuration loading
-- Hard to test individual concerns
-- Violates "Do one thing" principle
+**Refactoring Applied**:
+Extracted into focused methods:
+- ✅ `_init_system_variables()` - Core system variables (15 lines)
+- ✅ `_load_configuration()` - Load and parse model_settings.json (5 lines)
+- ✅ `_setup_model_details()` - Set model details (3 lines)
+- ✅ `_setup_capabilities()` - Set capability flags (13 lines)
+- ✅ `_setup_engine_settings()` - Set engine settings (10 lines)
+- ✅ `_setup_openai_mappings()` - Configure OpenAI voice mappings (6 lines)
 
-**Recommendation**:
-Split into separate methods:
-- `_init_system_variables()` - Core system variables
-- `_load_configuration()` - Load and parse model_settings.json
-- `_setup_capabilities()` - Set capability flags
-- `_setup_openai_mappings()` - Configure OpenAI voice mappings
+**Result**:
+- Main function reduced from 163 lines to 110 lines (33% reduction)
+- Each extracted method has single, clear responsibility
+- Easier to test individual configuration concerns
+- Improved maintainability and extensibility
+- Preserved all original functionality
 
 ### 2. `generate_tts` Method (Lines 1193-1277) ✅ **REFACTORED**
 **Severity**: High (Resolved)

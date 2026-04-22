@@ -314,64 +314,12 @@ class tts_class:
         Other variables should be configured through their respective JSON files or
         you can add new central variables in the section provided down below.
         """
-        # DO NOT MODIFY - Sets up the base variables required for any tts engine #
-        self.this_dir = Path(__file__).parent.resolve()
-        self.main_dir = Path(__file__).parent.parent.parent.parent.resolve()
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.cuda_is_available = torch.cuda.is_available()
-        self.tts_generating_lock = False
-        self.tts_stop_generation = False
-        self.tts_narrator_generatingtts = False
-        self.model = None
-        self.is_tts_model_loaded = False
-        self.current_model_loaded = None
-        self.available_models = None
-        self.setup_has_run = False
-        self.engines_available = tts_engines_config.get_engine_names_available()
-        self.engine_loaded = tts_engines_config.engine_loaded
-        self.selected_model = tts_engines_config.selected_model
-
-        # DO NOT MODIFY - Load in the current TTS Engines model_settings.json file
-        with open(os.path.join(self.this_dir, "model_settings.json")) as f:
-            model_settings_file = json.load(f)
-
-        # DO NOT MODIFY - Model details from model_settings.json
-        self.manufacturer_name = model_settings_file["model_details"]["manufacturer_name"]
-        self.manufacturer_website = model_settings_file["model_details"]["manufacturer_website"]
-
-        # DO NOT MODIFY - Model capabilities from model_settings.json
-        self.audio_format = model_settings_file["model_capabilties"]["audio_format"]
-        self.deepspeed_capable = model_settings_file["model_capabilties"]["deepspeed_capable"]
-        self.deepspeed_available = "deepspeed" in globals()
-        self.generationspeed_capable = model_settings_file["model_capabilties"]["generationspeed_capable"]
-        self.languages_capable = model_settings_file["model_capabilties"]["languages_capable"]
-        self.lowvram_capable = model_settings_file["model_capabilties"]["lowvram_capable"]
-        self.multimodel_capable = model_settings_file["model_capabilties"]["multimodel_capable"]
-        self.repetitionpenalty_capable = model_settings_file["model_capabilties"]["repetitionpenalty_capable"]
-        self.streaming_capable = model_settings_file["model_capabilties"]["streaming_capable"]
-        self.temperature_capable = model_settings_file["model_capabilties"]["temperature_capable"]
-        self.multivoice_capable = model_settings_file["model_capabilties"]["multivoice_capable"]
-        self.pitch_capable = model_settings_file["model_capabilties"]["pitch_capable"]
-
-        # DO NOT MODIFY - Engine settings from model_settings.json
-        self.def_character_voice = model_settings_file["settings"]["def_character_voice"]
-        self.def_narrator_voice = model_settings_file["settings"]["def_narrator_voice"]
-        self.deepspeed_enabled = model_settings_file["settings"]["deepspeed_enabled"]
-        self.engine_installed = model_settings_file["settings"]["engine_installed"]
-        self.generationspeed_set = model_settings_file["settings"]["generationspeed_set"]
-        self.lowvram_enabled = model_settings_file["settings"]["lowvram_enabled"]
-        self.lowvram_enabled = False if not torch.cuda.is_available() else self.lowvram_enabled
-        self.repetitionpenalty_set = model_settings_file["settings"]["repetitionpenalty_set"]
-        self.temperature_set = model_settings_file["settings"]["temperature_set"]
-        self.pitch_set = model_settings_file["settings"]["pitch_set"]
-
-        # DO NOT MODIFY - OpenAI voice mappings from model_settings.json
-        self.openai_alloy = model_settings_file["openai_voices"]["alloy"]
-        self.openai_echo = model_settings_file["openai_voices"]["echo"]
-        self.openai_fable = model_settings_file["openai_voices"]["fable"]
-        self.openai_nova = model_settings_file["openai_voices"]["nova"]
-        self.openai_onyx = model_settings_file["openai_voices"]["onyx"]
-        self.openai_shimmer = model_settings_file["openai_voices"]["shimmer"]
+        self._init_system_variables()
+        model_settings_file = self._load_configuration()
+        self._setup_model_details(model_settings_file)
+        self._setup_capabilities(model_settings_file)
+        self._setup_engine_settings(model_settings_file)
+        self._setup_openai_mappings(model_settings_file)
 
         """
         Below is the name of the folder that will be created-used under `/models/{folder}`
@@ -399,10 +347,111 @@ class tts_class:
         """
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
         # ↑↑↑ Add your own central `self.myvariable` variables in here if needed for your engine ↑↑↑
-        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
+        # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
         # DO NOT MODIFY - log the function call to this function
         self.debug_func_entry()
+
+    def _init_system_variables(self):
+        """
+        Initialize core system variables required for TTS engine integration.
+
+        These variables are critical for system integration with tts_server.py and
+        must not be modified or renamed.
+        """
+        # DO NOT MODIFY - Sets up the base variables required for any tts engine #
+        self.this_dir = Path(__file__).parent.resolve()
+        self.main_dir = Path(__file__).parent.parent.parent.parent.resolve()
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.cuda_is_available = torch.cuda.is_available()
+        self.tts_generating_lock = False
+        self.tts_stop_generation = False
+        self.tts_narrator_generatingtts = False
+        self.model = None
+        self.is_tts_model_loaded = False
+        self.current_model_loaded = None
+        self.available_models = None
+        self.setup_has_run = False
+        self.engines_available = tts_engines_config.get_engine_names_available()
+        self.engine_loaded = tts_engines_config.engine_loaded
+        self.selected_model = tts_engines_config.selected_model
+
+    def _load_configuration(self):
+        """
+        Load and parse model_settings.json configuration file.
+
+        Returns:
+            dict: Parsed configuration data from model_settings.json
+        """
+        # DO NOT MODIFY - Load in the current TTS Engines model_settings.json file
+        with open(os.path.join(self.this_dir, "model_settings.json")) as f:
+            return json.load(f)
+
+    def _setup_model_details(self, model_settings_file):
+        """
+        Set model details from configuration.
+
+        Args:
+            model_settings_file (dict): Parsed configuration data
+        """
+        # DO NOT MODIFY - Model details from model_settings.json
+        self.manufacturer_name = model_settings_file["model_details"]["manufacturer_name"]
+        self.manufacturer_website = model_settings_file["model_details"]["manufacturer_website"]
+
+    def _setup_capabilities(self, model_settings_file):
+        """
+        Set model capability flags from configuration.
+
+        Args:
+            model_settings_file (dict): Parsed configuration data
+        """
+        # DO NOT MODIFY - Model capabilities from model_settings.json
+        self.audio_format = model_settings_file["model_capabilties"]["audio_format"]
+        self.deepspeed_capable = model_settings_file["model_capabilties"]["deepspeed_capable"]
+        self.deepspeed_available = "deepspeed" in globals()
+        self.generationspeed_capable = model_settings_file["model_capabilties"]["generationspeed_capable"]
+        self.languages_capable = model_settings_file["model_capabilties"]["languages_capable"]
+        self.lowvram_capable = model_settings_file["model_capabilties"]["lowvram_capable"]
+        self.multimodel_capable = model_settings_file["model_capabilties"]["multimodel_capable"]
+        self.repetitionpenalty_capable = model_settings_file["model_capabilties"]["repetitionpenalty_capable"]
+        self.streaming_capable = model_settings_file["model_capabilties"]["streaming_capable"]
+        self.temperature_capable = model_settings_file["model_capabilties"]["temperature_capable"]
+        self.multivoice_capable = model_settings_file["model_capabilties"]["multivoice_capable"]
+        self.pitch_capable = model_settings_file["model_capabilties"]["pitch_capable"]
+
+    def _setup_engine_settings(self, model_settings_file):
+        """
+        Set engine settings from configuration.
+
+        Args:
+            model_settings_file (dict): Parsed configuration data
+        """
+        # DO NOT MODIFY - Engine settings from model_settings.json
+        self.def_character_voice = model_settings_file["settings"]["def_character_voice"]
+        self.def_narrator_voice = model_settings_file["settings"]["def_narrator_voice"]
+        self.deepspeed_enabled = model_settings_file["settings"]["deepspeed_enabled"]
+        self.engine_installed = model_settings_file["settings"]["engine_installed"]
+        self.generationspeed_set = model_settings_file["settings"]["generationspeed_set"]
+        self.lowvram_enabled = model_settings_file["settings"]["lowvram_enabled"]
+        self.lowvram_enabled = False if not torch.cuda.is_available() else self.lowvram_enabled
+        self.repetitionpenalty_set = model_settings_file["settings"]["repetitionpenalty_set"]
+        self.temperature_set = model_settings_file["settings"]["temperature_set"]
+        self.pitch_set = model_settings_file["settings"]["pitch_set"]
+
+    def _setup_openai_mappings(self, model_settings_file):
+        """
+        Set OpenAI voice mappings from configuration.
+
+        Args:
+            model_settings_file (dict): Parsed configuration data
+        """
+        # DO NOT MODIFY - OpenAI voice mappings from model_settings.json
+        self.openai_alloy = model_settings_file["openai_voices"]["alloy"]
+        self.openai_echo = model_settings_file["openai_voices"]["echo"]
+        self.openai_fable = model_settings_file["openai_voices"]["fable"]
+        self.openai_nova = model_settings_file["openai_voices"]["nova"]
+        self.openai_onyx = model_settings_file["openai_voices"]["onyx"]
+        self.openai_shimmer = model_settings_file["openai_voices"]["shimmer"]
 
     #####################################################
     # Printout engine loading bits # Do not change this #
