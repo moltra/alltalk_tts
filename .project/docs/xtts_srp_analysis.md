@@ -72,10 +72,12 @@ Split into focused methods:
 - `_generate_non_streaming_audio()` - Non-streaming generation logic
 - `_cleanup_after_generation()` - Resource cleanup
 
-### 3. `handle_tts_method_change` Method (Lines 925-992)
-**Severity**: Medium
-**Lines**: 67 lines
-**Responsibilities**:
+### 3. `handle_tts_method_change` Method (Lines 974-1020) ✅ **REFACTORED**
+**Severity**: Medium (Resolved)
+**Lines**: 46 lines (reduced from 67 lines)
+**Status**: **COMPLETED** - Refactored on 2025-04-22
+
+**Original Responsibilities**:
 - Model availability validation
 - Model unloading
 - Method string parsing
@@ -84,15 +86,18 @@ Split into focused methods:
 - Performance timing
 - State tracking
 
-**Issues**:
-- Mixes validation with execution
-- Handles both loader types in one method
-- Timing logic mixed with business logic
+**Refactoring Applied**:
+Extracted into focused methods:
+- ✅ `_validate_model_change()` - Model availability validation (6 lines)
+- ✅ `_execute_model_loader()` - Parse method string and execute appropriate loader (33 lines)
+- ✅ `_report_load_time()` - Report model loading time (4 lines)
 
-**Recommendation**:
-- Extract validation to `_validate_model_change()`
-- Extract loader selection to `_select_model_loader()`
-- Keep timing but separate from core logic
+**Result**:
+- Main function reduced from 67 lines to 46 lines (31% reduction)
+- Separated validation from execution logic
+- Timing logic isolated in dedicated method
+- Easier to test individual concerns
+- Improved maintainability
 
 ### 4. `setup` Method (Lines 582-631)
 **Severity**: Medium
@@ -114,24 +119,30 @@ Split into focused methods:
 
 ## Moderate SRP Violations
 
-### 5. `voices_file_list` Method (Lines 701-777)
-**Severity**: Medium
-**Lines**: 76 lines
-**Responsibilities**:
+### 5. `voices_file_list` Method (Lines 757-809) ✅ **REFACTORED**
+**Severity**: Medium (Resolved)
+**Lines**: 52 lines (reduced from 76 lines)
+**Status**: **COMPLETED** - Refactored on 2025-04-22
+
+**Original Responsibilities**:
 - Directory scanning (3 locations)
 - File filtering
 - Voice type classification
 - Sorting
 - Error handling
 
-**Issues**:
-- Scans multiple directories in one method
-- Complex branching for different voice types
-- Error handling mixed with scanning logic
+**Refactoring Applied**:
+Extracted into focused methods:
+- ✅ `_scan_individual_wavs()` - Scan for individual WAV files (3 lines)
+- ✅ `_scan_voice_sets()` - Scan for voice sets in multi_voice_sets directory (9 lines)
+- ✅ `_scan_latents()` - Scan for JSON latent files (10 lines)
 
-**Recommendation**:
-- Extract directory scanners: `_scan_individual_wavs()`, `_scan_voice_sets()`, `_scan_latents()`
-- Combine results in main method
+**Result**:
+- Main function reduced from 76 lines to 52 lines (32% reduction)
+- Each directory scanner has single, clear responsibility
+- Easier to test individual scanning logic
+- Improved maintainability and extensibility
+- Preserved all original functionality
 
 ### 6. `scan_models_folder` Method (Lines 636-696)
 **Severity**: Low-Medium

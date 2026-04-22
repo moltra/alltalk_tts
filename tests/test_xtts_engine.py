@@ -10,6 +10,7 @@ Tests cover the core functionality of the XTTS engine including:
 
 import json
 import sys
+import time
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -563,3 +564,246 @@ class TestXTTSInitMethods:
             assert engine.openai_nova == "nova_voice"
             assert engine.openai_onyx == "onyx_voice"
             assert engine.openai_shimmer == "shimmer_voice"
+
+
+class TestXTTSHandleTTSMethodChangeHelpers:
+    """Tests for handle_tts_method_change helper methods"""
+
+    def test_validate_model_change_success(self, temp_xtts_dir, temp_dir):
+        """Test validation when models are available"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.available_models = ["xtts - model1", "apitts - model2"]
+
+            result = engine._validate_model_change()
+
+            assert result is True
+
+    def test_validate_model_change_no_models(self, temp_xtts_dir, temp_dir):
+        """Test validation when no models are available"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.available_models = ["No Models Available"]
+
+            result = engine._validate_model_change()
+
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_execute_model_loader_xtts(self, temp_xtts_dir, temp_dir):
+        """Test XTTS loader execution"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.device = "cuda"
+            engine.xtts_manual_load_model = AsyncMock(return_value=Mock())
+
+            result = await engine._execute_model_loader("xtts - test_model")
+
+            assert result is True
+            assert engine.current_model_loaded == "xtts - test_model"
+            engine.xtts_manual_load_model.assert_called_once_with("test_model")
+
+    @pytest.mark.asyncio
+    async def test_execute_model_loader_apitts(self, temp_xtts_dir, temp_dir):
+        """Test API TTS loader execution"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.device = "cuda"
+            engine.load_model = AsyncMock(return_value=Mock())
+
+            result = await engine._execute_model_loader("apitts - test_model")
+
+            assert result is True
+            assert engine.current_model_loaded == "apitts - test_model"
+            engine.load_model.assert_called_once_with("test_model")
+
+    @pytest.mark.asyncio
+    async def test_execute_model_loader_invalid(self, temp_xtts_dir, temp_dir):
+        """Test loader execution with invalid method type"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+
+            result = await engine._execute_model_loader("invalid_type - model")
+
+            assert result is False
+            assert engine.current_model_loaded is None
+
+    def test_report_load_time(self, temp_xtts_dir, temp_dir):
+        """Test load time reporting"""
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            start_time = time.time()
+            time.sleep(0.01)  # Small delay to ensure elapsed time > 0
+
+            engine._report_load_time(start_time)
+
+            # Just verify it doesn't raise an exception
+            assert True
+
+
+class TestXTTSVoicesFileListHelpers:
+    """Tests for voices_file_list helper methods"""
+
+    def test_scan_individual_wavs(self, temp_voices_dir, temp_xtts_dir, temp_dir):
+        """Test scanning individual WAV files"""
+        (temp_voices_dir / "voice1.wav").write_bytes(b"RIFF" + b"\x00" * 100)
+        (temp_voices_dir / "voice2.wav").write_bytes(b"RIFF" + b"\x00" * 100)
+        (temp_voices_dir / "not_a_voice.txt").write_text("text")
+
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+
+            wavs = engine._scan_individual_wavs(temp_voices_dir)
+
+            assert "voice1.wav" in wavs
+            assert "voice2.wav" in wavs
+            assert "not_a_voice.txt" not in wavs
+
+    def test_scan_voice_sets(self, temp_voices_dir, temp_xtts_dir, temp_dir):
+        """Test scanning voice sets directory"""
+        multi_voice_dir = temp_voices_dir / "xtts_multi_voice_sets"
+        multi_voice_dir.mkdir()
+
+        voice_set = multi_voice_dir / "voice_set_1"
+        voice_set.mkdir()
+        (voice_set / "sample1.wav").write_bytes(b"RIFF" + b"\x00" * 100)
+        (voice_set / "sample2.wav").write_bytes(b"RIFF" + b"\x00" * 100)
+
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+
+            voice_sets = engine._scan_voice_sets(multi_voice_dir)
+
+            assert "voiceset:voice_set_1" in voice_sets
+
+    def test_scan_voice_sets_empty_dir(self, temp_voices_dir, temp_xtts_dir, temp_dir):
+        """Test scanning voice sets with no valid sets"""
+        multi_voice_dir = temp_voices_dir / "xtts_multi_voice_sets"
+        multi_voice_dir.mkdir()
+
+        voice_set = multi_voice_dir / "empty_set"
+        voice_set.mkdir()
+        (voice_set / "not_a_wav.txt").write_text("text")
+
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+
+            voice_sets = engine._scan_voice_sets(multi_voice_dir)
+
+            assert len(voice_sets) == 0
+
+    def test_scan_latents_xtts(self, temp_voices_dir, temp_xtts_dir, temp_dir):
+        """Test scanning latents for XTTS model"""
+        latents_dir = temp_voices_dir / "xtts_latents"
+        latents_dir.mkdir()
+
+        (latents_dir / "latent1.json").write_text("{}")
+        (latents_dir / "latent2.json").write_text("{}")
+
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.current_model_loaded = "xtts - test_model"
+
+            latents = engine._scan_latents(latents_dir)
+
+            assert "latent:latent1.json" in latents
+            assert "latent:latent2.json" in latents
+
+    def test_scan_latents_apitts(self, temp_voices_dir, temp_xtts_dir, temp_dir):
+        """Test that API TTS doesn't include latents"""
+        latents_dir = temp_voices_dir / "xtts_latents"
+        latents_dir.mkdir()
+        (latents_dir / "latent1.json").write_text("{}")
+
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.current_model_loaded = "apitts - test_model"
+
+            latents = engine._scan_latents(latents_dir)
+
+            # API TTS should not include latents
+            assert "latent:latent1.json" not in latents
+
+    def test_scan_latents_no_dir(self, temp_voices_dir, temp_xtts_dir, temp_dir):
+        """Test scanning latents when directory doesn't exist"""
+        latents_dir = temp_voices_dir / "xtts_latents"
+
+        with (
+            patch("config.AlltalkConfig"),
+            patch("config.AlltalkTTSEnginesConfig"),
+            patch("config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.current_model_loaded = "xtts - test_model"
+
+            latents = engine._scan_latents(latents_dir)
+
+            assert len(latents) == 0
