@@ -93,7 +93,7 @@ def is_running_in_docker():
     )
 
 
-def download_file(url: str, dest_path: str, timeout: int = 30, retries: int = 3) -> bool:
+def download_file(url: str, dest_path: str, timeout: int = 30, retries: int = 3, progress_callback=None) -> bool:
     """
     Download a file from a URL to a specified destination path with progress bar.
 
@@ -102,6 +102,8 @@ def download_file(url: str, dest_path: str, timeout: int = 30, retries: int = 3)
         dest_path (str): Destination path where the file will be saved.
         timeout (int, optional): Connection and read timeout in seconds. Defaults to 30.
         retries (int, optional): Number of retry attempts for failed downloads. Defaults to 3.
+        progress_callback (callable, optional): Callback function for progress updates. 
+            Should accept (progress: float, desc: str) where progress is 0.0-1.0.
 
     Returns:
         bool: True if the file was successfully downloaded, False otherwise.
@@ -112,6 +114,8 @@ def download_file(url: str, dest_path: str, timeout: int = 30, retries: int = 3)
     # Don't re-download if file already exists (which is the case when using Docker):
     if Path(dest_path).exists():
         print(f"File already exists at: {dest_path}. Skipping download.")
+        if progress_callback:
+            progress_callback(1.0, "File already exists")
         return True
 
     progress_bar = None
@@ -138,6 +142,11 @@ def download_file(url: str, dest_path: str, timeout: int = 30, retries: int = 3)
                     if data:
                         dwn_file.write(data)
                         progress_bar.update(len(data))
+                        
+                        # Report progress via callback
+                        if progress_callback and total_size > 0:
+                            progress_percent = progress_bar.n / total_size
+                            progress_callback(progress_percent, f"Downloading {Path(dest_path).name} ({progress_percent:.1%})")
 
             if progress_bar:
                 progress_bar.close()
@@ -205,7 +214,7 @@ def setup_tts(tts_model: str, on_download_completed=unzip_compressed_files, skip
     set_firstrun_model_false()
 
 
-def download_tts_model(tts_model: str, on_download_completed=None):
+def download_tts_model(tts_model: str, model_name: str = None, on_download_completed=None, progress_callback=None):
     """Download TTS model files. Returns True if successful, False otherwise."""
     # Check if available_models.json exists
     available_models_path = os.path.join(this_dir, "system", "tts_engines", tts_model, "available_models.json")
@@ -219,8 +228,14 @@ def download_tts_model(tts_model: str, on_download_completed=None):
     try:
         with open(available_models_path) as f:
             available_models = json.load(f)
-            first_start_model = available_models["first_start_model"]
-            model = next(m for m in available_models["models"] if m["model_name"] == first_start_model)
+            
+            # Use specified model name or default to first_start_model
+            target_model_name = model_name if model_name else available_models["first_start_model"]
+            model = next((m for m in available_models["models"] if m["model_name"] == target_model_name), None)
+            
+            if not model:
+                print(f"[AllTalk] Error: Model '{target_model_name}' not found in available_models.json")
+                return False
 
             # folder_path: Special case for vits: firstrun.py expects the ZIP download directly in the model folder.
             # When firstrun.py unzips the file, the correct folder will be created automatically.
@@ -232,15 +247,35 @@ def download_tts_model(tts_model: str, on_download_completed=None):
                 files_to_download = list(files_to_download.values())
 
             downloaded_files = []
-            for file_download in files_to_download:
+            total_files = len(files_to_download)
+            
+            for idx, file_download in enumerate(files_to_download):
                 urlpath = urlsplit(file_download).path
                 file_name = os.path.basename(urlpath)
                 target_file = target_dir / file_name
-                download_file(file_download, target_file)
+                
+                # Calculate overall progress for this file
+                def file_progress_callback(progress, desc):
+                    if progress_callback:
+                        overall_progress = (idx + progress) / total_files
+                        progress_callback(overall_progress, f"File {idx + 1}/{total_files}: {desc}")
+                
+                success = download_file(file_download, target_file, progress_callback=file_progress_callback)
+                if not success:
+                    print(f"[AllTalk] Failed to download {file_name} from {file_download}")
+                    return False
                 downloaded_files.append(target_file)
 
             if on_download_completed:
+                if progress_callback:
+                    progress_callback(0.95, "Extracting files...")
                 on_download_completed(downloaded_files)
+            
+            # Verify at least one file was downloaded
+            if not downloaded_files:
+                print(f"[AllTalk] No files were downloaded for {tts_model}")
+                return False
+            
             return True
     except Exception as e:
         print(f"[AllTalk] Error downloading model {tts_model}: {e}")
@@ -322,126 +357,131 @@ if "ip_address" in config_json:
 
 config = AlltalkConfig.get_instance()
 branding = config.branding
-# Argument parser setup
-parser = argparse.ArgumentParser(description="TTS Setup Script")
-parser.add_argument(
-    "--tts_model",
-    type=str,
-    choices=["piper", "vits", "xtts", "none"],
-    help="Specify TTS model to set up (piper, vits, xtts, or none)",
-)
-args = parser.parse_args()
 
-# Check environment variable for auto-download preference
-auto_download = os.getenv("ALLTALK_AUTO_DOWNLOAD_MODEL", "false").lower() == "true"
-default_model = os.getenv("ALLTALK_DEFAULT_MODEL", "none").lower()
-
-# Check if firstrun_model is true
-if config.firstrun_model:
-    # Handle command-line argument for tts_model
-    if args.tts_model:
-        if args.tts_model in {"piper", "vits", "xtts"}:
-            print(f"[{branding}TTS] Setting up model '{args.tts_model}'.")
-            setup_tts(args.tts_model, skip_download=not auto_download)
-        elif args.tts_model == "none":
-            print(f"[{branding}TTS] No TTS model setup requested. Creating directory structure.")
-            # Create all model directories
-            os.makedirs(this_dir / "models/piper", exist_ok=True)
-            os.makedirs(this_dir / "models/vits", exist_ok=True)
-            os.makedirs(this_dir / "models/xtts", exist_ok=True)
-            os.makedirs(this_dir / "models/f5-tts", exist_ok=True)
-            os.makedirs(this_dir / "models/rvc_voices", exist_ok=True)
-            update_tts_engines("piper")  # Set default engine
-            set_firstrun_model_false()
-        print(f"[{branding}TTS] Setup completed for {args.tts_model}. Exiting.")
-        sys.exit()
-
-    # Check for Colab or Docker environment first
-    if is_running_in_colab() or is_running_in_docker():
-        if default_model != "none" and auto_download:
-            print(f"[{branding}TTS] Detected Colab/Docker environment - downloading {default_model}")
-            setup_tts(default_model if default_model in ["piper", "vits", "xtts"] else "piper")
-        else:
-            print(f"[{branding}TTS] Detected Colab/Docker environment - skipping auto-download")
-            print(f"[{branding}TTS] Models can be downloaded via Gradio UI or CLI")
-            # Create directory structure
-            os.makedirs(this_dir / "models/piper", exist_ok=True)
-            os.makedirs(this_dir / "models/vits", exist_ok=True)
-            os.makedirs(this_dir / "models/xtts", exist_ok=True)
-            os.makedirs(this_dir / "models/f5-tts", exist_ok=True)
-            os.makedirs(this_dir / "models/rvc_voices", exist_ok=True)
-            update_tts_engines("piper")  # Set default engine
-            set_firstrun_model_false()
-        warning_message()
-        sys.exit()
-
-    # Present the menu if no argument is passed and not in Colab/Docker
-    print(f"[{branding}TTS]")
-    print(
-        f"[{branding}TTS] \033[92mThis is the first-time startup.. Please download a start TTS model. Other TTS engines\033[0m"
+if __name__ == "__main__":
+    # First-time setup logic
+    branding = "AllTalk"
+    
+    # Argument parser setup
+    parser = argparse.ArgumentParser(description="TTS Setup Script")
+    parser.add_argument(
+        "--tts_model",
+        type=str,
+        choices=["piper", "vits", "xtts", "none"],
+        help="Specify TTS model to set up (piper, vits, xtts, or none)",
     )
-    print(
-        f"[{branding}TTS] \033[92mand TTS models can be downloaded/managed in the Gradio Interface `TTS Engines Settings`\033[0m"
-    )
-    print(f"[{branding}TTS] \033[92mtab after initial setup.\033[0m")
-    print(f"[{branding}TTS]")
+    args = parser.parse_args()
 
-    # List of available models
-    models = [
-        {"name": "piper", "model": "piper"},
-        {"name": "vits", "model": "tts_models--en--vctk--vits"},
-        {"name": "xtts", "model": "xttsv2_2.0.3"},
-    ]
+    # Check environment variable for auto-download preference
+    auto_download = os.getenv("ALLTALK_AUTO_DOWNLOAD_MODEL", "false").lower() == "true"
+    default_model = os.getenv("ALLTALK_DEFAULT_MODEL", "none").lower()
 
-    # Display models to the user
-    print(f"[{branding}TTS]    \033[94mAvailable First Time Start-up models:\033[0m")
-    print(f"[{branding}TTS]")
-    for idx, model in enumerate(models):
-        print(f"[{branding}TTS]    \033[93m{idx + 1}. \033[94m{model['name']} - {model['model']}\033[0m")
-    print(f"[{branding}TTS]    \033[93m{len(models) + 1}.\033[94m I have my own models already\033[0m")
-    print(f"[{branding}TTS]")
-    print(
-        f"[{branding}TTS]    \033[94mIn \033[91m60 seconds\033[0m \033[94ma Piper model will be \033[91mdownloaded automatically.\033[0m"
-    )
-    print(f"[{branding}TTS]")
+    # Check if firstrun_model is true
+    if config.firstrun_model:
+        # Handle command-line argument for tts_model
+        if args.tts_model:
+            if args.tts_model in {"piper", "vits", "xtts"}:
+                print(f"[{branding}TTS] Setting up model '{args.tts_model}'.")
+                setup_tts(args.tts_model, skip_download=not auto_download)
+            elif args.tts_model == "none":
+                print(f"[{branding}TTS] No TTS model setup requested. Creating directory structure.")
+                # Create all model directories
+                os.makedirs(this_dir / "models/piper", exist_ok=True)
+                os.makedirs(this_dir / "models/vits", exist_ok=True)
+                os.makedirs(this_dir / "models/xtts", exist_ok=True)
+                os.makedirs(this_dir / "models/f5-tts", exist_ok=True)
+                os.makedirs(this_dir / "models/rvc_voices", exist_ok=True)
+                update_tts_engines("piper")  # Set default engine
+                set_firstrun_model_false()
+            print(f"[{branding}TTS] Setup completed for {args.tts_model}. Exiting.")
+            sys.exit()
 
-    # Auto-select model after 60 seconds
-    selected_model = models[0]  # Default to the first model (piper)
-    try:
-        user_choice = inputimeout(prompt=f"[{branding}TTS]    \033[92mEnter your choice 1-4: \033[0m ", timeout=60)
-    except TimeoutOccurred:
-        user_choice = None
-
-    if user_choice is None:
-        print(f"[{branding}TTS]")
-        print(f"[{branding}TTS] No input received. Proceeding with the default model (piper).")
-    elif user_choice.lower() == "own" or (user_choice.isdigit() and int(user_choice) == len(models) + 1):
-        print(f"[{branding}TTS]")
-        print(f"[{branding}TTS] Please use the Gradio interface TTS Engine Settings > [Engine Name] > Model Download")
-        print(
-            f"[{branding}TTS] To download models for your selected TTS Engine. Or use the [Engine Name] help sections"
-        )
-        print(f"[{branding}TTS] for instructions on using your own TTS models.")
-        print(f"[{branding}TTS]")
-        os.makedirs("models/piper", exist_ok=True)
-        os.makedirs("models/vits", exist_ok=True)
-        os.makedirs("models/xtts/", exist_ok=True)
-        os.makedirs("models/f5-tts/", exist_ok=True)
-        os.makedirs("models/rvc_voices/", exist_ok=True)
-        update_tts_engines("piper")
-        set_firstrun_model_false()
-        warning_message()
-        exit()
-
-    if user_choice is not None and user_choice.isdigit() and 1 <= int(user_choice) <= len(models):
-        selected_model = models[int(user_choice) - 1]
-        warning_message()
-
-    if user_choice is None or user_choice.lower() != "own":
-        if selected_model["name"] in {"piper", "vits", "xtts"}:
-            setup_tts(selected_model["name"])
-            print(f"[{branding}TTS] {selected_model['name']} model downloaded and configuration updated successfully.")
+        # Check for Colab or Docker environment first
+        if is_running_in_colab() or is_running_in_docker():
+            if default_model != "none" and auto_download:
+                print(f"[{branding}TTS] Detected Colab/Docker environment - downloading {default_model}")
+                setup_tts(default_model if default_model in ["piper", "vits", "xtts"] else "piper")
+            else:
+                print(f"[{branding}TTS] Detected Colab/Docker environment - skipping auto-download")
+                print(f"[{branding}TTS] Models can be downloaded via Gradio UI or CLI")
+                # Create directory structure
+                os.makedirs(this_dir / "models/piper", exist_ok=True)
+                os.makedirs(this_dir / "models/vits", exist_ok=True)
+                os.makedirs(this_dir / "models/xtts", exist_ok=True)
+                os.makedirs(this_dir / "models/f5-tts", exist_ok=True)
+                os.makedirs(this_dir / "models/rvc_voices", exist_ok=True)
+                update_tts_engines("piper")  # Set default engine
+                set_firstrun_model_false()
             warning_message()
             sys.exit()
-else:
-    sys.exit()
+
+        # Present the menu if no argument is passed and not in Colab/Docker
+        print(f"[{branding}TTS]")
+        print(
+            f"[{branding}TTS] \033[92mThis is the first-time startup.. Please download a start TTS model. Other TTS engines\033[0m"
+        )
+        print(
+            f"[{branding}TTS] \033[92mand TTS models can be downloaded/managed in the Gradio Interface `TTS Engines Settings`\033[0m"
+        )
+        print(f"[{branding}TTS] \033[92mtab after initial setup.\033[0m")
+        print(f"[{branding}TTS]")
+
+        # List of available models
+        models = [
+            {"name": "piper", "model": "piper"},
+            {"name": "vits", "model": "tts_models--en--vctk--vits"},
+            {"name": "xtts", "model": "xttsv2_2.0.3"},
+        ]
+
+        # Display models to the user
+        print(f"[{branding}TTS]    \033[94mAvailable First Time Start-up models:\033[0m")
+        print(f"[{branding}TTS]")
+        for idx, model in enumerate(models):
+            print(f"[{branding}TTS]    \033[93m{idx + 1}. \033[94m{model['name']} - {model['model']}\033[0m")
+        print(f"[{branding}TTS]    \033[93m{len(models) + 1}.\033[94m I have my own models already\033[0m")
+        print(f"[{branding}TTS]")
+        print(
+            f"[{branding}TTS]    \033[94mIn \033[91m60 seconds\033[0m \033[94ma Piper model will be \033[91mdownloaded automatically.\033[0m"
+        )
+        print(f"[{branding}TTS]")
+
+        # Auto-select model after 60 seconds
+        selected_model = models[0]  # Default to the first model (piper)
+        try:
+            user_choice = inputimeout(prompt=f"[{branding}TTS]    \033[92mEnter your choice 1-4: \033[0m ", timeout=60)
+        except TimeoutOccurred:
+            user_choice = None
+
+        if user_choice is None:
+            print(f"[{branding}TTS]")
+            print(f"[{branding}TTS] No input received. Proceeding with the default model (piper).")
+        elif user_choice.lower() == "own" or (user_choice.isdigit() and int(user_choice) == len(models) + 1):
+            print(f"[{branding}TTS]")
+            print(f"[{branding}TTS] Please use the Gradio interface TTS Engine Settings > [Engine Name] > Model Download")
+            print(
+                f"[{branding}TTS] To download models for your selected TTS Engine. Or use the [Engine Name] help sections"
+            )
+            print(f"[{branding}TTS] for instructions on using your own TTS models.")
+            print(f"[{branding}TTS]")
+            os.makedirs("models/piper", exist_ok=True)
+            os.makedirs("models/vits", exist_ok=True)
+            os.makedirs("models/xtts/", exist_ok=True)
+            os.makedirs("models/f5-tts/", exist_ok=True)
+            os.makedirs("models/rvc_voices/", exist_ok=True)
+            update_tts_engines("piper")
+            set_firstrun_model_false()
+            warning_message()
+            exit()
+
+        if user_choice is not None and user_choice.isdigit() and 1 <= int(user_choice) <= len(models):
+            selected_model = models[int(user_choice) - 1]
+            warning_message()
+
+        if user_choice is None or user_choice.lower() != "own":
+            if selected_model["name"] in {"piper", "vits", "xtts"}:
+                setup_tts(selected_model["name"])
+                print(f"[{branding}TTS] {selected_model['name']} model downloaded and configuration updated successfully.")
+                warning_message()
+                sys.exit()
+        else:
+            sys.exit()

@@ -812,6 +812,81 @@ class TestXTTSVoicesFileListHelpers:
 
             assert len(latents) == 0
 
+    def test_scan_builtin_xtts_voices(self, temp_xtts_dir, temp_models_dir, temp_dir):
+        """Test scanning builtin XTTS voices from speakers_xtts.pth"""
+        # Create a valid model with speakers_xtts.pth
+        model_folder = temp_models_dir / "test_model"
+        model_folder.mkdir()
+        required_files = ["config.json", "model.pth", "mel_stats.pth", "speakers_xtts.pth", "vocab.json", "dvae.pth"]
+        for file in required_files:
+            (model_folder / file).write_text("{}")
+
+        # Create a mock speakers_xtts.pth with speaker embeddings
+        mock_speakers = {
+            "Claribel Dervla": [[0.1, 0.2, 0.3]],
+            "Daisy Studious": [[0.4, 0.5, 0.6]],
+            "Gracie Wise": [[0.7, 0.8, 0.9]],
+        }
+
+        with (
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
+            patch("torch.load", return_value=mock_speakers),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.main_dir = temp_dir
+            engine.current_model_loaded = "xtts - test_model"
+
+            builtin_voices = engine._scan_builtin_xtts_voices()
+
+            assert "builtin:Claribel Dervla" in builtin_voices
+            assert "builtin:Daisy Studious" in builtin_voices
+            assert "builtin:Gracie Wise" in builtin_voices
+
+    def test_scan_builtin_xtts_voices_apitts(self, temp_xtts_dir, temp_models_dir, temp_dir):
+        """Test that API TTS doesn't include builtin voices"""
+        model_folder = temp_models_dir / "test_model"
+        model_folder.mkdir()
+        required_files = ["config.json", "model.pth", "mel_stats.pth", "speakers_xtts.pth", "vocab.json", "dvae.pth"]
+        for file in required_files:
+            (model_folder / file).write_text("{}")
+
+        with (
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.main_dir = temp_dir
+            engine.current_model_loaded = "apitts - test_model"
+
+            builtin_voices = engine._scan_builtin_xtts_voices()
+
+            # API TTS should not include builtin voices
+            assert len(builtin_voices) == 0
+
+    def test_scan_builtin_xtts_voices_no_model(self, temp_xtts_dir, temp_dir):
+        """Test scanning builtin voices when no model is loaded"""
+        with (
+            patch("config.app.config.AlltalkConfig"),
+            patch("config.app.config.AlltalkTTSEnginesConfig"),
+            patch("config.app.config.AlltalkNewEnginesConfig"),
+        ):
+            from system.tts_engines.xtts.model_engine import tts_class
+
+            engine = tts_class()
+            engine.main_dir = temp_dir
+            engine.current_model_loaded = None
+
+            builtin_voices = engine._scan_builtin_xtts_voices()
+
+            assert len(builtin_voices) == 0
+
 
 class TestXTTSSetupHelpers:
     """Tests for setup helper methods"""

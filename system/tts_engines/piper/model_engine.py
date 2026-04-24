@@ -1,14 +1,28 @@
 ###############################################
 # DONT CHANGE # These are base imports needed #
 ###############################################
+import asyncio
 import json
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 from fastapi import HTTPException
+
+# Constants
+PIPER_ENGINE_NAME = "piper"
+PIPER_MODELS_DIR = "models/piper"
+PIPER_ENGINE_DIR = "system/tts_engines/piper/engine"
+ONNX_EXTENSION = ".onnx"
+JSON_EXTENSION = ".json"
+NO_VOICES_FOUND = "No Voices Found"
+NO_MODELS_FOUND = "No Models Found"
+DEFAULT_SPEED_INVERSION = 1.0
+WINDOWS_PLATFORM = "win32"
 
 # Loguru handles logging levels via configuration
 #################################################################
@@ -34,14 +48,15 @@ except ImportError:
 # In this section you will import any imports that your specific TTS Engine will use. You will provide any
 # start-up errors for those bits, as if you were starting up a normal Python script. Note the logging.disable
 # a few lines up from here, you may want to # that out while debugging!
-import asyncio
+# asyncio already imported at top
 
 
 #################################################################################################################################
 # DONT CHANGE # Do not change the Class name from tts_class as this is what will be imported into the main tts_server.py script #
 #################################################################################################################################
 class tts_class:
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the Piper TTS engine with configuration and settings."""
         ########################################################################
         # DONT CHANGE # Sets up the base variables required for any tts engine #
         ########################################################################
@@ -71,7 +86,7 @@ class tts_class:
         ##############################################################################################
         # DONT CHANGE # Load in a list of the available TTS engines and the currently set TTS engine #
         ##############################################################################################
-        tts_engines_file = os.path.join(self.main_dir, "system", "tts_engines", "tts_engines.json")
+        tts_engines_file = self.main_dir / "system" / "tts_engines" / "tts_engines.json"
         with open(tts_engines_file) as f:
             tts_engines_data = json.load(f)
         self.engines_available = [
@@ -87,7 +102,7 @@ class tts_class:
         # DONT CHANGE # Pull out all the settings for the currently set TTS engine #
         ############################################################################
         with open(
-            os.path.join(self.this_dir, "..", "..", "..", "config", "engines", "piper", "model_settings.json")
+            self.this_dir.parent.parent.parent / "config" / "engines" / "piper" / "model_settings.json"
         ) as f:
             tts_model_loaded = json.load(f)
         # Access the model details
@@ -211,7 +226,8 @@ class tts_class:
     ################################################################
     # DONT CHANGE #  Print out Python, CUDA, DeepSpeed versions ####
     ################################################################
-    def printout_versions(self):
+    def printout_versions(self) -> None:
+        """Print system version information for debugging."""
         if deepspeed_available:
             print(f"[{self.branding}ENG] \033[92mDeepSpeed version :\033[93m", deepspeed.__version__, "\033[0m")
         else:
@@ -234,7 +250,8 @@ class tts_class:
     # may be calling your model loader via handle_tts_method_change or if your TTS
     # engine doesnt actually load a model into CUDA or System RAM, you may be doing
     # Something to fake its start-up.
-    async def setup(self):
+    async def setup(self) -> None:
+        """Initialize the Piper TTS engine and scan for available models."""
         self.printout_versions()
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
         # ↑↑↑ Keep everything above this line ↑↑↑
@@ -244,7 +261,7 @@ class tts_class:
         generate_start_time = time.time()  # Record the start time of loading the model - Piper doesnt load a model, so its a bit unique that we put a load time in here.
         self.available_models = self.scan_models_folder()
         print("in setup - self.selected_model:", self.selected_model) if self.debug_tts else None
-        self.current_model_loaded = "piper"
+        self.current_model_loaded = PIPER_ENGINE_NAME
         self.is_tts_model_loaded = True  # Set self.is_tts_model_loaded to True so that other portions of AllTalk know that the script is ready to recieve generation requests, as piper doesnt load in models
         generate_end_time = time.time()  # Create an end timer for calculating load times
         generate_elapsed_time = generate_end_time - generate_start_time  # Calculate start time minus end time
@@ -272,7 +289,8 @@ class tts_class:
     # function in place. The "pass" tells the function to just exit out cleanly if called.
     # However, its quite a simple check along the lines of "if CUDA is available and model is
     # in X place, then send it to Y place (or Y to X).
-    async def handle_lowvram_change(self):
+    async def handle_lowvram_change(self) -> None:
+        """Handle LowVRAM changes (not applicable for Piper)."""
         pass  # Piper does not stay in CUDA or support swapping of location
 
     ########################################
@@ -285,7 +303,8 @@ class tts_class:
     # TTS model doesnt support DeepSpeed, then it should be globally set in your
     # model_settings.JSON and this function will never get called, however it still needs
     # to exist as a function.
-    async def handle_deepspeed_change(self, value):
+    async def handle_deepspeed_change(self, value: bool) -> bool:
+        """Handle DeepSpeed enable/disable changes."""
         if value:
             # DeepSpeed enabled
             print(f"[{self.branding}ENG] \033[93mDeepSpeed Activating\033[0m")
@@ -316,19 +335,20 @@ class tts_class:
     # then engine name, then we use the voices_file_list to populate the models as available
     # voices that can be selected in the interface.
     # If no models are found, we return "No Models Available" and continue on with the script.
-    def scan_models_folder(self):
+    def scan_models_folder(self) -> Dict[str, str]:
+        """Scan for available Piper models (voices)."""
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
         # ↑↑↑ Keep everything above this line ↑↑↑
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
-        self.available_models = {"piper": "piper"}
+        self.available_models = {PIPER_ENGINE_NAME: PIPER_ENGINE_NAME}
 
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
         # ↓↓↓ Keep everything below this line ↓↓↓
         # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
         if not self.available_models:
-            self.available_models["No Models Found"] = (
-                "No Models Found"  # Return a list with {'No Models Found'} if there are no models found.
+            self.available_models[NO_MODELS_FOUND] = (
+                NO_MODELS_FOUND  # Return a list with {'No Models Found'} if there are no models found.
             )
         return (
             self.available_models
@@ -344,36 +364,37 @@ class tts_class:
     # (Piper) and some are text (Parler) thats stored in a JSON file. We just need to
     # populate the "voices" variable somehow and if no voices are found, we return
     # "No Voices Found" back to the interface/api.
-    def voices_file_list(self):
+    def voices_file_list(self) -> List[str]:
+        """Scan for available Piper voice models and return list of relative paths."""
         try:
             voices = []
             # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
             # ↑↑↑ Keep everything above this line ↑↑↑
             # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
-            models_dir = self.main_dir / "models" / "piper"
+            models_dir = self.main_dir / PIPER_MODELS_DIR
             for root, dirs, files in os.walk(models_dir):
-                onnx_files = [file for file in files if file.endswith(".onnx")]
+                onnx_files = [file for file in files if file.endswith(ONNX_EXTENSION)]
                 for onnx_file in onnx_files:
-                    json_file = onnx_file + ".json"
+                    json_file = onnx_file + JSON_EXTENSION
                     if json_file in files:
-                        relative_path = os.path.relpath(os.path.join(root, onnx_file), models_dir)
-                        voices.append(relative_path)
+                        relative_path = Path(root).relative_to(models_dir) / onnx_file
+                        voices.append(str(relative_path))
 
             # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
             # ↓↓↓ Keep everything below this line ↓↓↓
             # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
             if not voices:
                 return [
-                    "No Voices Found"
+                    NO_VOICES_FOUND
                 ]  # Return a list with {'No Voices Found'} if there are no voices/voice models.
-            return voices  # Return a list of models in the format {'engine name': 'model 1', 'engine name': 'model 2", etc}
-        except Exception:
+            return voices  # Return a list of models in the format {'engine name': 'model 1', 'engine name': 'model 2", etc
+        except (FileNotFoundError, PermissionError, OSError) as e:
             print(
-                f"[{self.branding}ENG] \033[91mError\033[0m: Voices/Voice Models not found. Cannot load a list of voices."
+                f"[{self.branding}ENG] \033[91mError\033[0m: Voices/Voice Models not found. Cannot load a list of voices: {e}"
             )
             print(f"[{self.branding}ENG]")
-            return ["No Voices Found"]
+            return [NO_VOICES_FOUND]
 
     #################################################################################
     #################################################################################
@@ -387,8 +408,9 @@ class tts_class:
     # as this is used elsewhere in the scripts to confirm that a model is available to be used for TTS generation.
     # We always check for "No Models Available" being sent as that means we are trying to load in a model that
     # doesnt exist/wasnt found on script start-up e.g. someone deleted the model from the folder or something.
-    async def api_manual_load_model(self, model_name):
-        if model_name == "No Models Found":
+    async def api_manual_load_model(self, model_name: str) -> Optional[None]:
+        """Load a Piper model (fake load since Piper doesn't keep models resident)."""
+        if model_name == NO_MODELS_FOUND:
             print(f"[{self.branding}ENG] \033[91mError\033[0m: No models for this TTS engine were found to load.")
             raise HTTPException(status_code=400, detail="No models for this TTS engine were found to load.")
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
@@ -412,7 +434,8 @@ class tts_class:
     # doesnt load into memory, so we just need to put a fake function here that doesnt really do anything
     # other than set "self.is_tts_model_loaded = False", which would be set back to true by the model loader.
     # So look at the Piper model_engine.py if you DONT need to unload models.
-    async def unload_model(self):
+    async def unload_model(self) -> Optional[None]:
+        """Unload the Piper model (fake unload since Piper doesn't keep models resident)."""
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
         # ↑↑↑ Keep everything above this line ↑↑↑
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
@@ -434,9 +457,10 @@ class tts_class:
     # that it needs to load in and then we call the correct loader function. Whereas in Piper, which doesnt load models into memory at all,
     # we just have a fake function that doesnt really do anything. We always check to see if the model name has "No Models Available" in the
     # name thats sent over, just to catch any potential errors. We display the start load time and end load time. Thats about it.
-    async def handle_tts_method_change(self, tts_method):
+    async def handle_tts_method_change(self, tts_method: str) -> bool:
+        """Handle TTS method/model changes (fake for Piper since no models are resident)."""
         generate_start_time = time.time()  # Record the start time of loading the model
-        if "No Models Available" in self.available_models:
+        if NO_MODELS_FOUND in self.available_models:
             print(
                 f"[{self.branding}ENG] \033[91mError\033[0m: No models for this TTS engine were found to load. Please download a model."
             )
@@ -475,10 +499,29 @@ class tts_class:
     # very clearly highlighted in its model_engine.py script.
     # Piper TTS, which uses command line based calls and therefore has different ones for Windows and Linux/Mac, has an example of doing this
     # within its model_engine.py file.
+    def _validate_file_exists(self, file_path: Path, file_type: str) -> None:
+        """Validate that a required file exists."""
+        if not file_path.exists():
+            print(f"[{self.branding}Debug] {file_type} not found: {file_path}") if self.debug_tts else None
+            raise HTTPException(status_code=500, detail=f"{file_type} not found.")
+
     async def generate_tts(
-        self, text, voice, language, temperature, repetition_penalty, speed, pitch, output_file, streaming
-    ):
-        if voice == "No Voices Found":
+        self, text: str, voice: str, language: str, temperature: float, repetition_penalty: float, speed: float, pitch: float, output_file: Path, streaming: bool
+    ) -> Union[bytes, None]:
+        """Generate TTS audio using Piper subprocess."""
+        print(f"[{self.branding}ENG] DEBUG: voice parameter value: '{voice}'")
+        
+        # Input validation - prevent path traversal attacks
+        if voice != NO_VOICES_FOUND:
+            if ".." in voice or voice.startswith("/") or voice.startswith("\\"):
+                print(f"[{self.branding}ENG] \033[91mError\033[0m: Invalid voice path detected (potential path traversal).")
+                raise HTTPException(status_code=400, detail="Invalid voice path.")
+            # Ensure voice is a relative path without absolute path components
+            if os.path.isabs(voice):
+                print(f"[{self.branding}ENG] \033[91mError\033[0m: Absolute voice path not allowed.")
+                raise HTTPException(status_code=400, detail="Absolute voice path not allowed.")
+        
+        if voice == NO_VOICES_FOUND:
             print(f"[{self.branding}ENG] \033[91mError\033[0m: No voices found to generate TTS.")
             raise HTTPException(status_code=400, detail="No voices found to generate TTS.")
         if not self.is_tts_model_loaded:
@@ -490,24 +533,19 @@ class tts_class:
         # ↑↑↑ Keep everything above this line ↑↑↑
         # ↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
-        model_dir = self.main_dir / "models" / "piper" / voice
-        model_file = model_dir.with_suffix(".onnx")
-        config_file = model_file.with_suffix(".onnx.json")
-        inverted_speed = 1.0 / float(speed)
+        model_file = self.main_dir / PIPER_MODELS_DIR / voice
+        config_file = Path(str(model_file) + JSON_EXTENSION)
+        print(f"[{self.branding}ENG] DEBUG: model_file path: '{model_file}'")
+        print(f"[{self.branding}ENG] DEBUG: config_file path: '{config_file}'")
+        inverted_speed = DEFAULT_SPEED_INVERSION / float(speed)
 
-        if sys.platform == "win32":
+        if sys.platform == WINDOWS_PLATFORM:
             # Windows: Use piper.exe
-            piper_exe = self.main_dir / "system" / "tts_engines" / "piper" / "engine" / "piper.exe"
+            piper_exe = self.main_dir / PIPER_ENGINE_DIR / "piper.exe"
             # Ensure all files exist
-            if not piper_exe.exists():
-                print(f"[{self.branding}Debug] Piper executable not found: {piper_exe}") if self.debug_tts else None
-                raise HTTPException(status_code=500, detail="Piper executable not found.")
-            if not model_file.exists():
-                print(f"[{self.branding}Debug] Model file not found: {model_file}") if self.debug_tts else None
-                raise HTTPException(status_code=500, detail="Model file not found.")
-            if not config_file.exists():
-                print(f"[{self.branding}Debug] Config file not found: {config_file}") if self.debug_tts else None
-                raise HTTPException(status_code=500, detail="Config file not found.")
+            self._validate_file_exists(piper_exe, "Piper executable")
+            self._validate_file_exists(model_file, "Model file")
+            self._validate_file_exists(config_file, "Config file")
             command = [
                 str(piper_exe),
                 "--model",
@@ -524,21 +562,22 @@ class tts_class:
                 command.append("--output-raw")
         else:
             # Linux and macOS: Use piper command directly # In piper there are different call methods between Windows and Linux/Mac
-            if not model_file.exists():
-                print(f"[{self.branding}Debug] Model file not found: {model_file}") if self.debug_tts else None
-                raise HTTPException(status_code=500, detail="Model file not found.")
-            if not config_file.exists():
-                print(f"[{self.branding}Debug] Config file not found: {config_file}") if self.debug_tts else None
-                raise HTTPException(status_code=500, detail="Config file not found.")
+            self._validate_file_exists(model_file, "Model file")
+            self._validate_file_exists(config_file, "Config file")
+            # Use full path to piper executable (installed via piper-tts package)
+            piper_path = Path.home() / ".local" / "bin" / "piper"
+            if not piper_path.exists():
+                # Fallback to system piper if local path doesn't exist
+                piper_path = "piper"
             command = [
-                "piper",
+                str(piper_path),
                 "-m",
                 str(model_file),
                 "-c",
                 str(config_file),
                 "-f",
                 str(output_file),
-                "--length-scale",
+                "--length_scale",
                 str(inverted_speed),
             ]
             if streaming:
@@ -564,7 +603,7 @@ class tts_class:
                     f"[{self.branding}Debug] Subprocess failed with return code: {return_code}"
                 ) if self.debug_tts else None
                 raise HTTPException(status_code=500, detail=f"Subprocess failed with return code: {return_code}")
-            if not os.path.exists(output_file):
+            if not output_file.exists():
                 print(f"[{self.branding}Debug] Output file does not exist: {output_file}") if self.debug_tts else None
                 if streaming:
                     print(f"[{self.branding}Debug] Yielding stdout") if self.debug_tts else None
@@ -573,7 +612,7 @@ class tts_class:
                     print(f"[{self.branding}Debug] Yielding empty byte string") if self.debug_tts else None
                     yield b""
 
-        except Exception as e:
+        except (asyncio.TimeoutError, OSError, subprocess.SubprocessError) as e:
             print(f"[{self.branding}Debug] Exception while running subprocess: {e!s}") if self.debug_tts else None
             raise HTTPException(status_code=500, detail=f"Exception while running subprocess: {e!s}")
 

@@ -851,6 +851,9 @@ class tts_class:
             # Scan for JSON latents
             voices.extend(self._scan_latents(json_latents_dir))
 
+            # Scan for builtin XTTS voices
+            voices.extend(self._scan_builtin_xtts_voices())
+
             # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
             # ↓↓↓ Keep everything below this line ↓↓↓
             # ↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓↓
@@ -917,6 +920,33 @@ class tts_class:
                     voices.append(f"latent:{json_file}")
                 if json_files:
                     self.print_message(f"Added {len(json_files)} JSON latent files", message_type="debug_tts")
+        return voices
+
+    def _scan_builtin_xtts_voices(self):
+        """
+        Scan for builtin XTTS voices from speakers_xtts.pth file.
+
+        Returns:
+            list: List of builtin voice identifiers (format: "builtin:speaker_name")
+        """
+        voices = []
+        if self.current_model_loaded and self.current_model_loaded.startswith("xtts"):
+            # Find the speakers_xtts.pth file in the model directory
+            models_dir = self.main_dir / "models" / "xtts"
+            if self.current_model_loaded and self.current_model_loaded != "No Models Available":
+                # Strip the "xtts - " or "apitts - " prefix to get the folder name
+                model_folder_name = self.current_model_loaded.split(" - ")[-1] if " - " in self.current_model_loaded else self.current_model_loaded
+                speakers_path = models_dir / model_folder_name / "speakers_xtts.pth"
+                if speakers_path.exists():
+                    try:
+                        speakers_dict = torch.load(speakers_path, map_location='cpu')
+                        if isinstance(speakers_dict, dict):
+                            speaker_names = list(speakers_dict.keys())
+                            for speaker_name in speaker_names:
+                                voices.append(f"builtin:{speaker_name}")
+                            self.print_message(f"Added {len(speaker_names)} builtin XTTS voices", message_type="debug_tts")
+                    except Exception as e:
+                        self.print_message(f"Error loading speakers_xtts.pth: {e}", message_type="warning")
         return voices
 
     ############################################
@@ -1174,7 +1204,8 @@ class tts_class:
         """
         Prepare voice input by processing different voice types and extracting conditioning latents.
 
-        Handles three voice input types:
+        Handles four voice input types:
+        - builtin: Pre-computed speaker embeddings from speakers_xtts.pth
         - latent: Pre-computed latents from JSON files
         - voiceset: Multiple WAV files for voice cloning
         - single: Single WAV file reference
@@ -1193,7 +1224,26 @@ class tts_class:
         speaker_embedding = None
         wavs_files = []
 
-        if voice.startswith("latent:"):
+        if voice.startswith("builtin:"):
+            # Handle builtin XTTS voices from speakers_xtts.pth
+            if self.current_model_loaded and self.current_model_loaded.startswith("xtts"):
+                speaker_name = voice.replace("builtin:", "")
+                models_dir = self.main_dir / "models" / "xtts"
+                # Strip the "xtts - " or "apitts - " prefix to get the folder name
+                model_folder_name = self.current_model_loaded.split(" - ")[-1] if " - " in self.current_model_loaded else self.current_model_loaded
+                speakers_path = models_dir / model_folder_name / "speakers_xtts.pth"
+                if speakers_path.exists():
+                    try:
+                        speakers_dict = torch.load(speakers_path, map_location='cpu')
+                        if isinstance(speakers_dict, dict) and speaker_name in speakers_dict:
+                            speaker_embedding = speakers_dict[speaker_name]
+                            self.print_message(f"Using builtin speaker embedding: {speaker_name}", message_type="debug_tts")
+                        else:
+                            self.print_message(f"Speaker {speaker_name} not found in speakers_xtts.pth", message_type="error")
+                    except Exception as e:
+                        self.print_message(f"Error loading speaker embedding: {e}", message_type="error")
+
+        elif voice.startswith("latent:"):
             if self.current_model_loaded.startswith("xtts"):
                 gpt_cond_latent, speaker_embedding = self._load_latents(voice)
 
@@ -1428,6 +1478,22 @@ class tts_class:
             # Generate speech
             if self.current_model_loaded.startswith("xtts"):
                 self.print_message(f"Generating speech for text: {text}", message_type="debug_tts")
+
+                # Provide default gpt_cond_latent if None (e.g., for builtin voices)
+                # The TTS library's inference method expects gpt_cond_latent to always be a tensor
+                if gpt_cond_latent is None:
+                    self.print_message("gpt_cond_latent is None, using default zero tensor", message_type="debug_tts")
+                    gpt_cond_latent = torch.zeros(1, self.model.config.gpt_cond_len, device=self.device)
+
+                # Provide default speaker_embedding if None (e.g., for builtin voices or when voice processing fails)
+                # The TTS library's inference method expects speaker_embedding to always be a tensor
+                # XTTS uses 512-dimensional speaker embeddings
+                if speaker_embedding is None:
+                    self.print_message("speaker_embedding is None, using default zero tensor", message_type="debug_tts")
+                    speaker_embedding = torch.zeros(1, 512, device=self.device)
+                elif isinstance(speaker_embedding, dict):
+                    self.print_message(f"speaker_embedding is a dict (keys: {list(speaker_embedding.keys())}), using default zero tensor", message_type="error")
+                    speaker_embedding = torch.zeros(1, 512, device=self.device)
 
                 common_args = {
                     "text": text,

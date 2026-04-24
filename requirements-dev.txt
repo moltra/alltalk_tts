@@ -12,6 +12,7 @@ pytest-xdist>=3.6.0
 pytest-timeout>=2.3.0
 pytest-loguru>=0.4.0
 pytest-html>=4.1.0
+loguru>=0.7.0
 
 # Code Quality - Linting and Formatting
 ruff>=0.7.0
@@ -67,3 +68,6 @@ python-dotenv>=1.0.0
 # Build Tools
 build>=1.2.0
 twine>=5.1.0
+
+# Browser Automation for Gradio UI Testing
+playwright>=1.41.0

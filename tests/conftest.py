@@ -1,12 +1,20 @@
 # tests/conftest.py
+import os
 import shutil
+import sys
 import tempfile
 from io import StringIO
 from pathlib import Path
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock, Mock, MagicMock
 
 import pytest
 from loguru import logger
+
+# Mock deepspeed before any imports
+sys.modules["deepspeed"] = MagicMock()
+sys.modules["deepspeed.ops"] = MagicMock()
+sys.modules["deepspeed.ops.op_builder"] = MagicMock()
+sys.modules["deepspeed.git_version_info"] = MagicMock()
 
 from config.app.config import AlltalkConfig, AlltalkTTSEnginesConfig
 
@@ -56,6 +64,17 @@ def mock_model_engine():
     engine.unload_model = AsyncMock()
     engine.handle_tts_method_change = AsyncMock(return_value=True)
     return engine
+
+
+@pytest.fixture
+def mock_tts_engines_config():
+    """Create mock TTS engines config"""
+    config = Mock()
+    config.is_valid_engine = Mock(return_value=True)
+    config.change_engine = Mock(return_value=config)
+    config.save = Mock()
+    config.reload = Mock()
+    return config
 
 
 @pytest.fixture

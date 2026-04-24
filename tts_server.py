@@ -342,7 +342,8 @@ async def apifunction_enginereload(request: Request):
     print_message("", component="ENG")
 
     try:
-        tts_engines_config.change_engine(requested_engine).save()
+        tts_engines_config.change_engine(requested_engine)
+        tts_engines_config.save()
         print_message(f"Engine configuration updated to: {requested_engine}", "debug_api", "API")
     finally:
         tts_engines_config.reload()

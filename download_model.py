@@ -95,6 +95,22 @@ def download_model(engine: str, force: bool = False):
     else:
         print(f"\n❌ Failed to download {engine} model")
         print(f"   You may need to download it manually or check available_models.json")
+        print(f"\n💡 Manual download instructions:")
+        if engine == "xtts":
+            print(f"   XTTS models can be downloaded from:")
+            print(f"   https://huggingface.co/coqui/XTTS-v2")
+        elif engine == "piper":
+            print(f"   Piper models can be downloaded from:")
+            print(f"   https://huggingface.co/rhasspy/piper-voices")
+        elif engine == "vits":
+            print(f"   VITS models can be downloaded from:")
+            print(f"   https://github.com/jaywalnut310/vits")
+        elif engine == "f5tts":
+            print(f"   F5-TTS models can be downloaded from:")
+            print(f"   https://huggingface.co/SWivid/F5-TTS")
+        elif engine == "parler":
+            print(f"   Parler models can be downloaded from:")
+            print(f"   https://huggingface.co/Parler-TTS")
     
     return success
 
