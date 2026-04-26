@@ -595,14 +595,15 @@ class tts_class:
             print(f"[{self.branding}Debug] Communicating with subprocess") if self.debug_tts else None
             stdout, stderr = await process.communicate(text.encode())
             if stderr:
-                print(f"[{self.branding}Debug] Subprocess stderr: {stderr.decode()}") if self.debug_tts else None
+                print(f"[{self.branding}ENG] Subprocess stderr: {stderr.decode()}")
             return_code = process.returncode
             print(f"[{self.branding}Debug] Subprocess return code: {return_code}") if self.debug_tts else None
             if return_code != 0:
-                print(
-                    f"[{self.branding}Debug] Subprocess failed with return code: {return_code}"
-                ) if self.debug_tts else None
-                raise HTTPException(status_code=500, detail=f"Subprocess failed with return code: {return_code}")
+                error_msg = f"Subprocess failed with return code: {return_code}"
+                if stderr:
+                    error_msg += f" | stderr: {stderr.decode()}"
+                print(f"[{self.branding}ENG] ERROR: {error_msg}")
+                raise HTTPException(status_code=500, detail=error_msg)
             if not output_file.exists():
                 print(f"[{self.branding}Debug] Output file does not exist: {output_file}") if self.debug_tts else None
                 if streaming:
