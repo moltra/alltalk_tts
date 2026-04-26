@@ -1528,6 +1528,28 @@ def get_alltalk_settings():
 get_alltalk_settings()
 
 
+##############################
+#### TTS TEST TEXT PRESETS ####
+##############################
+def load_test_preset(preset_choice):
+    """Load predefined test text based on selection"""
+    debug_func_entry()
+    
+    presets = {
+        "None": "",
+        "Comprehensive Test": """Hello! This is a comprehensive test for the Text-to-Speech server. Today is Sunday, April 26th, 2026, and the current time is approximately 10:57 AM Eastern Daylight Time. My name is Mark Strickland, and I'm testing from Ironton, Ohio in the United States.
+Please pronounce these correctly: supercalifragilisticexpialidocious, 1,234,567.89 dollars, the quick brown fox jumps over the lazy dog, and the acronym NASA.
+Question: How well does the system handle questions and exclamation marks?!
+Numbers and symbols: 42, 3.14159, 100%, @gmail.com, and https://example.com/test.
+This sentence has a mix of short and long words to test natural prosody and pacing.
+End of test. How does it sound?""",
+        "Quick Test": "The quick brown fox jumps over the lazy dog. This is a simple test of the text to speech system.",
+        "Numbers Test": "Testing numbers: 1, 2, 3, 10, 100, 1000. Decimals: 3.14, 2.718. Large numbers: 1,234,567.89. Percentages: 50%, 100%."
+    }
+    
+    return presets.get(preset_choice, "")
+
+
 #############################
 #### TTS STOP GENERATION ####
 #############################
@@ -2906,7 +2928,13 @@ if gradio_enabled is True:
                 if config.api_def.api_use_legacy_api:
                     return result["output_file_url"], "TTS Audio Generated"
 
-                # Prepend the URL and PORT to the output_file_url
+                # Return the file path directly for Gradio to avoid SSRF protection issues
+                # Gradio can access files directly from the filesystem
+                output_file_path = result.get("output_file_path", "")
+                if output_file_path:
+                    return output_file_path, "TTS Audio Generated"
+                
+                # Fallback to URL if path not available
                 output_file_url = build_dynamic_url(
                     result["output_file_url"].lstrip("/"),
                     include_protocol=False,
@@ -3001,6 +3029,18 @@ if gradio_enabled is True:
                     update_btn = gr.Button("Click here to hide welcome screen on the next startup")
                     update_btn.click(fn=modify_config, inputs=None, outputs=None)
             with gr.Tab("Generate TTS"):
+                with gr.Row():
+                    test_presets = gr.Dropdown(
+                        choices=[
+                            "None",
+                            "Comprehensive Test",
+                            "Quick Test",
+                            "Numbers Test"
+                        ],
+                        label="Test Text Presets",
+                        value="None",
+                        interactive=True
+                    )
                 with gr.Row():
                     gen_text = gr.Textbox(label="Text Input", lines=6)
                 if _state["running_in_docker"]:
@@ -3362,6 +3402,7 @@ if gradio_enabled is True:
                         engine_choices,
                     ],
                 )
+                test_presets.change(load_test_preset, inputs=[test_presets], outputs=[gen_text])
                 stop_button.click(stop_generate_tts, inputs=[], outputs=[output_message])
                 submit_button.click(
                     generate_tts,

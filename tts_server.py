@@ -1182,9 +1182,12 @@ class OpenAIInput(BaseModel):
     @classmethod
     def validate_response_format(cls, value):
         """Validate and clean response_format input."""
+        print_message(f"DEBUG validate_response_format RAW value: {value!r} (type: {type(value).__name__})", "debug_openai", "TTS")
         if not isinstance(value, str):
             raise ValueError("response_format must be a string")
-        cleaned = value.lower().strip('"').strip("'")
+        # Strip quotes, parentheses, and whitespace
+        cleaned = value.lower().strip().strip('"').strip("'").strip(")").strip("(")
+        print_message(f"DEBUG validate_response_format CLEANED value: {cleaned!r}", "debug_openai", "TTS")
         supported_formats = ["wav", "mp3", "opus", "flac", "aac", "m4a", "ogg"]
         if cleaned not in supported_formats:
             raise ValueError(f"response_format must be one of {supported_formats}")
@@ -1359,8 +1362,10 @@ async def transcode_for_openai(input_file, output_format):
     """Transcode audio files for OpenAI API compatibility."""
     debug_func_entry()
 
-    # Strip any trailing quotes from output_format to prevent format errors
-    output_format = output_format.strip("'\"")
+    # Strip any trailing quotes, parentheses, and whitespace from output_format
+    print_message(f"DEBUG transcode_for_openai RAW output_format: {output_format!r}", "debug_openai", "TTS")
+    output_format = output_format.strip().strip("'\"").strip("()").strip()
+    print_message(f"DEBUG transcode_for_openai CLEANED output_format: {output_format!r}", "debug_openai", "TTS")
 
     print_message("************************************", "debug_openai", "TTS")
     print_message("transcode_for_openai function called", "debug_openai", "TTS")
@@ -2251,7 +2256,7 @@ async def tts_generate_part(part: str, voice: str, params: dict) -> Path | None:
     """Generate audio for text part."""
     debug_func_entry()
     cleaned_part = tts_clean_text(part, params["text_filtering"])
-    output_file = await tts_handle_output_paths(params["output_file_name"])
+    output_file_path, _, _ = await tts_handle_output_paths(params["output_file_name"])
 
     try:
         await generate_audio(
@@ -2262,10 +2267,10 @@ async def tts_generate_part(part: str, voice: str, params: dict) -> Path | None:
             params["repetition_penalty"],
             params["speed"],
             params["pitch"],
-            output_file[0],
+            output_file_path,
             False,
         )
-        return output_file[0]
+        return output_file_path
     except ValueError as e:
         print_message(f"Invalid parameter value: {e!s}", "error", "GEN")
         return None
@@ -2333,7 +2338,7 @@ async def tts_process_standard_mode(params: dict, text_input: str) -> StreamingR
 
     print_message("Standard generation mode", "debug_tts", "GEN")
 
-    output_file_path = await tts_handle_output_paths(params["output_file_name"], params["output_file_timestamp"])
+    output_file_path, output_file_url, output_cache_url = await tts_handle_output_paths(params["output_file_name"], params["output_file_timestamp"])
 
     cleaned_text = tts_clean_text(text_input, params["text_filtering"])
 
