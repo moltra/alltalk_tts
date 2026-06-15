@@ -242,6 +242,7 @@ try:
         AlltalkTTSEnginesConfig,
     )  # TGWUI import
     from .system.gradio_pages.alltalk_diskspace import get_disk_interface
+    from .system.gradio_pages.gpu_stats import get_gpu_stats_interface
     from .system.gradio_pages.help_content import AllTalkHelpContent
     from .system.proxy_module.interface import create_proxy_interface
     from .system.proxy_module.proxy_manager import ProxyManager
@@ -252,6 +253,7 @@ except ImportError:
         AlltalkTTSEnginesConfig,
     )  # Standalone import
     from system.gradio_pages.alltalk_diskspace import get_disk_interface
+    from system.gradio_pages.gpu_stats import get_gpu_stats_interface
     from system.gradio_pages.help_content import AllTalkHelpContent
     from system.proxy_module.interface import create_proxy_interface
     from system.proxy_module.proxy_manager import ProxyManager
@@ -4631,6 +4633,9 @@ if gradio_enabled is True:
 
                 disk_space_page = get_disk_interface()
                 disk_space_page()
+
+                gpu_stats_page = get_gpu_stats_interface()
+                gpu_stats_page()
 
             if config.gradio_pages.TTS_Engines_Settings_page:
                 with gr.Tab("TTS Engines Settings"):

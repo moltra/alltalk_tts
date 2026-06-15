@@ -71,7 +71,7 @@ RUN <<EOR
 
     mkdir -p ${ALLTALK_DIR}/pip_cache
     pip install --no-cache-dir --cache-dir=${ALLTALK_DIR}/pip_cache -r system/requirements/requirements_standalone.txt
-    pip install --no-cache-dir --cache-dir=${ALLTALK_DIR}/pip_cache --upgrade gradio==4.32.2
+    pip install --no-cache-dir --cache-dir=${ALLTALK_DIR}/pip_cache --upgrade gradio==4.44.1
 
     # By default, version 1.9.10 is used causing this warning on startup: 'FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated'
     pip install --no-cache-dir --cache-dir=${ALLTALK_DIR}/pip_cache local-attention==1.11.1

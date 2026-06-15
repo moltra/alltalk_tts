@@ -1,0 +1,19 @@
+{
+    "_comment": "Template file for adding new TTS engines. Copy this file to new_engines.json and modify as needed.",
+    "_purpose": "This file serves as a template for adding new TTS engines to the configuration system.",
+    "_usage": "1. Copy this file to new_engines.json 2. Add your engine configuration 3. Ensure engine names are unique 4. Restart AllTalk to apply changes",
+    "engines_available": [
+        {
+            "name": "parler",
+            "selected_model": "these are examples of how you add new engines into the list here. You would put a model name in this line"
+        },
+        {
+            "name": "xtts",
+            "selected_model": "xtts - xttsv2_2.0.3"
+        },
+        {
+            "name": "f5tts",
+            "selected_model": "f5tts - f5tts_v1"
+        }
+    ]
+}

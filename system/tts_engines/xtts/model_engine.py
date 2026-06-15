@@ -1234,10 +1234,34 @@ class tts_class:
                 speakers_path = models_dir / model_folder_name / "speakers_xtts.pth"
                 if speakers_path.exists():
                     try:
-                        speakers_dict = torch.load(speakers_path, map_location='cpu')
+                        speakers_dict = torch.load(speakers_path, map_location="cpu")
                         if isinstance(speakers_dict, dict) and speaker_name in speakers_dict:
-                            speaker_embedding = speakers_dict[speaker_name]
-                            self.print_message(f"Using builtin speaker embedding: {speaker_name}", message_type="debug_tts")
+                            speaker_data = speakers_dict[speaker_name]
+                            if isinstance(speaker_data, dict):
+                                # Extract both gpt_cond_latent and speaker_embedding from the dictionary
+                                if "speaker_embedding" in speaker_data and "gpt_cond_latent" in speaker_data:
+                                    speaker_embedding = speaker_data["speaker_embedding"]
+                                    gpt_cond_latent = speaker_data["gpt_cond_latent"]
+                                    
+                                    # Keep the tensor dimension as [1, 512, 1] for HiFi-GAN decoder compatibility
+                                    # The squeeze operation was incorrect - HiFi-GAN expects the extra dimension
+                                    if speaker_embedding.dim() == 2 and speaker_embedding.shape[-1] == 512:
+                                        # If somehow squeezed, add the dimension back
+                                        speaker_embedding = speaker_embedding.unsqueeze(-1)
+                                    elif speaker_embedding.dim() == 3 and speaker_embedding.shape[-1] == 1:
+                                        # Keep as-is - this is the correct format for HiFi-GAN
+                                        pass
+                                    
+                                    self.print_message(f"Using builtin speaker embedding: {speaker_name} (shape: {speaker_embedding.shape})", message_type="info")
+                                    self.print_message(f"Using builtin gpt_cond_latent: {speaker_name} (shape: {gpt_cond_latent.shape})", message_type="info")
+                                else:
+                                    self.print_message(f"Required tensors not found in speaker data for {speaker_name}", message_type="error")
+                                    speaker_embedding = None
+                                    gpt_cond_latent = None
+                            else:
+                                # Legacy format: speaker_data is already a tensor
+                                speaker_embedding = speaker_data
+                                self.print_message(f"Using builtin speaker embedding (legacy): {speaker_name}", message_type="info")
                         else:
                             self.print_message(f"Speaker {speaker_name} not found in speakers_xtts.pth", message_type="error")
                     except Exception as e:

@@ -1,3 +1,10 @@
+# AllTalk Development Docker Compose Configuration
+#
+# IMPORTANT: Run ./docker-init-config.sh before starting to ensure config files exist
+# Or use the convenience script: ./docker-start-dev.sh
+#
+# Start with: docker compose -f docker-compose.dev.yml up -d
+#
 services:
   alltalk-dev:
     build:
@@ -13,8 +20,8 @@ services:
       - no-new-privileges:true
     restart: unless-stopped
     ports:
-      - "7855:7851"  # External:Internal - API
-      - "7856:7852"  # External:Internal - Gradio UI
+      - "7851:7851"  # External:Internal - API
+      - "7852:7852"  # External:Internal - Gradio UI
     environment:
       - TZ=${TZ:-UTC}
       - PUID=${PUID:-1000}
@@ -26,16 +33,14 @@ services:
     volumes:
       # Mount only specific files/directories to preserve container environment
       # Main application files
-      - ./tts_server.py:/home/alltalk/tts_server.py
-      - ./script.py:/home/alltalk/script.py
-      - ./start_dev.sh:/home/alltalk/start_dev.sh
-      - ./download_model.py:/home/alltalk/download_model.py
+      - /mnt/samsungssd/repo/alltalk_tts/tts_server.py:/home/alltalk/tts_server.py
+      - /mnt/samsungssd/repo/alltalk_tts/script.py:/home/alltalk/script.py
+      - /mnt/samsungssd/repo/alltalk_tts/start_dev.sh:/home/alltalk/start_dev.sh
+      - /mnt/samsungssd/repo/alltalk_tts/download_model.py:/home/alltalk/download_model.py
       # Config directory (centralized configs)
-      - ./config:/home/alltalk/config
-      # Config file (persistent)
-      - /mnt/samsungssd/docker/appdata/alltalk/alltalk_test/confignew.json:/home/alltalk/config/app/confignew.json
-      # System directory (refactored code)
-      - ./system:/home/alltalk/system
+      - /mnt/samsungssd/repo/alltalk_tts/config:/home/alltalk/config
+      # System directory (refactored code) - includes tts_engines subdirectory and config files
+      - /mnt/samsungssd/repo/alltalk_tts/system:/home/alltalk/system
       # Models and outputs (persistent data - external volumes)
       - /mnt/samsungssd/docker/appdata/alltalk/alltalk_test/models:/home/alltalk/models
       - /mnt/samsungssd/docker/appdata/alltalk/alltalk_test/outputs:/home/alltalk/outputs
@@ -50,6 +55,10 @@ services:
               count: all
               capabilities: [gpu]
     working_dir: /home/alltalk
+    networks:
+      - default
+
 
 volumes:
   pip_cache:
+

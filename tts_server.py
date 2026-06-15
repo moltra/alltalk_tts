@@ -1170,7 +1170,10 @@ async def apifunction_preview_voice(
 class OpenAIInput(BaseModel):
     """Validates input parameters for OpenAI TTS generation."""
 
-    model: str = Field(..., description="The TTS model to use. Currently ignored.")
+    model: str = Field(
+        default="tts-1",
+        description="The TTS model identifier (e.g., 'tts-1', 'tts-1-hd'). Currently not used by the engine but validated for API compatibility."
+    )
     input: str = Field(..., max_length=4096, description="The text to generate audio for.")
     voice: str = Field(..., description="The voice to use when generating the audio.")
     response_format: str = Field(
@@ -1196,10 +1199,21 @@ class OpenAIInput(BaseModel):
     @field_validator("voice", mode="before")
     @classmethod
     def validate_voice(cls, value):
-        """Validate that the requested voice is supported by OpenAI TTS."""
-        supported_voices = ["alloy", "echo", "fable", "nova", "onyx", "shimmer"]
-        if value not in supported_voices:
-            raise ValueError(f"Voice must be one of {supported_voices}")
+        """Validate that the requested voice is supported by OpenAI TTS or is a valid engine voice."""
+        if not value or not isinstance(value, str):
+            raise ValueError("Voice must be a non-empty string")
+        
+        # Allow both OpenAI standard voices and engine-specific voices
+        openai_voices = ["alloy", "echo", "fable", "nova", "onyx", "shimmer"]
+        value = value.strip()
+        
+        # If it's not a standard OpenAI voice, validate it's a valid filename pattern
+        if value not in openai_voices:
+            # Basic validation for engine voice files (e.g., "en_US-lessac-high.onnx")
+            # Must contain at least one alphanumeric character
+            if not re.match(r'^[a-zA-Z0-9_\-\.]+$', value) or not re.search(r'[a-zA-Z0-9]', value):
+                raise ValueError(f"Invalid voice name: {value}")
+        
         return value
 
 
@@ -1225,7 +1239,7 @@ class OpenAIGenerator:
             for err in e.errors():
                 field = err["loc"][0]
                 message = err["msg"]
-                description = OpenAIInput.model_fields[field].field_info.description
+                description = OpenAIInput.model_fields[field].description  # Updated for Pydantic v2.x
                 errors.append(f"Error in field '{field}': {message}. Description: {description}")
             error_msg = ", ".join(errors)
             print_message(f"OpenAI input validation failed: {error_msg}", "error", "TTS")
@@ -1268,6 +1282,12 @@ async def openai_tts_generate(request: Request):
 
         # Process text and map voice
         cleaned_string = html.unescape(standard_filtering(input_text))
+        
+        # Add additional sanitization for control characters
+        cleaned_string = re.sub(r'[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f-\x9f]', '', cleaned_string)
+        if len(cleaned_string.strip()) == 0:
+            raise ValueError("Input text cannot be empty after filtering")
+        
         voice_mapping = {
             "alloy": model_engine.openai_alloy,
             "echo": model_engine.openai_echo,
@@ -1277,10 +1297,26 @@ async def openai_tts_generate(request: Request):
             "shimmer": model_engine.openai_shimmer,
         }
 
+        # Map OpenAI voice names to engine voices, or use the voice directly if it's engine-specific
         mapped_voice = voice_mapping.get(voice)
-        if not mapped_voice:
-            print_message(f"Unsupported voice: {voice}", "error", "TTS")
-            raise ValueError("Unsupported voice")
+
+        if mapped_voice is None:
+            # Voice might be engine-specific, validate it exists
+            if model_engine.multivoice_capable:
+                available_voices = model_engine.voices_file_list()
+                if voice not in available_voices:
+                    raise ValueError(f"Voice '{voice}' not found. Available voices: {available_voices[:5]}...")
+                mapped_voice = voice
+            else:
+                # Engine doesn't support multiple voices
+                # Only accept the OpenAI standard voices (which are mapped) or the default voice
+                if voice not in ["alloy", "echo", "fable", "nova", "onyx", "shimmer"]:
+                    raise ValueError(f"Engine '{model_engine.engine_loaded}' does not support custom voices. Use standard OpenAI voices: alloy, echo, fable, nova, onyx, shimmer")
+                # Use the mapped voice (which will be None if not in the mapping, causing a clearer error)
+                if voice in voice_mapping:
+                    mapped_voice = voice_mapping[voice]
+                else:
+                    raise ValueError(f"Voice '{voice}' is not supported by this engine")
 
         print_message(f"Mapped voice: {mapped_voice}", "debug_openai", "TTS")
 
@@ -1291,7 +1327,7 @@ async def openai_tts_generate(request: Request):
             f"DEBUG model_engine.audio_format: '{model_engine.audio_format}' (repr: {model_engine.audio_format!r})",
             "debug_transcode",
         )
-        output_file_path = f'{this_dir / config.get_output_directory() / f"openai_output_{unique_id}_{timestamp}.{model_engine.audio_format}"}'
+        output_file_path = this_dir / config.get_output_directory() / f"openai_output_{unique_id}_{timestamp}.{model_engine.audio_format}"
 
         if config.debugging.debug_fullttstext:
             print_message(cleaned_string, component="TTS")
@@ -1331,27 +1367,83 @@ async def openai_tts_generate(request: Request):
 
     except ValueError as e:
         print_message(f"Value error occurred: {e!s}", "error", "TTS")
-        response = JSONResponse(content={"error": f"Invalid value: {e!s}"})
-        status_code = 400
+        return JSONResponse(
+            content={
+                "error": {
+                    "message": f"Invalid value: {e!s}",
+                    "type": "invalid_request_error",
+                    "param": None,
+                    "code": None
+                }
+            },
+            status_code=400
+        )
     except KeyError as e:
         print_message(f"Key error occurred: Missing key {e!s}", "error", "TTS")
-        response = JSONResponse(content={"error": f"Missing required field: {e!s}"})
-        status_code = 400
+        return JSONResponse(
+            content={
+                "error": {
+                    "message": f"Missing required field: {e!s}",
+                    "type": "invalid_request_error",
+                    "param": str(e),
+                    "code": None
+                }
+            },
+            status_code=400
+        )
     except FileNotFoundError as e:
         print_message(f"File not found error: {e!s}", "error", "TTS")
-        response = JSONResponse(content={"error": "Required file not found"})
-        status_code = 404
+        return JSONResponse(
+            content={
+                "error": {
+                    "message": "Required file not found",
+                    "type": "not_found_error",
+                    "param": None,
+                    "code": None
+                }
+            },
+            status_code=404
+        )
     except TypeError as e:
         print_message(f"Type error occurred: {e!s}", "error", "TTS")
-        response = JSONResponse(content={"error": f"Type error: {e!s}"})
-        status_code = 400
+        return JSONResponse(
+            content={
+                "error": {
+                    "message": f"Type error: {e!s}",
+                    "type": "invalid_request_error",
+                    "param": None,
+                    "code": None
+                }
+            },
+            status_code=400
+        )
     except RuntimeError as e:
         print_message(f"Runtime error occurred: {e!s}", "error", "TTS")
-        response = JSONResponse(content={"error": "An internal runtime error occurred"})
-        status_code = 500
+        return JSONResponse(
+            content={
+                "error": {
+                    "message": "An internal runtime error occurred",
+                    "type": "internal_error",
+                    "param": None,
+                    "code": None
+                }
+            },
+            status_code=500
+        )
+    except Exception as e:
+        print_message(f"Unexpected error occurred: {e!s}", "error", "TTS")
+        return JSONResponse(
+            content={
+                "error": {
+                    "message": "An unexpected error occurred",
+                    "type": "internal_error",
+                    "param": None,
+                    "code": None
+                }
+            },
+            status_code=500
+        )
 
-    if status_code != 200:
-        return response.status_code(status_code)
     return response
 
 
@@ -1433,7 +1525,7 @@ async def update_openai_voice_mappings(mappings: VoiceMappings):
         settings_file = this_dir / "system" / "tts_engines" / model_engine.engine_loaded / "model_settings.json"
         with open(settings_file, "r+", encoding="utf-8") as model_file:
             settings = json.load(model_file)
-            settings["openai_voices"] = mappings.dict()
+            settings["openai_voices"] = mappings.model_dump()  # Updated for Pydantic v2.x
             model_file.seek(0)
             json.dump(settings, model_file, indent=4)
             model_file.truncate()
@@ -1444,6 +1536,228 @@ async def update_openai_voice_mappings(mappings: VoiceMappings):
     except Exception as e:
         print_message(f"Failed to update voice mappings: {e!s}", "error", "TTS")
         raise HTTPException(status_code=500, detail=f"Failed to update model settings file: {e!s}") from e
+
+
+#########################################################################
+# API Endpoint - OpenAI Models API compatible endpoint /v1/models #
+#########################################################################
+@app.get("/v1/models", response_class=JSONResponse)
+async def openai_list_models():
+    """Handle OpenAI-compatible models list requests.
+    
+    Returns a list of available TTS models/voices in OpenAI API format.
+    This endpoint is used by clients to discover available voices.
+    """
+    debug_func_entry()
+
+    try:
+        # Get available voices from the current engine
+        if not model_engine.multivoice_capable:
+            print_message(f"Engine '{model_engine.engine_loaded}' does not support multiple voices", "warning", "API")
+            # Return OpenAI-compatible format with standard voices
+            return {
+                "object": "list",
+                "data": [
+                    {
+                        "id": "tts-1",
+                        "object": "model",
+                        "created": int(time.time()),
+                        "owned_by": "alltalk"
+                    }
+                ]
+            }
+
+        available_voices = model_engine.voices_file_list()
+        
+        # Format voices in OpenAI API compatible format
+        models_data = []
+        for voice in available_voices:
+            models_data.append({
+                "id": voice,
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "alltalk"
+            })
+        
+        # Also include the standard OpenAI voice names as aliases
+        openai_voices = ["alloy", "echo", "fable", "nova", "onyx", "shimmer"]
+        for voice in openai_voices:
+            models_data.append({
+                "id": voice,
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "alltalk-openai"
+            })
+        
+        print_message(f"Successfully returned {len(models_data)} models", "debug_api", "API")
+        return {
+            "object": "list",
+            "data": models_data
+        }
+        
+    except AttributeError as e:
+        print_message(f"Attribute error in model engine: {e!s}", "error", "API")
+        return JSONResponse(
+            content={"error": {"message": "Model engine configuration is invalid. Please check your setup.", "type": "internal_error"}},
+            status_code=500,
+        )
+    except FileNotFoundError as e:
+        print_message(f"Voices file not found: {e!s}", "error", "API")
+        return JSONResponse(
+            content={"error": {"message": "The voices file could not be located. Please ensure the file exists.", "type": "not_found_error"}},
+            status_code=404,
+        )
+    except Exception as e:
+        print_message(f"Unexpected error listing models: {e!s}", "error", "API")
+        return JSONResponse(
+            content={"error": {"message": f"An unexpected error occurred: {e!s}", "type": "internal_error"}},
+            status_code=500,
+        )
+
+
+#########################################################################
+# API Endpoint - OpenAI Voices API compatible endpoint /v1/voices #
+#########################################################################
+@app.get("/v1/voices", response_class=JSONResponse)
+async def openai_list_voices():
+    """Handle OpenAI-compatible voices list requests.
+    
+    Returns a list of available TTS voices in a format compatible with
+    various TTS clients including moneyprinterturbo webui.
+    """
+    debug_func_entry()
+
+    try:
+        # Get available voices from the current engine
+        if not model_engine.multivoice_capable:
+            print_message(f"Engine '{model_engine.engine_loaded}' does not support multiple voices", "warning", "API")
+            # Return standard OpenAI voices as fallback
+            return {
+                "voices": ["alloy", "echo", "fable", "nova", "onyx", "shimmer"]
+            }
+
+        available_voices = model_engine.voices_file_list()
+        
+        print_message(f"Successfully returned {len(available_voices)} voices", "debug_api", "API")
+        return {
+            "voices": available_voices
+        }
+        
+    except AttributeError as e:
+        print_message(f"Attribute error in model engine: {e!s}", "error", "API")
+        return JSONResponse(
+            content={"error": {"message": "Model engine configuration is invalid. Please check your setup.", "type": "internal_error"}},
+            status_code=500,
+        )
+    except FileNotFoundError as e:
+        print_message(f"Voices file not found: {e!s}", "error", "API")
+        return JSONResponse(
+            content={"error": {"message": "The voices file could not be located. Please ensure the file exists.", "type": "not_found_error"}},
+            status_code=404,
+        )
+    except Exception as e:
+        print_message(f"Unexpected error listing voices: {e!s}", "error", "API")
+        return JSONResponse(
+            content={"error": {"message": f"An unexpected error occurred: {e!s}", "type": "internal_error"}},
+            status_code=500,
+        )
+
+
+#########################################################################
+# API Endpoint - API Info / Discovery endpoint #
+#########################################################################
+@app.get("/api/info", response_class=JSONResponse)
+async def api_info():
+    """Provide API information and available endpoints for client discovery.
+    
+    This endpoint helps clients like moneyprinterturbo webui discover the correct
+    API URLs and available endpoints without needing to know them in advance.
+    """
+    debug_func_entry()
+    
+    try:
+        # Get server base URL from config
+        base_url = f"http://{config.api_def.api_legacy_ip_address}:{config.api_def.api_port_number}" if config.api_def.api_use_legacy_api else ""
+        
+        api_info = {
+            "name": "AllTalk TTS API",
+            "version": "2.0",
+            "description": "Text-to-Speech API with OpenAI compatibility",
+            "base_url": base_url,
+            "endpoints": {
+                "openai_compatible": {
+                    "speech_generation": {
+                        "url": "/v1/audio/speech",
+                        "method": "POST",
+                        "description": "Generate speech from text using OpenAI-compatible format"
+                    },
+                    "list_models": {
+                        "url": "/v1/models", 
+                        "method": "GET",
+                        "description": "List available TTS models/voices in OpenAI format"
+                    },
+                    "list_voices": {
+                        "url": "/v1/voices",
+                        "method": "GET", 
+                        "description": "List available voices in simplified format"
+                    }
+                },
+                "native_api": {
+                    "list_voices": {
+                        "url": "/api/voices",
+                        "method": "GET",
+                        "description": "Get available voices for current TTS engine"
+                    },
+                    "list_rvc_voices": {
+                        "url": "/api/rvcvoices",
+                        "method": "GET",
+                        "description": "Get available RVC voice models"
+                    },
+                    "check_ready": {
+                        "url": "/api/ready",
+                        "method": "GET",
+                        "description": "Check if TTS engine is ready"
+                    },
+                    "get_settings": {
+                        "url": "/api/currentsettings",
+                        "method": "GET",
+                        "description": "Get current engine settings and capabilities"
+                    },
+                    "generate_tts": {
+                        "url": "/api/tts-generate",
+                        "method": "POST",
+                        "description": "Generate TTS audio with form data"
+                    },
+                    "generate_streaming": {
+                        "url": "/api/tts-generate-streaming",
+                        "method": "GET",
+                        "description": "Generate streaming TTS audio"
+                    }
+                }
+            },
+            "documentation": {
+                "swagger_ui": "/docs",
+                "openapi_spec": "/openapi.json",
+                "manual_docs": "/API_DOCUMENTATION.md"
+            },
+            "capabilities": {
+                "multivoice": model_engine.multivoice_capable,
+                "streaming": model_engine.streaming_capable,
+                "rvc_enabled": config.rvc_settings.rvc_enabled,
+                "current_engine": model_engine.engine_loaded,
+                "current_model": model_engine.current_model_loaded
+            }
+        }
+        
+        print_message("API info requested", "debug_api", "API")
+        return api_info
+        
+    except Exception as e:
+        print_message(f"Error generating API info: {e!s}", "error", "API")
+        return JSONResponse(
+            content={"error": {"message": f"Failed to generate API info: {e!s}", "type": "internal_error"}},
+            status_code=500,
+        )
 
 
 #######################
@@ -2809,6 +3123,27 @@ async def apifunction_srt_generation():
 # Static Mount for file serving #
 #################################
 app.mount("/static", StaticFiles(directory=str(this_dir / "system")), name="static")
+
+##############################
+# API Endpoint - /api/gpustats #
+##############################
+@app.get("/api/gpustats")
+async def apifunction_get_gpustats():
+    """Get GPU statistics including utilization, memory, temperature, and power usage."""
+    debug_func_entry()
+    
+    try:
+        from system.gpu_monitor import get_gpu_monitor
+        
+        gpu_monitor = get_gpu_monitor()
+        gpu_stats = gpu_monitor.get_gpu_stats()
+        
+        print_message("Returning GPU stats", "debug_api", "API")
+        return JSONResponse(content={"gpu_stats": gpu_stats})
+    except Exception as e:
+        print_message(f"Error retrieving GPU stats: {e!s}", "error", "API")
+        return JSONResponse(content={"gpu_stats": [], "error": str(e)})
+
 
 ########################################
 # Legacy JSON update settings function #

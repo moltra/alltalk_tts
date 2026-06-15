@@ -110,6 +110,66 @@ class TestVoicesEndpoint:
             assert "No Voices Found" in response.json()["voices"]
 
 
+class TestOpenAIEndpoints:
+    def test_v1_models_success(self, client, mock_model_engine):
+        """Test /v1/models endpoint returns OpenAI-compatible model list"""
+        mock_model_engine.multivoice_capable = True
+        mock_model_engine.voices_file_list = Mock(return_value=["voice1", "voice2"])
+
+        with patch("tts_server.model_engine", mock_model_engine):
+            response = client.get("/v1/models")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["object"] == "list"
+            assert "data" in data
+            assert len(data["data"]) > 0
+            # Check that engine voices are included
+            engine_voices = [m for m in data["data"] if m["owned_by"] == "alltalk"]
+            assert len(engine_voices) == 2
+            # Check that OpenAI voices are included
+            openai_voices = [m for m in data["data"] if m["owned_by"] == "alltalk-openai"]
+            assert len(openai_voices) == 6  # alloy, echo, fable, nova, onyx, shimmer
+
+    def test_v1_models_no_multivoice(self, client, mock_model_engine):
+        """Test /v1/models endpoint when engine doesn't support multiple voices"""
+        mock_model_engine.multivoice_capable = False
+
+        with patch("tts_server.model_engine", mock_model_engine):
+            response = client.get("/v1/models")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["object"] == "list"
+            assert len(data["data"]) == 1
+            assert data["data"][0]["id"] == "tts-1"
+
+    def test_v1_voices_success(self, client, mock_model_engine):
+        """Test /v1/voices endpoint returns voice list"""
+        mock_model_engine.multivoice_capable = True
+        mock_model_engine.voices_file_list = Mock(return_value=["voice1", "voice2", "voice3"])
+
+        with patch("tts_server.model_engine", mock_model_engine):
+            response = client.get("/v1/voices")
+            assert response.status_code == 200
+            data = response.json()
+            assert "voices" in data
+            assert len(data["voices"]) == 3
+            assert "voice1" in data["voices"]
+
+    def test_v1_voices_no_multivoice(self, client, mock_model_engine):
+        """Test /v1/voices endpoint when engine doesn't support multiple voices"""
+        mock_model_engine.multivoice_capable = False
+
+        with patch("tts_server.model_engine", mock_model_engine):
+            response = client.get("/v1/voices")
+            assert response.status_code == 200
+            data = response.json()
+            assert "voices" in data
+            # Should return standard OpenAI voices as fallback
+            assert len(data["voices"]) == 6
+            assert "alloy" in data["voices"]
+            assert "echo" in data["voices"]
+
+
 class TestAudioEndpoint:
     def test_get_audio_success(self, client, test_audio_file):
         """Test getting audio file"""

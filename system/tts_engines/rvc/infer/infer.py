@@ -10,11 +10,10 @@ import soundfile as sf
 import torch
 
 from config import AlltalkConfig
+from config.engines.rvc.configs.config import Config
 
 now_dir = os.getcwd()
 sys.path.append(now_dir)
-
-from ..configs.config import Config
 from ..infer.pipeline import VC
 from ..lib.infer_pack.models import (
     SynthesizerTrnMs256NSFsid,

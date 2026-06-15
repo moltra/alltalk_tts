@@ -1,0 +1,14 @@
+{
+    "_comment": "Configuration version 2.1 - XTTS primary with Piper backup. Must match tts_engines.json for consistency",
+    "version": "2.1",
+    "engines_available": [
+        {
+            "name": "xtts",
+            "selected_model": "xtts - xttsv2_2.0.3"
+        },
+        {
+            "name": "piper",
+            "selected_model": "piper - en_US-joe-medium"
+        }
+    ]
+}
