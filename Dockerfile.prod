@@ -56,7 +56,7 @@ RUN CUDA_SHORT_VERSION=${CUDA_VERSION%.*} && \
 ##############################################################################
 FROM base AS app
 
-ARG TTS_MODEL="xtts"
+ARG TTS_MODEL="piper"
 ARG DEEPSPEED_VERSION=0.17.2
 ENV TTS_MODEL=$TTS_MODEL
 ENV DEEPSPEED_VERSION=$DEEPSPEED_VERSION

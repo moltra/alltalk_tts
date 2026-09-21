@@ -301,6 +301,12 @@ class AllTalkHelpContent:
     ## 🎯 F5-TTS Voice Cloning Engine Help
 
     F5-TTS is a zero-shot voice cloning system that specializes in high-fidelity voice reproduction with precise reference text matching.
+
+    ---
+
+    ## NON-COMMERCIAL LICENSE WARNING
+
+    **The F5-TTS and E2-TTS model weights are licensed under CC-BY-NC-4.0 (trained on the Emilia dataset), which permits NON-COMMERCIAL use only.** Do not use this engine or its generated output in any commercial product or service. Commercial use requires training your own weights on appropriately licensed data (the F5-TTS code itself is MIT). For commercial deployments, use the Piper, Parler, or VITS engines instead (see THIRD_PARTY_LICENSES.md).
     """
 
     HELP_PAGE1 = """

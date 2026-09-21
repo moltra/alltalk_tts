@@ -13,7 +13,7 @@ services:
       args:
         DOCKER_REPOSITORY: erew123/
         DOCKER_TAG: latest
-        TTS_MODEL: xtts
+        TTS_MODEL: piper
     image: alltalk_tts:dev
     container_name: alltalk-dev
     security_opt:
@@ -29,7 +29,7 @@ services:
       # Model download configuration
       - ALLTALK_AUTO_DOWNLOAD_MODEL=${ALLTALK_AUTO_DOWNLOAD_MODEL:-false}
       - ALLTALK_DEFAULT_MODEL=${ALLTALK_DEFAULT_MODEL:-none}
-      - TTS_MODEL=${TTS_MODEL:-xtts}
+      - TTS_MODEL=${TTS_MODEL:-piper}
     volumes:
       # Mount only specific files/directories to preserve container environment
       # Main application files

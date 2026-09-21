@@ -20,7 +20,7 @@ echo ""
 docker build -f Dockerfile.dev \
   --build-arg DOCKER_REPOSITORY=erew123/ \
   --build-arg DOCKER_TAG=latest \
-  --build-arg TTS_MODEL=xtts \
+  --build-arg TTS_MODEL=piper \
   --progress=plain \
   -t alltalk_tts:dev \
   .

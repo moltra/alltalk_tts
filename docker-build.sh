@@ -5,7 +5,7 @@ cd $SCRIPT_DIR
 
 . ${SCRIPT_DIR=}/docker/variables.sh
 
-TTS_MODEL=xtts
+TTS_MODEL=piper
 DOCKER_TAG=latest-${TTS_MODEL}
 CLEAN=false
 LOCAL_DEEPSPEED_BUILD=false

@@ -60,7 +60,7 @@ following optional arguments:
     file path of a JSON file which can be a subset of `mem_config.json` with more fine-grained configuration options.
   - Example: `docker-start.sh --with-multi_engine_manager` to use MEM with default settings or
     `docker-start.sh --with-multi_engine_manager /my/config/file.json` to pass a JSON file containing more settings.
-- `--tag` allows to choose the docker tag of the image to run. Defaults to `latest-xtts`.
+- `--tag` allows to choose the docker tag of the image to run. Defaults to `latest-piper`.
     - Example: `docker-start.sh --tag mytag`
 - `--docker-repository` allows to choose another Docker repository for pulling the image from. Use an empty
   string for the local repo.
@@ -97,9 +97,9 @@ for a list of all available env variables.
 Under normal circumstances, there should be no need to build the Docker images locally. However, if needed for some
 reason, you may want to use `docker-build.sh` with the following arguments:
 
-- `--tts_model` allows to choose the TTS model that is used by default. Valid values are `piper`, `vits`, `xtts`. Defaults to `xtts`.
+- `--tts_model` allows to choose the TTS model that is used by default. Valid values are `piper`, `vits`, `xtts`. Defaults to `piper` (commercially-licensed; `xtts` and `f5tts` weights are non-commercial).
     - Example: `docker-build.sh --tts_model piper`
-- `--tag` allows to choose the docker tag. Defaults to `latest-xtts`.
+- `--tag` allows to choose the docker tag. Defaults to `latest-piper`.
     - Example: `docker-build.sh --tag mytag`
 - `--docker-repository` allows to choose another Docker repository for tagging the image from. Use an empty
   string for the local repo.
