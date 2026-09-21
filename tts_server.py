@@ -11,6 +11,7 @@ Github: https://github.com/moltra/
 import argparse
 import asyncio
 import hashlib
+import hmac
 import html
 import importlib
 import inspect
@@ -266,6 +267,64 @@ app.add_middleware(
 
 # Global lock
 model_change_lock = Lock()
+
+
+###############################################
+# Optional API-key authentication             #
+###############################################
+class ApiKeyAuthError(Exception):
+    """Raised when a request fails API-key authentication."""
+
+    def __init__(self, openai_error_shape: bool = False):
+        super().__init__("Invalid or missing API key")
+        self.openai_error_shape = openai_error_shape
+
+
+@app.exception_handler(ApiKeyAuthError)
+async def api_key_auth_error_handler(request: Request, exc: ApiKeyAuthError):
+    """Return a 401 response; OpenAI-shaped error body for /v1/* routes."""
+    if exc.openai_error_shape:
+        return JSONResponse(
+            status_code=401,
+            content={
+                "error": {
+                    "message": "Incorrect API key provided or missing. Pass the key via the Authorization: Bearer <key> or X-API-Key: <key> header.",
+                    "type": "invalid_request_error",
+                    "param": None,
+                    "code": "invalid_api_key",
+                }
+            },
+        )
+    return JSONResponse(
+        status_code=401,
+        content={"status": "error", "message": "Invalid or missing API key"},
+    )
+
+
+def _extract_api_key(request: Request) -> str:
+    """Return the API key supplied via the X-API-Key or Authorization headers."""
+    header_key = request.headers.get("x-api-key")
+    if header_key:
+        return header_key.strip()
+    authorization = request.headers.get("authorization", "")
+    if authorization.lower().startswith("bearer "):
+        return authorization[7:].strip()
+    return ""
+
+
+async def verify_api_key(request: Request):
+    """FastAPI dependency enforcing optional API-key auth on protected routes.
+
+    Disabled when config.api_def.api_key is empty (the default), preserving
+    current behavior. When enabled, accepts X-API-Key or Bearer auth.
+    """
+    expected_key = getattr(config.api_def, "api_key", "")
+    if not isinstance(expected_key, str) or not expected_key.strip():
+        return  # API-key auth disabled
+    provided_key = _extract_api_key(request)
+    if provided_key and hmac.compare_digest(provided_key, expected_key.strip()):
+        return
+    raise ApiKeyAuthError(openai_error_shape=request.url.path.startswith("/v1/"))
 
 
 ##############################
@@ -940,7 +999,7 @@ async def transcode_audio_if_necessary(output_file, model_audio_format, output_a
 ##############################
 #### Streaming Generation ####
 ##############################
-@app.get("/api/tts-generate-streaming", response_class=StreamingResponse)
+@app.get("/api/tts-generate-streaming", response_class=StreamingResponse, dependencies=[Depends(verify_api_key)])
 async def apifunction_generate_streaming(text: str, voice: str, language: str, output_file: str):
     """Handle streaming TTS generation via GET request."""
     debug_func_entry()
@@ -988,7 +1047,7 @@ async def apifunction_generate_streaming(text: str, voice: str, language: str, o
         return JSONResponse(content={"error": "An internal runtime error occurred"}, status_code=500)
 
 
-@app.post("/api/tts-generate-streaming", response_class=JSONResponse)
+@app.post("/api/tts-generate-streaming", response_class=JSONResponse, dependencies=[Depends(verify_api_key)])
 async def tts_generate_streaming(
     _request: Request,
     text: str = Form(...),
@@ -1086,7 +1145,7 @@ async def generate_audio(
 ###########################
 #### PREVIEW VOICE API ####
 ###########################
-@app.post("/api/previewvoice/", response_class=JSONResponse)
+@app.post("/api/previewvoice/", response_class=JSONResponse, dependencies=[Depends(verify_api_key)])
 async def apifunction_preview_voice(
     _request: Request,
     voice: str = Form(...),
@@ -1249,7 +1308,7 @@ class OpenAIGenerator:
 #########################################################################
 # API Endpoint - OpenAI Speech API compatable endpoint /v1/audio/speech #
 #########################################################################
-@app.post("/v1/audio/speech", response_class=JSONResponse)
+@app.post("/v1/audio/speech", response_class=JSONResponse, dependencies=[Depends(verify_api_key)])
 async def openai_tts_generate(request: Request):
     """Handle OpenAI-compatible TTS generation requests."""
     debug_func_entry()
@@ -2788,7 +2847,7 @@ def detect_language(text: str) -> str:
         raise ValueError("Could not detect language")
 
 
-@app.post("/api/tts-generate", response_class=JSONResponse)
+@app.post("/api/tts-generate", response_class=JSONResponse, dependencies=[Depends(verify_api_key)])
 async def apifunction_generate_tts_standard(
     text_input: str = Form(...),
     text_filtering: str = Form(None),

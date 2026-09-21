@@ -10,6 +10,12 @@ AllTalk TTS API provides high-quality text-to-speech generation with support for
 http://localhost:7851
 ```
 
+## Authentication (Optional API Key)
+
+Optional API-key authentication can protect the TTS generation endpoints. It is **disabled by default** (empty key = no auth, unchanged behavior).
+
+Enable via `"api_key"` in `config/app/confignew.json` (under `"api_def"`) or the `ALLTALK_API_KEY` environment variable. When enabled, send `Authorization: Bearer <key>` or `X-API-Key: <key>`; missing or wrong keys receive HTTP 401. See API_DOCUMENTATION.md for the full list of protected endpoints and details.
+
 ## Available Endpoints
 
 ### Main TTS Generation

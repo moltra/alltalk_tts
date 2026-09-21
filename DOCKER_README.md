@@ -85,6 +85,8 @@ or when using Docker directly:
 docker run -e ALLTALK_BRANDING="My Brand " -e ALLTALK_API_PORT_NUMBER=9876 ...
 ```
 
+The `ALLTALK_API_KEY` environment variable enables optional API-key authentication on the TTS generation endpoints - for example `-e ALLTALK_API_KEY=your-secret-key`. See API_DOCUMENTATION.md, section Authentication. It overrides the `api_key` field in confignew.json and defaults to empty (disabled).
+
 Consult [docker_default_confignew.json](https://github.com/erew123/alltalk_tts/blob/alltalkbeta/docker_default_confignew.json)
 and [docker_default_mem_config.json](https://github.com/erew123/alltalk_tts/blob/alltalkbeta/docker_default_mem_config.json)
 for a list of all available env variables.

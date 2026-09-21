@@ -77,6 +77,15 @@ class AlltalkConfigApiDef(BaseModel):
     api_output_file_timestamp: bool = True
     api_autoplay: bool = False
     api_autoplay_volume: float = 0.5
+    # Optional API key for protected TTS endpoints. Empty (default) disables auth.
+    # The ALLTALK_API_KEY environment variable overrides the JSON value.
+    api_key: str = ""
+
+    def __init__(self, **data):
+        # Allow environment variable to override the API key
+        if "ALLTALK_API_KEY" in os.environ:
+            data["api_key"] = os.environ["ALLTALK_API_KEY"]
+        super().__init__(**data)
 
 
 class AlltalkConfigDebug(BaseModel):
