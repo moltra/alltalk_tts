@@ -9,6 +9,7 @@ from config.app.config import (
     AlltalkConfigRvcSettings,
     AlltalkConfigTgwUi,
     AlltalkConfigTheme,
+    AlltalkMultiEngineManagerConfig,
     AlltalkNewEnginesConfig,
     AlltalkTTSEnginesConfig,
 )
@@ -24,6 +25,7 @@ __all__ = [
     "AlltalkConfigRvcSettings",
     "AlltalkConfigTgwUi",
     "AlltalkConfigTheme",
+    "AlltalkMultiEngineManagerConfig",
     "AlltalkNewEnginesConfig",
     "AlltalkTTSEnginesConfig",
 ]
