@@ -8,6 +8,12 @@ system/tts_engines/tts_engines.json
 confignew.json
 diagnostics.log
 
+# Generated TTS outputs and runtime state (never commit)
+config/app/outputs/
+logs/
+temp/
+*.backup
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
