@@ -4,7 +4,7 @@ version = "2.1.0"
 description = "AllTalk TTS v2 - Comprehensive Text-to-Speech Framework"
 readme = "README.md"
 requires-python = ">=3.9,<3.13"
-license = {text = "MIT"}
+license = {text = "AGPL-3.0-only"}
 authors = [
     {name = "erew123", email = "erew123@github.com"}
 ]
@@ -12,7 +12,7 @@ keywords = ["tts", "text-to-speech", "voice", "audio", "ai"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
