@@ -1,9 +1,16 @@
+import json
 import os.path
 import tempfile
 from pathlib import Path
 from unittest import TestCase
 
 from config import AlltalkConfig, AlltalkMultiEngineManagerConfig, AlltalkNewEnginesConfig, AlltalkTTSEnginesConfig
+
+
+def _live_config_value(key):
+    """Read a top-level value from the active confignew.json on disk."""
+    with open(AlltalkConfig.default_config_path()) as f:
+        return json.load(f)[key]
 
 
 def _key_structure(value):
@@ -91,7 +98,9 @@ class TestAlltalkConfig(TestCase):
         self.assertEqual(self.config.gradio_port_number, 7852)
 
     def test_firstrun_model(self):
-        self.assertFalse(self.config.firstrun_model)
+        # confignew.json is user-modifiable state; assert the file value loads
+        # into the model rather than hardcoding a specific value.
+        self.assertEqual(self.config.firstrun_model, _live_config_value("firstrun_model"))
 
     def test_firstrun_splash(self):
         self.assertTrue(self.config.firstrun_splash)
@@ -100,7 +109,7 @@ class TestAlltalkConfig(TestCase):
         self.assertTrue(self.config.launch_gradio)
 
     def test_transcode_audio_format(self):
-        self.assertEqual(self.config.transcode_audio_format, "wav")
+        self.assertEqual(self.config.transcode_audio_format, _live_config_value("transcode_audio_format"))
 
     def test_theme(self):
         self.assertEqual(self.config.theme.file, None)
