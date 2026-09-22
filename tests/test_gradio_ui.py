@@ -22,6 +22,9 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+
+pytest.importorskip("playwright", reason="requires playwright and browser binaries")
+
 from playwright.async_api import async_playwright
 
 # Mark all tests in this file as requiring Playwright

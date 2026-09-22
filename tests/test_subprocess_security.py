@@ -11,6 +11,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+# diagnostics.py imports psutil (and tries to install it if absent)
+pytest.importorskip("psutil", reason="required by diagnostics.py")
+
 # Import the functions from diagnostics
 from diagnostics import ALLOWED_PIP_COMMANDS, execute_pip_command
 

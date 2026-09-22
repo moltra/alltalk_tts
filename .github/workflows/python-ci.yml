@@ -29,7 +29,10 @@ jobs:
       - name: Test with pytest
         if: ${{ hashFiles('./test') != '' }}
         run: |
-          pytest tests test --doctest-modules --junitxml=junit/test-results.xml
+          # test/ and tests/ contain same-named modules (e.g. test_config.py),
+          # so they must run as separate pytest invocations.
+          pytest test --doctest-modules --junitxml=junit/test-results.xml
+          pytest tests --doctest-modules --junitxml=junit/test-results-tests.xml
       - name: Dependency security audit (non-blocking)
         continue-on-error: true
         run: |
