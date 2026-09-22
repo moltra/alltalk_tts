@@ -302,6 +302,12 @@ class AllTalkHelpContent:
     ## 🎯 XTTS Voice Cloning Engine Help
 
     XTTS is a powerful multi-speaker, voice cloning model that can generate speech in multiple languages using short audio samples for voice cloning.
+
+    ---
+
+    ## NON-COMMERCIAL LICENSE WARNING
+
+    **The XTTS-v2 model weights are licensed under the Coqui Public Model License (CPML) 1.0.0, which permits NON-COMMERCIAL use only.** Do not use this engine or its generated output in any commercial product or service without a separate commercial license from Coqui. For commercial deployments, use the Piper, Parler, or VITS engines instead (see THIRD_PARTY_LICENSES.md).
     """
 
     HELP_PAGE1 = """

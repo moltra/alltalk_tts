@@ -87,7 +87,8 @@ if [ ! -f "$CONFIG_FILE" ]; then
     "api_output_file_name": "myoutputfile",
     "api_output_file_timestamp": true,
     "api_autoplay": false,
-    "api_autoplay_volume": 0.5
+    "api_autoplay_volume": 0.5,
+    "api_key": ""
   },
   "debugging": {
     "debug_transcode": false,

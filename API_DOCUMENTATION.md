@@ -29,6 +29,26 @@ The API is typically available at:
 - `http://alltalk-dev:7851` (Docker environment)
 - `http://your-server-ip:7851` (remote deployment)
 
+## Authentication (Optional API Key)
+
+The API supports optional API-key authentication for the audio-generation endpoints. It is **disabled by default** for full backward compatibility.
+
+**Enable it** by either:
+- Setting `"api_key"` in `config/app/confignew.json` under `"api_def"`, or
+- Setting the `ALLTALK_API_KEY` environment variable (Docker: `-e ALLTALK_API_KEY=your-key`). The env var overrides the JSON value.
+
+**Protected endpoints** (when enabled): `POST /v1/audio/speech`, `POST /api/tts-generate`, `GET`/`POST /api/tts-generate-streaming`, `POST /api/previewvoice/`
+
+**Send the key** via either header:
+- `Authorization: Bearer <your-key>` (what OpenAI-compatible clients send)
+- `X-API-Key: <your-key>`
+
+**Behavior:**
+- Missing or wrong key returns HTTP 401; `/v1/*` routes return an OpenAI-shaped error body (`error.code = invalid_api_key`).
+- Key comparison uses constant-time comparison (`hmac.compare_digest`).
+- The Gradio UI (port 7852), `/docs`, and non-generation endpoints are NOT gated.
+- Treat the key as a secret - distribute via env var rather than committing it to confignew.json.
+
 ## Recent Fixes
 
 ### Pydantic v2 Compatibility (2024-01-XX)

@@ -14,6 +14,9 @@ from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock
 
 import pytest
+
+pytest.importorskip("tts_server", reason="requires full application dependencies")
+
 from fastapi.testclient import TestClient
 
 from tts_server import app

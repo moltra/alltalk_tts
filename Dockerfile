@@ -3,7 +3,7 @@ ARG DOCKER_TAG=latest
 FROM ${DOCKER_REPOSITORY}alltalk_tts_environment:${DOCKER_TAG}
 
 # Argument to choose the model: piper, vits, xtts
-ARG TTS_MODEL="xtts"
+ARG TTS_MODEL="piper"
 ENV TTS_MODEL=$TTS_MODEL
 
 ARG DEEPSPEED_VERSION=0.17.2

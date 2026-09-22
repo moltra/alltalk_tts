@@ -1,14 +1,14 @@
 {
-    "_comment": "Configuration version 2.1.0 - Piper primary with XTTS available. Active configuration file (not a template)",
+    "_comment": "Configuration version 2.1.0 - Piper primary with XTTS available. Downloadable engines limited to commercially-licensed weights (Parler/VITS: Apache-2.0). f5tts intentionally excluded (CC-BY-NC-4.0 weights); xtts is already in engines_available.",
     "version": "2.1.0",
     "engines_available": [
         {
-            "name": "piper",
-            "selected_model": "en_US-joe-medium.onnx"
+            "name": "parler",
+            "selected_model": "parler - parler-tts-mini-v1"
         },
         {
-            "name": "xtts",
-            "selected_model": "xtts - xttsv2_2.0.3"
+            "name": "vits",
+            "selected_model": "vits - tts_models--en--vctk--vits"
         }
     ]
 }

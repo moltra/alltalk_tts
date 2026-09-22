@@ -54,14 +54,14 @@ Set these in your `docker-compose.yml` or `.env` file:
 ```yaml
 environment:
   - ALLTALK_AUTO_DOWNLOAD_MODEL=true
-  - ALLTALK_DEFAULT_MODEL=xtts
-  - TTS_MODEL=xtts
+  - ALLTALK_DEFAULT_MODEL=piper
+  - TTS_MODEL=piper
 ```
 
 Or use the `--tts_model` argument in `firstrun.py`:
 
 ```bash
-python ./system/config/firstrun.py --tts_model xtts
+python ./system/config/firstrun.py --tts_model piper
 ```
 
 **Best for**: Automated deployments, production environments
@@ -150,14 +150,14 @@ services:
       # Model download configuration
       - ALLTALK_AUTO_DOWNLOAD_MODEL=false  # Set to 'true' to enable auto-download
       - ALLTALK_DEFAULT_MODEL=none         # Options: xtts, piper, vits, none
-      - TTS_MODEL=xtts                     # Model to use (for firstrun.py)
+      - TTS_MODEL=piper                     # Model to use (for firstrun.py)
 ```
 
 ### Default Behavior
 
 - **ALLTALK_AUTO_DOWNLOAD_MODEL**: `false` (no auto-download)
 - **ALLTALK_DEFAULT_MODEL**: `none` (no default model)
-- **TTS_MODEL**: `xtts` (used by firstrun.py if triggered)
+- **TTS_MODEL**: `piper` (used by firstrun.py if triggered)
 
 ## 🐛 Troubleshooting
 

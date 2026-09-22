@@ -4,6 +4,11 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+pytest.importorskip(
+    "system.tts_engines.piper.model_engine",
+    reason="requires full application dependencies (torch, fastapi)",
+)
+
 
 class TestPiperModelScanning:
     def test_scan_piper_models(self, temp_dir):

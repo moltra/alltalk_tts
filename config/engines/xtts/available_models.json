@@ -3,6 +3,8 @@
     "models": [
       {
         "model_name": "xttsv2_2.0.3",
+        "license": "Coqui Public Model License 1.0.0",
+        "commercial_use": "NON-COMMERCIAL - XTTS-v2 weights may not be used commercially without a separate Coqui license.",
         "folder_path": "xttsv2_2.0.3",
         "files_to_download": {
           "LICENSE.txt": "https://huggingface.co/coqui/XTTS-v2/resolve/v2.0.3/LICENSE.txt?download=true",
@@ -17,6 +19,8 @@
       },
       {
         "model_name": "xttsv2_2.0.2",
+        "license": "Coqui Public Model License 1.0.0",
+        "commercial_use": "NON-COMMERCIAL - XTTS-v2 weights may not be used commercially without a separate Coqui license.",
         "folder_path": "xttsv2_2.0.2",
         "files_to_download": {
           "LICENSE.txt": "https://huggingface.co/coqui/XTTS-v2/resolve/v2.0.2/LICENSE.txt?download=true",
@@ -31,6 +35,8 @@
       },
       {
         "model_name": "xttsv2_2.0.1",
+        "license": "Coqui Public Model License 1.0.0",
+        "commercial_use": "NON-COMMERCIAL - XTTS-v2 weights may not be used commercially without a separate Coqui license.",
         "folder_path": "xttsv2_2.0.1",
         "files_to_download": {
           "LICENSE.txt": "https://huggingface.co/coqui/XTTS-v2/resolve/v2.0.1/LICENSE.txt?download=true",
@@ -45,6 +51,8 @@
       },
       {
         "model_name": "xttsv2_2.0.0",
+        "license": "Coqui Public Model License 1.0.0",
+        "commercial_use": "NON-COMMERCIAL - XTTS-v2 weights may not be used commercially without a separate Coqui license.",
         "folder_path": "xttsv2_2.0.0",
         "files_to_download": {
           "LICENSE.txt": "https://huggingface.co/coqui/XTTS-v2/resolve/v2.0.0/LICENSE.txt?download=true",

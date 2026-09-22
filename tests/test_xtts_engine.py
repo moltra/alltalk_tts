@@ -34,6 +34,9 @@ for module in sys_modules:
             mock.__version__ = "2.0.0"
         sys.modules[module] = mock
 
+# The engine module also imports fastapi, which is not mocked above.
+pytest.importorskip("fastapi", reason="requires full application dependencies")
+
 
 @pytest.fixture
 def temp_xtts_dir(temp_dir):

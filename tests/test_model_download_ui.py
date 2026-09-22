@@ -104,7 +104,14 @@ class TestGetModelInfo:
 
 class TestDownloadModelAsync:
     """Tests for download_model_async function."""
-    
+
+    @pytest.fixture(autouse=True)
+    def _require_firstrun(self):
+        pytest.importorskip(
+            "system.config.firstrun",
+            reason="requires full application dependencies",
+        )
+
     @patch('system.config.firstrun.download_tts_model')
     @patch('system.config.firstrun.update_tts_engines')
     def test_successful_download(self, mock_update, mock_download):
@@ -243,10 +250,10 @@ class TestGetModelInfoPiperGrouping:
             
             # Check quality legend is present
             assert "Quality legend" in info
-            assert "🔴=high" in info
-            assert "🟡=medium" in info
-            assert "🟢=low" in info
-            assert "🔹=x_low" in info
+            assert "🔴 high" in info
+            assert "🟡 medium" in info
+            assert "🟢 low" in info
+            assert "🔹 x_low" in info
 
 
 class TestGetAvailableModels:

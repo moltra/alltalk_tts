@@ -1,5 +1,5 @@
 {
-    "_comment": "Configuration version 2.1.0 - XTTS primary for tensor error investigation",
+    "_comment": "Configuration version 2.1.0 - Piper primary (commercially-licensed default); XTTS available but non-commercial",
     "version": "2.1.0",
     "engines_available": [
         {
@@ -11,6 +11,6 @@
             "selected_model": "xtts - xttsv2_2.0.3"
         }
     ],
-    "engine_loaded": "xtts",
-    "selected_model": "xtts - xttsv2_2.0.3"
+    "engine_loaded": "piper",
+    "selected_model": "en_US-joe-medium.onnx"
 }

@@ -3,6 +3,8 @@
   "models": [
       {
           "model_name": "f5tts_v1a",
+          "license": "CC-BY-NC-4.0",
+          "commercial_use": "NON-COMMERCIAL - F5-TTS/E2-TTS weights are CC-BY-NC-4.0 (Emilia dataset); commercial use requires self-training on licensed data.",
           "folder_path": "f5tts_v1a",
           "files_to_download": {
               "model_1250000.safetensors": "https://huggingface.co/SWivid/F5-TTS/resolve/main/F5TTS_v1_Base/model_1250000.safetensors",
@@ -13,6 +15,8 @@
       },
       {
         "model_name": "e2tts_v1a",
+          "license": "CC-BY-NC-4.0",
+          "commercial_use": "NON-COMMERCIAL - F5-TTS/E2-TTS weights are CC-BY-NC-4.0 (Emilia dataset); commercial use requires self-training on licensed data.",
         "folder_path": "e2tts_v1a",
         "files_to_download": {
             "model_1200000.safetensors": "https://huggingface.co/SWivid/E2-TTS/resolve/main/E2TTS_Base/model_1200000.safetensors",

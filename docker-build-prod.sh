@@ -8,7 +8,7 @@ set -e
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd $SCRIPT_DIR
 
-TTS_MODEL=${1:-xtts}
+TTS_MODEL=${1:-piper}
 TAG=${2:-latest}
 
 echo "Building AllTalk production image..."
