@@ -11,8 +11,22 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-# diagnostics.py imports psutil (and tries to install it if absent)
-pytest.importorskip("psutil", reason="required by diagnostics.py")
+# diagnostics.py imports optional/heavy packages at module load and tries to
+# pip-install them when missing (psutil, importlib_metadata, packaging, PyQt6).
+# PyQt6 cannot be imported in headless CI (libEGL), so stub them out before
+# importing diagnostics — the code paths under test don't touch them.
+for _mod in [
+    "psutil",
+    "importlib_metadata",
+    "packaging",
+    "packaging.specifiers",
+    "packaging.version",
+    "PyQt6",
+    "PyQt6.QtCore",
+    "PyQt6.QtGui",
+    "PyQt6.QtWidgets",
+]:
+    sys.modules.setdefault(_mod, Mock())
 
 # Import the functions from diagnostics
 from diagnostics import ALLOWED_PIP_COMMANDS, execute_pip_command
